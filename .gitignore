@@ -25,6 +25,8 @@ CLAUDE.md
 # Local AI agent state
 .studio/
 **/.studio/
+.task/
+**/.task/
 
 # Engine generated files
 **/[Ll]ibrary/
@@ -36,3 +38,10 @@ CLAUDE.md
 **/[Uu]ser[Ss]ettings/
 **/[Mm]emoryCaptures/
 **/[Rr]ecordings/
+
+# Imported asset archives (contents live in Assets/ after import)
+*.unitypackage
+
+# Editor-generated scene-template defaults (recreated by Unity on demand;
+# commit deliberately only if templates are ever customized)
+**/ProjectSettings/SceneTemplateSettings.json

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Медитация в спешке — как играется, по шагам</title>
+<style>
+  body { font-family:-apple-system,"Segoe UI",sans-serif; background:#fafaf7; color:#333; margin:0; padding:32px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  .sub { color:#777; margin-bottom:28px; }
+  .col { max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:34px; }
+  figure { margin:0; background:#fff; border:1px solid #ddd; border-radius:10px; padding:14px; }
+  figcaption { margin-top:10px; }
+  figcaption .t { font-size:18px; font-weight:700; color:#1a7a5e; }
+  figcaption .d { font-size:13.5px; color:#666; margin-top:3px; line-height:1.5; }
+  svg { width:100%; height:auto; display:block; background:#f4f2ec; border-radius:6px; }
+</style>
+</head>
+<body>
+<h1>«Медитация в спешке» — как играется, по шагам</h1>
+<div class="sub">Один цикл сбора на уровне 1 · верх кадра = экран 1920×1080 · серая панель внизу = что в этот момент делают руки игрока</div>
+
+<svg width="0" height="0" style="position:absolute">
+<defs>
+  <g id="bldgs">
+    <rect x="100" y="250" width="230" height="560" fill="#d6d2c8"/>
+    <rect x="420" y="180" width="260" height="630" fill="#d6d2c8"/>
+    <rect x="760" y="330" width="200" height="480" fill="#d6d2c8"/>
+    <rect x="1180" y="220" width="250" height="590" fill="#d6d2c8"/>
+    <rect x="1560" y="320" width="210" height="490" fill="#d6d2c8"/>
+  </g>
+  <g id="ground"><rect x="0" y="810" width="1920" height="270" fill="#dcd8cc"/></g>
+  <g id="vessel"><rect x="840" y="855" width="240" height="150" rx="14" fill="#7fc9a5" stroke="#2b7a5c" stroke-width="4"/></g>
+  <g id="det4">
+    <rect x="530" y="300" width="60" height="60" rx="8" fill="#bcd3e8" stroke="#4a7096" stroke-width="3"/>
+    <rect x="975" y="675" width="50" height="50" rx="8" fill="#c9a689" stroke="#7a5230" stroke-width="3"/>
+    <rect x="1305" y="275" width="50" height="50" rx="8" fill="#a8a29a" stroke="#5f5a52" stroke-width="3"/>
+    <rect x="1625" y="715" width="50" height="50" rx="8" fill="#8d8d99" stroke="#4c4c58" stroke-width="3"/>
+  </g>
+  <g id="dand"><rect x="-25" y="-25" width="50" height="50" rx="8" fill="#e8d44d" stroke="#8f7d0a" stroke-width="3"/></g>
+  <g id="sun"><circle cx="1800" cy="100" r="60" fill="#f0b24a" stroke="#a8761d" stroke-width="4"/></g>
+  <g id="slots">
+    <rect x="60" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+    <rect x="148" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+    <rect x="236" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+    <rect x="324" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+    <rect x="412" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  </g>
+  <g id="panelbg">
+    <rect x="0" y="1080" width="1920" height="220" fill="#eceae2"/>
+    <line x1="960" y1="1100" x2="960" y2="1280" stroke="#ccc" stroke-width="3"/>
+  </g>
+  <g id="dyn">
+    <circle r="60" fill="#fff" stroke="#555" stroke-width="8"/>
+    <rect x="48" y="-62" width="14" height="34" rx="6" fill="#555"/>
+  </g>
+  <g id="joy">
+    <rect x="-70" y="40" width="140" height="30" rx="10" fill="#888"/>
+    <line x1="0" y1="40" x2="0" y2="-40" stroke="#555" stroke-width="14"/>
+    <circle cy="-55" r="28" fill="#b0413e"/>
+  </g>
+  <g id="dyn-on">
+    <circle r="86" fill="#cfe8db"/>
+    <use href="#dyn"/>
+    <path d="M -78 30 A 84 84 0 0 1 -30 -78" stroke="#2b7a5c" stroke-width="10" fill="none"/>
+    <path d="M -30 -78 l -20 -2 m 20 2 l -4 20" stroke="#2b7a5c" stroke-width="10" fill="none"/>
+  </g>
+  <g id="gaze"><circle r="90" fill="#7aa7d9" opacity="0.25"/><circle r="90" fill="none" stroke="#4a7096" stroke-width="5" stroke-dasharray="12 10"/></g>
+  <g id="blob">
+    <rect x="-140" y="-110" width="280" height="220" rx="60" fill="#f2c7b8" stroke="#c08b77" stroke-width="4"/>
+    <text y="10" font-size="30" text-anchor="middle" fill="#7a4433">гора посуды</text>
+  </g>
+</defs>
+</svg>
+
+<div class="col">
+
+<!-- ШАГ 1 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <use href="#dand" x="180" y="760"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">1</text>
+  <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
+  <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
+</svg>
+<figcaption><div class="t">1 · Видим сцену</div>
+<div class="d">Уровень начался: локация, 5 деталей слегка пульсируют, сосуд-портфель внизу, слоты пустые, таймер полный. Руки ещё не работают.</div></figcaption>
+</figure>
+
+<!-- ШАГ 2 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <use href="#dand" x="180" y="760"/>
+  <use href="#sun"/><use href="#slots"/>
+  <path d="M 960 540 Q 700 560 470 660" stroke="#4a7096" stroke-width="4" stroke-dasharray="4 14" fill="none"/>
+  <use href="#gaze" x="470" y="660"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">2</text>
+  <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
+  <circle cx="1360" cy="1170" r="86" fill="#dce6f2"/>
+  <use href="#joy" transform="translate(1360,1170) rotate(-22)"/>
+  <path d="M 1240 1120 l -30 -18 m 30 18 l -34 6" stroke="#4a7096" stroke-width="8" fill="none"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#39587a">джойстик: плавный наклон</text>
+</svg>
+<figcaption><div class="t">2 · Ведём взгляд</div>
+<div class="d">Плавный наклон стика двигает по сцене полупрозрачный круг-«взгляд» (r=90, до 900 px/с). Пунктир — путь взгляда от центра.</div></figcaption>
+</figure>
+
+<!-- ШАГ 3 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <use href="#dand" x="180" y="760"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#gaze" x="180" y="760"/>
+  <path d="M 180 660 A 100 100 0 1 1 90 810" stroke="#2b7a5c" stroke-width="12" fill="none"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">3</text>
+  <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
+  <circle cx="1360" cy="1170" r="86" fill="#dce6f2"/>
+  <use href="#joy" transform="translate(1360,1170) rotate(-22)"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#39587a">джойстик: держим наклон</text>
+</svg>
+<figcaption><div class="t">3 · Смотрим на деталь</div>
+<div class="d">Взгляд накрыл одуванчик и держится на нём. Вокруг взгляда набегает дуга-таймер удержания (0.4 с [tune]).</div></figcaption>
+</figure>
+
+<!-- ШАГ 4 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <use href="#dand" x="180" y="760"/>
+  <g stroke-width="6">
+    <line x1="180" y1="700" x2="180" y2="668" stroke="#c9a227"/>
+    <line x1="240" y1="760" x2="272" y2="760" stroke="#c9a227"/>
+    <line x1="224" y1="716" x2="247" y2="693" stroke="#c9a227"/>
+    <line x1="136" y1="716" x2="113" y2="693" stroke="#c9a227"/>
+  </g>
+  <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">4</text>
+  <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
+  <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: отпустили</text>
+</svg>
+<figcaption><div class="t">4 · Деталь замечена!</div>
+<div class="d">Вспышка. От детали к сосуду протягивается пунктирная нить. Взгляд больше не нужен — деталь «привязана», пока её не уронишь.</div></figcaption>
+</figure>
+
+<!-- ШАГ 5 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
+  <use href="#dand" x="414" y="811"/>
+  <circle cx="414" cy="811" r="55" fill="none" stroke="#2b7a5c" stroke-width="9" stroke-dasharray="120 226"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">5</text>
+  <use href="#dyn-on" transform="translate(560,1170)"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим, не отпуская</text>
+  <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
+</svg>
+<figcaption><div class="t">5 · Крутим — деталь едет</div>
+<div class="d">Левая рука непрерывно крутит динамо. Деталь ползёт по нити к сосуду; вокруг неё кольцо прогресса — зелёное, пока кручение выше порога.</div></figcaption>
+</figure>
+
+<!-- ШАГ 6 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
+  <use href="#dand" x="531" y="837"/>
+  <circle cx="531" cy="837" r="55" fill="none" stroke="#2b7a5c" stroke-width="9" stroke-dasharray="155 191"/>
+  <use href="#blob" x="640" y="470"/>
+  <circle cx="588" cy="600" r="8" fill="#7a4433"/><circle cx="616" cy="600" r="8" fill="#7a4433"/>
+  <circle cx="644" cy="600" r="8" fill="#7a4433"/><circle cx="672" cy="600" r="8" fill="#7a4433"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">6</text>
+  <use href="#dyn-on" transform="translate(560,1170)"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим</text>
+  <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
+</svg>
+<figcaption><div class="t">6 · Врывается мысль</div>
+<div class="d">Пока тащим — выплывает мысль и начинает закрывать сцену (может закрыть и нить, и деталь). Под ней 4 пипса = её прочность, 4 удара.</div></figcaption>
+</figure>
+
+<!-- ШАГ 7 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
+  <use href="#dand" x="648" y="862"/>
+  <circle cx="648" cy="862" r="55" fill="none" stroke="#2b7a5c" stroke-width="9" stroke-dasharray="200 146"/>
+  <use href="#blob" x="652" y="462"/>
+  <path d="M 480 380 l -40 -26 M 480 550 l -40 26 M 824 380 l 40 -26 M 824 550 l 40 26" stroke="#b0413e" stroke-width="8"/>
+  <circle cx="600" cy="592" r="8" fill="#7a4433"/><circle cx="628" cy="592" r="8" fill="#7a4433"/>
+  <circle cx="656" cy="592" r="8" fill="#7a4433"/><circle cx="684" cy="592" r="8" fill="none" stroke="#7a4433" stroke-width="3"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">7</text>
+  <use href="#dyn-on" transform="translate(560,1170)"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: НЕ останавливаем</text>
+  <circle cx="1360" cy="1170" r="86" fill="#f2d9d7"/>
+  <use href="#joy" transform="translate(1360,1170) rotate(14)"/>
+  <path d="M 1250 1130 l -26 -14 m 262 14 l 26 -14 M 1250 1200 l -26 14 m 262 -14 l 26 14" stroke="#b0413e" stroke-width="8"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">джойстик: ТРЯСЁМ</text>
+</svg>
+<figcaption><div class="t">7 · Трясём, продолжая крутить</div>
+<div class="d">Главный момент игры: правая рука бьёт тряской по мысли (она вздрагивает, пипс гаснет — осталось 3), а левая продолжает крутить. Остановишь динамо — потеряешь деталь (шаг 9).</div></figcaption>
+</figure>
+
+<!-- ШАГ 8 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
+  <use href="#dand" x="765" y="888"/>
+  <circle cx="765" cy="888" r="55" fill="none" stroke="#2b7a5c" stroke-width="9" stroke-dasharray="260 86"/>
+  <g transform="translate(652,462) scale(0.45)" opacity="0.5"><use href="#blob"/></g>
+  <path d="M 560 380 l -34 -34 M 744 380 l 34 -34 M 560 545 l -34 34 M 744 545 l 34 34" stroke="#c08b77" stroke-width="7"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">8</text>
+  <use href="#dyn-on" transform="translate(560,1170)"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим</text>
+  <circle cx="1360" cy="1170" r="86" fill="#f2d9d7"/>
+  <use href="#joy" transform="translate(1360,1170) rotate(-14)"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">джойстик: добиваем</text>
+</svg>
+<figcaption><div class="t">8 · Мысль лопается</div>
+<div class="d">Четвёртый удар — пипсы кончились, мысль схлопывается и исчезает. Деталь тем временем доехала почти до сосуда.</div></figcaption>
+</figure>
+
+<!-- ШАГ 9 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
+  <use href="#dand" x="570" y="845"/>
+  <circle cx="570" cy="845" r="55" fill="none" stroke="#c0392b" stroke-width="9"/>
+  <path d="M 540 830 Q 380 770 220 766" stroke="#c0392b" stroke-width="7" stroke-dasharray="16 12" fill="none"/>
+  <path d="M 220 766 l 30 -14 m -30 14 l 32 12" stroke="#c0392b" stroke-width="7" fill="none"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="40" y="1215" font-size="60" font-weight="bold" fill="#aaa">9</text>
+  <circle cx="560" cy="1170" r="86" fill="#f2d9d7"/>
+  <use href="#dyn" transform="translate(560,1170)"/>
+  <text x="490" y="1120" font-size="56" fill="#c0392b" font-weight="bold">✕</text>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">динамо: ОСТАНОВИЛИ — ошибка</text>
+  <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
+</svg>
+<figcaption><div class="t">9 · Отпустили ручку — деталь срывается</div>
+<div class="d">Кручение упало ниже порога дольше grace-периода: кольцо краснеет, деталь летит обратно на своё место (0.6 с). Прогресс пути потерян [toggle: в ноль / быстро тает]. Деталь остаётся «замеченной» — нить сохраняется.</div></figcaption>
+</figure>
+
+<!-- ШАГ 10 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det4"/>
+  <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
+  <use href="#dand" x="219" y="769"/>
+  <circle cx="219" cy="769" r="55" fill="none" stroke="#2b7a5c" stroke-width="9" stroke-dasharray="35 311"/>
+  <use href="#sun"/><use href="#slots"/>
+  <use href="#panelbg"/>
+  <text x="24" y="1215" font-size="60" font-weight="bold" fill="#aaa">10</text>
+  <use href="#dyn-on" transform="translate(560,1170)"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим снова</text>
+  <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
+</svg>
+<figcaption><div class="t">10 · Тащим заново</div>
+<div class="d">Возобновили кручение — деталь снова поехала по той же нити с начала пути.</div></figcaption>
+</figure>
+
+<!-- ШАГ 11 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#det4"/>
+  <rect x="830" y="847" width="260" height="166" rx="16" fill="#7fc9a5" stroke="#2b7a5c" stroke-width="6"/>
+  <use href="#dand" x="930" y="915"/>
+  <path d="M 900 800 l -14 -24 M 960 790 l 0 -28 M 1020 800 l 14 -24" stroke="#2b7a5c" stroke-width="7"/>
+  <use href="#sun"/>
+  <rect x="60" y="40" width="72" height="72" rx="10" fill="#e8d44d" stroke="#999" stroke-width="3"/>
+  <rect x="148" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  <rect x="236" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  <rect x="324" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  <rect x="412" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  <use href="#panelbg"/>
+  <text x="24" y="1215" font-size="60" font-weight="bold" fill="#aaa">11</text>
+  <use href="#dyn-on" transform="translate(560,1170)"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: докрутили</text>
+  <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
+</svg>
+<figcaption><div class="t">11 · Деталь в сосуде</div>
+<div class="d">Деталь падает в портфель: сосуд подпрыгивает (scale 1.0→1.1→1.0, 0.3 с), первый слот в HUD заполняется. Нить исчезает.</div></figcaption>
+</figure>
+
+<!-- ШАГ 12 -->
+<figure>
+<svg viewBox="0 0 1920 1300">
+  <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/>
+  <rect x="975" y="675" width="50" height="50" rx="8" fill="#c9a689" stroke="#7a5230" stroke-width="3"/>
+  <rect x="1305" y="275" width="50" height="50" rx="8" fill="#a8a29a" stroke="#5f5a52" stroke-width="3"/>
+  <rect x="1625" y="715" width="50" height="50" rx="8" fill="#8d8d99" stroke="#4c4c58" stroke-width="3"/>
+  <use href="#blob" x="330" y="300"/>
+  <g transform="translate(1450,560)"><rect x="-210" y="-160" width="420" height="320" rx="80" fill="#f0d290" stroke="#b3922e" stroke-width="4"/><text y="10" font-size="34" text-anchor="middle" fill="#6e5714">счёт ЖКХ</text></g>
+  <use href="#gaze" x="1000" y="700"/>
+  <use href="#sun"/>
+  <rect x="60" y="40" width="72" height="72" rx="10" fill="#e8d44d" stroke="#999" stroke-width="3"/>
+  <rect x="148" y="40" width="72" height="72" rx="10" fill="#bcd3e8" stroke="#999" stroke-width="3"/>
+  <rect x="236" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  <rect x="324" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  <rect x="412" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
+  <path d="M 1800 100 L 1800 40 A 60 60 0 1 1 1745 125 Z" fill="#a8761d" opacity="0.5"/>
+  <use href="#panelbg"/>
+  <text x="24" y="1215" font-size="60" font-weight="bold" fill="#aaa">12</text>
+  <use href="#dyn-on" transform="translate(560,1170)"/>
+  <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим</text>
+  <circle cx="1360" cy="1170" r="86" fill="#dce6f2"/>
+  <use href="#joy" transform="translate(1360,1170) rotate(18)"/>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#39587a">джойстик: ищем следующую</text>
+</svg>
+<figcaption><div class="t">12 · И так все 5 деталей</div>
+<div class="d">Цикл повторяется: 2 собраны, взгляд идёт к чашке, мыслей на экране всё больше, таймер тает. Успели все 5 до конца таймера — победа; мысли заполнили экран или время вышло — поражение.</div></figcaption>
+</figure>
+
+</div>
+</body>
+</html>

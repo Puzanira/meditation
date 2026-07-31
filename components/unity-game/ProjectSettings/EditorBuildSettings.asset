@@ -6,7 +6,19 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 8c9cfa26abfee488c85f1582747f6a02
+    path: Assets/_Project/Scenes/PreviewMenu.unity
+    guid: ea634b5aee7214ae4819117d8def2cba
+  - enabled: 1
+    path: Assets/_Project/Scenes/Scene1_CrankCollect.unity
+    guid: 02c4c6c2da5e745af99e664450c8cefc
+  - enabled: 1
+    path: Assets/_Project/Scenes/Scene2_ShakeAway.unity
+    guid: 9d69b815d1ec447d1b4e3e5ddfb4ecf3
+  - enabled: 1
+    path: Assets/_Project/Scenes/Scene3_TwoHands.unity
+    guid: 11d475978bf3b4920b358f5adf96a112
+  - enabled: 1
+    path: Assets/_Project/Scenes/Scene4_FullLevel.unity
+    guid: f3a3ace042f9f410dba7e2cdc47668be
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}

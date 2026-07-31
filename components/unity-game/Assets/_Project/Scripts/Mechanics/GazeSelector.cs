@@ -1,0 +1,92 @@
+using System.Collections.Generic;
+using Meditation.Tuning;
+using UnityEngine;
+
+namespace Meditation.Mechanics
+{
+    /// <summary>
+    /// SCREENS.md, "Выбор детали", variant B (base): a soft gaze circle r = 90 px driven by a smooth
+    /// stick tilt; rest it on a detail for the dwell time and the detail is noticed. During a shake the
+    /// gaze freezes in place, which is what keeps the two stick gestures from fighting each other.
+    /// </summary>
+    public sealed class GazeSelector
+    {
+        public const float Radius = 90f;
+
+        /// <summary>Gaze centre in design px.</summary>
+        public Vector2 Position = new Vector2(960f, 540f);
+
+        /// <summary>How long the gaze has rested on <see cref="HoveredIndex"/>, seconds.</summary>
+        public float Dwell { get; private set; }
+
+        /// <summary>Detail currently under the gaze, or -1.</summary>
+        public int HoveredIndex { get; private set; } = -1;
+
+        /// <summary>True on the tick a detail became noticed.</summary>
+        public bool NoticedThisTick { get; private set; }
+
+        /// <summary>Detail noticed on this tick, or -1.</summary>
+        public int NoticedIndex { get; private set; } = -1;
+
+        /// <summary>0..1 dwell arc for the view.</summary>
+        public float DwellProgress01 =>
+            Mathf.Clamp01(Dwell / Mathf.Max(0.01f, TuningConfig.GazeDwellSeconds));
+
+        public void Reset()
+        {
+            Position = new Vector2(960f, 540f);
+            Dwell = 0f;
+            HoveredIndex = -1;
+            NoticedIndex = -1;
+            NoticedThisTick = false;
+        }
+
+        /// <param name="stick">Joystick vector (Y up).</param>
+        /// <param name="deltaTime">Frame time.</param>
+        /// <param name="targets">Detail centres in design px.</param>
+        /// <param name="selectable">Per-detail: may it still be noticed (not collected / not covered)?</param>
+        /// <param name="frozen">True while shaking — the gaze holds still.</param>
+        public void Tick(Vector2 stick, float deltaTime, IReadOnlyList<Vector2> targets,
+            IReadOnlyList<bool> selectable, bool frozen)
+        {
+            NoticedThisTick = false;
+            NoticedIndex = -1;
+            if (deltaTime <= 0f) return;
+
+            if (!frozen)
+            {
+                // Design space grows downwards, so the stick's Y is inverted here.
+                Position += new Vector2(stick.x, -stick.y) * (TuningConfig.GazeSpeedPxPerSec * deltaTime);
+                Position.x = Mathf.Clamp(Position.x, 0f, ThoughtField.ScreenWidth);
+                Position.y = Mathf.Clamp(Position.y, 0f, LevelOneData.SceneHeight);
+            }
+
+            int hovered = -1;
+            float best = Radius * Radius;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                if (selectable != null && i < selectable.Count && !selectable[i]) continue;
+                float d = (targets[i] - Position).sqrMagnitude;
+                if (d > best) continue;
+                best = d;
+                hovered = i;
+            }
+
+            if (hovered != HoveredIndex)
+            {
+                HoveredIndex = hovered;
+                Dwell = 0f;
+                return;
+            }
+
+            if (hovered < 0) return;
+
+            Dwell += deltaTime;
+            if (Dwell < TuningConfig.GazeDwellSeconds) return;
+
+            Dwell = 0f;
+            NoticedThisTick = true;
+            NoticedIndex = hovered;
+        }
+    }
+}

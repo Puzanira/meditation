@@ -1,0 +1,17 @@
+{
+    "name": "Meditation",
+    "rootNamespace": "Meditation",
+    "references": [
+        "AiGameStudio.ArcadeControls",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

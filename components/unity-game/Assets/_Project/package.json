@@ -1,0 +1,13 @@
+{
+  "name": "com.aigamestudio.game-meditation",
+  "version": "0.1.0",
+  "displayName": "Медитация в спешке",
+  "description": "Two-handed calm-under-pressure game for the AI Game Studio arcade cabinet: the crank collects the details of a scene while the joystick shakes intrusive thoughts off the screen. Reads input only through the shared arcade-controls layer (ArcadeInput).",
+  "unity": "6000.5",
+  "author": {
+    "name": "AI Game Studio"
+  },
+  "dependencies": {
+    "com.aigamestudio.arcade-controls": "0.1.0"
+  }
+}

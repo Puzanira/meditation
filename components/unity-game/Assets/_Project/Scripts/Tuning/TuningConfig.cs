@@ -68,7 +68,22 @@ namespace Meditation.Tuning
     /// </summary>
     public static class TuningConfig
     {
-        /// <summary>Shipped starting values. After a playtest they change here — and only here.</summary>
+        /// <summary>
+        /// Shipped starting values. After a playtest they change here — and only here.
+        ///
+        /// FINAL, 2026-08-01: every number below is the founder's own, read back out of
+        /// <c>UserSettings/tuning.json</c> at the end of her playtest session and baked in. That baking
+        /// is not cosmetic — the game ships to the cabinet as a Unity PACKAGE consumed by the arcade
+        /// hub, and <c>UserSettings/</c> belongs to the meditation project, not to the hub: on the
+        /// cabinet the file simply is not there, so anything left un-baked would silently play at the
+        /// pre-playtest numbers.
+        ///
+        /// The GLOBAL §3/§4/§5 values are the level-1 band, and that is not a coincidence:
+        /// <see cref="ApplyLevel"/> copies the active band over them at every level start, so what the
+        /// file recorded is the last band the founder was in. They are kept in step with L1 on purpose —
+        /// the globals are what the preview stand's scenettes run on, and the stand should teach the
+        /// same feel the first level does.
+        /// </summary>
         public static class Defaults
         {
             public const float CrankThresholdDegPerSec = 120f;
@@ -86,31 +101,107 @@ namespace Meditation.Tuning
             public const float ShakeAmplitude = 0.5f;
             public const float ShakeGestureSpeed = 3f;
 
-            // Pip counts of the walkthrough's own frames: гора посуды 4, клубок ? 3.
+            // Pip counts of the walkthrough's own frames: гора посуды 4, клубок ? 3. Strong came down
+            // from 7 to the level-1 band's 6 in the playtest — see the note on the globals above.
             public const int DurabilityWeak = 3;
             public const int DurabilityMedium = 4;
-            public const int DurabilityStrong = 7;
+            public const int DurabilityStrong = 6;
 
             public const bool HitDecayEnabled = true;
             public const float HitDecayMs = 800f;
             public const ShakeTargeting Targeting = ShakeTargeting.NearestToCenter;
 
-            public const float WaveIntervalSeconds = 6f;
+            public const float WaveIntervalSeconds = 7f;
             public const int WaveWeak = 1;
-            public const int WaveMedium = 1;
+            public const int WaveMedium = 0;
             public const int WaveStrong = 0;
             public const bool PressureRamp = false;
-            public const float PressureRampPercent = 10f;
+            public const float PressureRampPercent = 0f;
             public const bool ThoughtDrift = true;
-            public const float DriftPxPerSec = 40f;
+            public const float DriftPxPerSec = 25f;
             public const bool ThoughtsCoverVessel = false;
             public const float LossOverlapPercent = 92f;
+            public const float PeakOverlapPercent = 70f;
 
-            public const float LevelSeconds = 120f;
+            public const float LevelSeconds = 112f;
             public const bool BreatherEnabled = true;
             public const float BreatherSeconds = 2f;
             public const bool AutoRetry = true;
+
+            public const bool TutorialTimerPaused = true;
+
+            /// <summary>
+            /// Is the tuning panel expanded on start? FALSE since the playtest: the panel is the
+            /// founder's instrument, and on the cabinet the game opens as a game. She turns it back on
+            /// with the panel's own toggle, and <see cref="TuningStore"/> remembers the choice.
+            /// </summary>
+            public const bool PanelVisible = false;
+
+            // ---- §6 Прогрессия сложности: [tune per level] ------------------------------------
+            // «с каждым уровнем больше мыслей, выше прочность, быстрее наплыв». The shipped ladder
+            // is monotonic in every dimension — that monotonicity is what LevelProgressionTests
+            // pins, so re-tuning a number after the playtest cannot quietly flatten the curve.
+            public const float L1LevelSeconds = 112f;
+            public const float L1WaveIntervalSeconds = 7f;
+            public const int L1WaveWeak = 1;
+            public const int L1WaveMedium = 0;
+            public const int L1WaveStrong = 0;
+            public const int L1DurabilityWeak = 3;
+            public const int L1DurabilityMedium = 4;
+            public const int L1DurabilityStrong = 6;
+            public const float L1DriftPxPerSec = 25f;
+            public const float L1PressureRampPercent = 0f;
+
+            public const float L2LevelSeconds = 110f;
+            public const float L2WaveIntervalSeconds = 5.5f;
+            public const int L2WaveWeak = 1;
+            public const int L2WaveMedium = 1;
+            public const int L2WaveStrong = 0;
+            public const int L2DurabilityWeak = 3;
+            public const int L2DurabilityMedium = 5;
+            public const int L2DurabilityStrong = 8;
+            public const float L2DriftPxPerSec = 35f;
+            public const float L2PressureRampPercent = 8f;
+
+            public const float L3LevelSeconds = 100f;
+            public const float L3WaveIntervalSeconds = 4.5f;
+            public const int L3WaveWeak = 1;
+            public const int L3WaveMedium = 1;
+            public const int L3WaveStrong = 1;
+            public const int L3DurabilityWeak = 4;
+            public const int L3DurabilityMedium = 6;
+            public const int L3DurabilityStrong = 9;
+            public const float L3DriftPxPerSec = 45f;
+            public const float L3PressureRampPercent = 15f;
+
+            // Levels 4 and 5 carry the same ladder on: fewer details to find (five each), so the
+            // pressure rather than the length is what makes them harder. Every number stays inside the
+            // slider range the panel declares (MECHANICS §7), so the founder can tune in both directions.
+            public const float L4LevelSeconds = 92f;
+            public const float L4WaveIntervalSeconds = 4f;
+            public const int L4WaveWeak = 1;
+            public const int L4WaveMedium = 2;
+            public const int L4WaveStrong = 1;
+            public const int L4DurabilityWeak = 4;
+            public const int L4DurabilityMedium = 7;
+            public const int L4DurabilityStrong = 10;
+            public const float L4DriftPxPerSec = 52f;
+            public const float L4PressureRampPercent = 20f;
+
+            public const float L5LevelSeconds = 85f;
+            public const float L5WaveIntervalSeconds = 3.5f;
+            public const int L5WaveWeak = 2;
+            public const int L5WaveMedium = 2;
+            public const int L5WaveStrong = 1;
+            public const int L5DurabilityWeak = 5;
+            public const int L5DurabilityMedium = 8;
+            public const int L5DurabilityStrong = 11;
+            public const float L5DriftPxPerSec = 58f;
+            public const float L5PressureRampPercent = 25f;
         }
+
+        /// <summary>How many per-level bands exist — one per level of <c>LevelCatalog</c>.</summary>
+        public const int LevelBands = 5;
 
         // ---- §1 Сбор (динамо) ----------------------------------------------------------------
         /// <summary>Minimum crank speed that still counts as "cranking", deg/s. [tune]</summary>
@@ -176,6 +267,16 @@ namespace Meditation.Tuning
         /// <summary>Screen coverage that means defeat, %. [tune 85–100]</summary>
         public static float LossOverlapPercent = Defaults.LossOverlapPercent;
 
+        /// <summary>
+        /// Screen coverage at which the picture goes into «пик хаоса», %. [tune]
+        ///
+        /// SCREENS lists this as its own [tune] («Пик хаоса: при перекрытии ≥ порога»), separate from
+        /// the defeat threshold of §4 — and it has to be, because a peak that starts where the level
+        /// ends is a peak nobody ever sees. It is the warning: the edges darken while there is still
+        /// time to dig out.
+        /// </summary>
+        public static float PeakOverlapPercent = Defaults.PeakOverlapPercent;
+
         // ---- §5 Таймер, победа, поражение ----------------------------------------------------
         /// <summary>Level duration, s. [tune 60–180]</summary>
         public static float LevelSeconds = Defaults.LevelSeconds;
@@ -186,9 +287,73 @@ namespace Meditation.Tuning
         /// <summary>Auto-restart the scenette 4 s after a defeat instead of waiting for the crank. [toggle]</summary>
         public static bool AutoRetry = Defaults.AutoRetry;
 
+        /// <summary>Does the level-1 tutorial hold the timer while it teaches? [toggle] (SCREENS §Обучение)</summary>
+        public static bool TutorialTimerPaused = Defaults.TutorialTimerPaused;
+
+        // ---- §6 Прогрессия сложности — [tune per level] ---------------------------------------
+        // Flat fields, one per level, rather than an array of bands: TuningStore persists every
+        // mutable static field of this class by reflection, and its round-trip test walks the same
+        // set — so a per-level knob is saved, restored and covered the moment it is declared here.
+        // An array would have needed a second serialiser and a second test to trust it.
+
+        public static float L1LevelSeconds = Defaults.L1LevelSeconds;
+        public static float L1WaveIntervalSeconds = Defaults.L1WaveIntervalSeconds;
+        public static int L1WaveWeak = Defaults.L1WaveWeak;
+        public static int L1WaveMedium = Defaults.L1WaveMedium;
+        public static int L1WaveStrong = Defaults.L1WaveStrong;
+        public static int L1DurabilityWeak = Defaults.L1DurabilityWeak;
+        public static int L1DurabilityMedium = Defaults.L1DurabilityMedium;
+        public static int L1DurabilityStrong = Defaults.L1DurabilityStrong;
+        public static float L1DriftPxPerSec = Defaults.L1DriftPxPerSec;
+        public static float L1PressureRampPercent = Defaults.L1PressureRampPercent;
+
+        public static float L2LevelSeconds = Defaults.L2LevelSeconds;
+        public static float L2WaveIntervalSeconds = Defaults.L2WaveIntervalSeconds;
+        public static int L2WaveWeak = Defaults.L2WaveWeak;
+        public static int L2WaveMedium = Defaults.L2WaveMedium;
+        public static int L2WaveStrong = Defaults.L2WaveStrong;
+        public static int L2DurabilityWeak = Defaults.L2DurabilityWeak;
+        public static int L2DurabilityMedium = Defaults.L2DurabilityMedium;
+        public static int L2DurabilityStrong = Defaults.L2DurabilityStrong;
+        public static float L2DriftPxPerSec = Defaults.L2DriftPxPerSec;
+        public static float L2PressureRampPercent = Defaults.L2PressureRampPercent;
+
+        public static float L3LevelSeconds = Defaults.L3LevelSeconds;
+        public static float L3WaveIntervalSeconds = Defaults.L3WaveIntervalSeconds;
+        public static int L3WaveWeak = Defaults.L3WaveWeak;
+        public static int L3WaveMedium = Defaults.L3WaveMedium;
+        public static int L3WaveStrong = Defaults.L3WaveStrong;
+        public static int L3DurabilityWeak = Defaults.L3DurabilityWeak;
+        public static int L3DurabilityMedium = Defaults.L3DurabilityMedium;
+        public static int L3DurabilityStrong = Defaults.L3DurabilityStrong;
+        public static float L3DriftPxPerSec = Defaults.L3DriftPxPerSec;
+        public static float L3PressureRampPercent = Defaults.L3PressureRampPercent;
+
+        public static float L4LevelSeconds = Defaults.L4LevelSeconds;
+        public static float L4WaveIntervalSeconds = Defaults.L4WaveIntervalSeconds;
+        public static int L4WaveWeak = Defaults.L4WaveWeak;
+        public static int L4WaveMedium = Defaults.L4WaveMedium;
+        public static int L4WaveStrong = Defaults.L4WaveStrong;
+        public static int L4DurabilityWeak = Defaults.L4DurabilityWeak;
+        public static int L4DurabilityMedium = Defaults.L4DurabilityMedium;
+        public static int L4DurabilityStrong = Defaults.L4DurabilityStrong;
+        public static float L4DriftPxPerSec = Defaults.L4DriftPxPerSec;
+        public static float L4PressureRampPercent = Defaults.L4PressureRampPercent;
+
+        public static float L5LevelSeconds = Defaults.L5LevelSeconds;
+        public static float L5WaveIntervalSeconds = Defaults.L5WaveIntervalSeconds;
+        public static int L5WaveWeak = Defaults.L5WaveWeak;
+        public static int L5WaveMedium = Defaults.L5WaveMedium;
+        public static int L5WaveStrong = Defaults.L5WaveStrong;
+        public static int L5DurabilityWeak = Defaults.L5DurabilityWeak;
+        public static int L5DurabilityMedium = Defaults.L5DurabilityMedium;
+        public static int L5DurabilityStrong = Defaults.L5DurabilityStrong;
+        public static float L5DriftPxPerSec = Defaults.L5DriftPxPerSec;
+        public static float L5PressureRampPercent = Defaults.L5PressureRampPercent;
+
         // ---- Стенд ---------------------------------------------------------------------------
         /// <summary>Is the tuning panel expanded? Remembered between scenettes like every other value.</summary>
-        public static bool PanelVisible = true;
+        public static bool PanelVisible = Defaults.PanelVisible;
 
         /// <summary>Total thoughts in one wave (composition of the three types).</summary>
         public static int ThoughtsPerWave => Mathf.Max(1, WaveWeak + WaveMedium + WaveStrong);
@@ -227,13 +392,227 @@ namespace Meditation.Tuning
             DriftPxPerSec = Defaults.DriftPxPerSec;
             ThoughtsCoverVessel = Defaults.ThoughtsCoverVessel;
             LossOverlapPercent = Defaults.LossOverlapPercent;
+            PeakOverlapPercent = Defaults.PeakOverlapPercent;
 
             LevelSeconds = Defaults.LevelSeconds;
             BreatherEnabled = Defaults.BreatherEnabled;
             BreatherSeconds = Defaults.BreatherSeconds;
             AutoRetry = Defaults.AutoRetry;
+            TutorialTimerPaused = Defaults.TutorialTimerPaused;
 
-            PanelVisible = true;
+            L1LevelSeconds = Defaults.L1LevelSeconds;
+            L1WaveIntervalSeconds = Defaults.L1WaveIntervalSeconds;
+            L1WaveWeak = Defaults.L1WaveWeak;
+            L1WaveMedium = Defaults.L1WaveMedium;
+            L1WaveStrong = Defaults.L1WaveStrong;
+            L1DurabilityWeak = Defaults.L1DurabilityWeak;
+            L1DurabilityMedium = Defaults.L1DurabilityMedium;
+            L1DurabilityStrong = Defaults.L1DurabilityStrong;
+            L1DriftPxPerSec = Defaults.L1DriftPxPerSec;
+            L1PressureRampPercent = Defaults.L1PressureRampPercent;
+
+            L2LevelSeconds = Defaults.L2LevelSeconds;
+            L2WaveIntervalSeconds = Defaults.L2WaveIntervalSeconds;
+            L2WaveWeak = Defaults.L2WaveWeak;
+            L2WaveMedium = Defaults.L2WaveMedium;
+            L2WaveStrong = Defaults.L2WaveStrong;
+            L2DurabilityWeak = Defaults.L2DurabilityWeak;
+            L2DurabilityMedium = Defaults.L2DurabilityMedium;
+            L2DurabilityStrong = Defaults.L2DurabilityStrong;
+            L2DriftPxPerSec = Defaults.L2DriftPxPerSec;
+            L2PressureRampPercent = Defaults.L2PressureRampPercent;
+
+            L3LevelSeconds = Defaults.L3LevelSeconds;
+            L3WaveIntervalSeconds = Defaults.L3WaveIntervalSeconds;
+            L3WaveWeak = Defaults.L3WaveWeak;
+            L3WaveMedium = Defaults.L3WaveMedium;
+            L3WaveStrong = Defaults.L3WaveStrong;
+            L3DurabilityWeak = Defaults.L3DurabilityWeak;
+            L3DurabilityMedium = Defaults.L3DurabilityMedium;
+            L3DurabilityStrong = Defaults.L3DurabilityStrong;
+            L3DriftPxPerSec = Defaults.L3DriftPxPerSec;
+            L3PressureRampPercent = Defaults.L3PressureRampPercent;
+
+            L4LevelSeconds = Defaults.L4LevelSeconds;
+            L4WaveIntervalSeconds = Defaults.L4WaveIntervalSeconds;
+            L4WaveWeak = Defaults.L4WaveWeak;
+            L4WaveMedium = Defaults.L4WaveMedium;
+            L4WaveStrong = Defaults.L4WaveStrong;
+            L4DurabilityWeak = Defaults.L4DurabilityWeak;
+            L4DurabilityMedium = Defaults.L4DurabilityMedium;
+            L4DurabilityStrong = Defaults.L4DurabilityStrong;
+            L4DriftPxPerSec = Defaults.L4DriftPxPerSec;
+            L4PressureRampPercent = Defaults.L4PressureRampPercent;
+
+            L5LevelSeconds = Defaults.L5LevelSeconds;
+            L5WaveIntervalSeconds = Defaults.L5WaveIntervalSeconds;
+            L5WaveWeak = Defaults.L5WaveWeak;
+            L5WaveMedium = Defaults.L5WaveMedium;
+            L5WaveStrong = Defaults.L5WaveStrong;
+            L5DurabilityWeak = Defaults.L5DurabilityWeak;
+            L5DurabilityMedium = Defaults.L5DurabilityMedium;
+            L5DurabilityStrong = Defaults.L5DurabilityStrong;
+            L5DriftPxPerSec = Defaults.L5DriftPxPerSec;
+            L5PressureRampPercent = Defaults.L5PressureRampPercent;
+
+            PanelVisible = Defaults.PanelVisible;
+        }
+
+        // ---- the per-level band, as one addressable record --------------------------------------
+
+        private static int _activeLevelIndex;
+
+        /// <summary>
+        /// The level currently on screen, 0-based. A property, not a field, precisely so
+        /// <see cref="TuningStore"/> does not persist it: where the player is is not a tuning value,
+        /// and a stale one in the file would apply the wrong band on the next start.
+        /// </summary>
+        public static int ActiveLevelIndex
+        {
+            get => _activeLevelIndex;
+            set => _activeLevelIndex = value;
+        }
+
+        /// <summary>
+        /// Copy level <paramref name="index"/>'s band (0-based) into the live values the mechanics
+        /// read. The rules classes (<c>ThoughtField</c>, <c>LevelRules</c>, <c>Thought</c>) keep
+        /// reading plain statics — the level machinery decides WHICH numbers those are, and does it
+        /// in exactly one place, at the moment a level starts.
+        ///
+        /// Consequence worth knowing: starting a game level overwrites the shared values the preview
+        /// stand also uses. That is deliberate — after this increment the levels are where tuning
+        /// happens, and the stand keeps working because its behaviour never depended on a particular
+        /// number (its tests read <see cref="Defaults"/>).
+        /// </summary>
+        public static void ApplyLevel(int index)
+        {
+            LevelSeconds = LevelSecondsOf(index);
+            WaveIntervalSeconds = WaveIntervalOf(index);
+            WaveWeak = WaveWeakOf(index);
+            WaveMedium = WaveMediumOf(index);
+            WaveStrong = WaveStrongOf(index);
+            DurabilityWeak = DurabilityWeakOf(index);
+            DurabilityMedium = DurabilityMediumOf(index);
+            DurabilityStrong = DurabilityStrongOf(index);
+            DriftPxPerSec = DriftOf(index);
+            PressureRampPercent = PressureRampPercentOf(index);
+
+            // «Рост давления внутри уровня» is on exactly when this level's band asks for it —
+            // a 0 % shortening is the same statement as "no ramp", so one number says both.
+            PressureRamp = PressureRampPercent > 0.01f;
+        }
+
+        /// <summary>Band index of a level, clamped: the flow never asks for one that is not there.</summary>
+        private static int Band(int i) => Mathf.Clamp(i, 0, LevelBands - 1);
+
+        private static float Pick(int i, float a, float b, float c, float d, float e)
+        {
+            switch (Band(i))
+            {
+                case 0: return a;
+                case 1: return b;
+                case 2: return c;
+                case 3: return d;
+                default: return e;
+            }
+        }
+
+        private static int Pick(int i, int a, int b, int c, int d, int e)
+        {
+            switch (Band(i))
+            {
+                case 0: return a;
+                case 1: return b;
+                case 2: return c;
+                case 3: return d;
+                default: return e;
+            }
+        }
+
+        public static float LevelSecondsOf(int i) =>
+            Pick(i, L1LevelSeconds, L2LevelSeconds, L3LevelSeconds, L4LevelSeconds, L5LevelSeconds);
+
+        public static float WaveIntervalOf(int i) =>
+            Pick(i, L1WaveIntervalSeconds, L2WaveIntervalSeconds, L3WaveIntervalSeconds,
+                L4WaveIntervalSeconds, L5WaveIntervalSeconds);
+
+        public static int WaveWeakOf(int i) =>
+            Pick(i, L1WaveWeak, L2WaveWeak, L3WaveWeak, L4WaveWeak, L5WaveWeak);
+
+        public static int WaveMediumOf(int i) =>
+            Pick(i, L1WaveMedium, L2WaveMedium, L3WaveMedium, L4WaveMedium, L5WaveMedium);
+
+        public static int WaveStrongOf(int i) =>
+            Pick(i, L1WaveStrong, L2WaveStrong, L3WaveStrong, L4WaveStrong, L5WaveStrong);
+
+        public static int DurabilityWeakOf(int i) =>
+            Pick(i, L1DurabilityWeak, L2DurabilityWeak, L3DurabilityWeak, L4DurabilityWeak,
+                L5DurabilityWeak);
+
+        public static int DurabilityMediumOf(int i) =>
+            Pick(i, L1DurabilityMedium, L2DurabilityMedium, L3DurabilityMedium, L4DurabilityMedium,
+                L5DurabilityMedium);
+
+        public static int DurabilityStrongOf(int i) =>
+            Pick(i, L1DurabilityStrong, L2DurabilityStrong, L3DurabilityStrong, L4DurabilityStrong,
+                L5DurabilityStrong);
+
+        public static float DriftOf(int i) =>
+            Pick(i, L1DriftPxPerSec, L2DriftPxPerSec, L3DriftPxPerSec, L4DriftPxPerSec, L5DriftPxPerSec);
+
+        public static float PressureRampPercentOf(int i) =>
+            Pick(i, L1PressureRampPercent, L2PressureRampPercent, L3PressureRampPercent,
+                L4PressureRampPercent, L5PressureRampPercent);
+
+        /// <summary>Thoughts sent by one wave of level <paramref name="i"/> — the progression's «больше мыслей».</summary>
+        public static int ThoughtsPerWaveOf(int i) =>
+            Mathf.Max(1, WaveWeakOf(i) + WaveMediumOf(i) + WaveStrongOf(i));
+
+        // ---- per-level writers (the panel's setters) ---------------------------------------------
+        // Each one re-applies the band when it belongs to the level being played, so a slider moved
+        // during a level changes that level in the same frame (done contract §7 «правки действуют
+        // сразу»), while editing another level's band only changes what happens when you get there.
+
+        public static void SetLevelSeconds(int i, float v) { Write(i, ref L1LevelSeconds, ref L2LevelSeconds, ref L3LevelSeconds, ref L4LevelSeconds, ref L5LevelSeconds, v); }
+        public static void SetWaveInterval(int i, float v) { Write(i, ref L1WaveIntervalSeconds, ref L2WaveIntervalSeconds, ref L3WaveIntervalSeconds, ref L4WaveIntervalSeconds, ref L5WaveIntervalSeconds, v); }
+        public static void SetDrift(int i, float v) { Write(i, ref L1DriftPxPerSec, ref L2DriftPxPerSec, ref L3DriftPxPerSec, ref L4DriftPxPerSec, ref L5DriftPxPerSec, v); }
+        public static void SetPressureRampPercent(int i, float v) { Write(i, ref L1PressureRampPercent, ref L2PressureRampPercent, ref L3PressureRampPercent, ref L4PressureRampPercent, ref L5PressureRampPercent, v); }
+
+        public static void SetWaveWeak(int i, int v) { Write(i, ref L1WaveWeak, ref L2WaveWeak, ref L3WaveWeak, ref L4WaveWeak, ref L5WaveWeak, v); }
+        public static void SetWaveMedium(int i, int v) { Write(i, ref L1WaveMedium, ref L2WaveMedium, ref L3WaveMedium, ref L4WaveMedium, ref L5WaveMedium, v); }
+        public static void SetWaveStrong(int i, int v) { Write(i, ref L1WaveStrong, ref L2WaveStrong, ref L3WaveStrong, ref L4WaveStrong, ref L5WaveStrong, v); }
+        public static void SetDurabilityWeak(int i, int v) { Write(i, ref L1DurabilityWeak, ref L2DurabilityWeak, ref L3DurabilityWeak, ref L4DurabilityWeak, ref L5DurabilityWeak, v); }
+        public static void SetDurabilityMedium(int i, int v) { Write(i, ref L1DurabilityMedium, ref L2DurabilityMedium, ref L3DurabilityMedium, ref L4DurabilityMedium, ref L5DurabilityMedium, v); }
+        public static void SetDurabilityStrong(int i, int v) { Write(i, ref L1DurabilityStrong, ref L2DurabilityStrong, ref L3DurabilityStrong, ref L4DurabilityStrong, ref L5DurabilityStrong, v); }
+
+        private static void Write(int index, ref float first, ref float second, ref float third,
+            ref float fourth, ref float fifth, float value)
+        {
+            switch (Band(index))
+            {
+                case 0: first = value; break;
+                case 1: second = value; break;
+                case 2: third = value; break;
+                case 3: fourth = value; break;
+                default: fifth = value; break;
+            }
+
+            if (Band(index) == ActiveLevelIndex) ApplyLevel(index);
+        }
+
+        private static void Write(int index, ref int first, ref int second, ref int third,
+            ref int fourth, ref int fifth, int value)
+        {
+            switch (Band(index))
+            {
+                case 0: first = value; break;
+                case 1: second = value; break;
+                case 2: third = value; break;
+                case 3: fourth = value; break;
+                default: fifth = value; break;
+            }
+
+            if (Band(index) == ActiveLevelIndex) ApplyLevel(index);
         }
 
         /// <summary>Hits needed to pop a thought of the given strength.</summary>

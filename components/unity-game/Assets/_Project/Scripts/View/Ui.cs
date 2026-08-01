@@ -50,6 +50,29 @@ namespace Meditation.View
             return image;
         }
 
+        /// <summary>
+        /// A rounded window: everything parented under it is clipped to a rounded rectangle.
+        ///
+        /// Level 3's vessel has no sprite of its own — it is cut out of the background plate — and a
+        /// straight rectangular cut showed its hard edges and a corner of the passenger's coat the
+        /// moment the bag left its place (the finale's row, the victory tableau). The mask is what
+        /// turns the cut-out back into an object.
+        /// </summary>
+        public static RectTransform RoundedMask(Transform parent, string name, float cx, float cy,
+            float w, float h, int cornerRadius = 20)
+        {
+            var image = NewImage(parent, name);
+            image.sprite = UiSprites.RoundedOf(cornerRadius);
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = 1f;
+            image.color = Color.white;
+            Place(image.rectTransform, cx, cy, w, h);
+
+            var mask = image.gameObject.AddComponent<Mask>();
+            mask.showMaskGraphic = false;
+            return image.rectTransform;
+        }
+
         /// <summary>Rounded rectangle with an optional stroke; returns the outer (stroke) image.</summary>
         public static Image Rounded(Transform parent, string name, float cx, float cy, float w, float h,
             Color fill, Color stroke, float strokeWidth = 0f, int cornerRadius = 14)

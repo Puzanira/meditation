@@ -34,6 +34,11 @@ namespace Meditation.View
         private readonly Image[] _segments = new Image[ArrowSegments];
         private readonly Image[] _head = new Image[2];
 
+        private Vector2 _centre;
+        private float _width;
+        private float _standoff;
+        private Color _ink;
+
         public HintCard(Transform parent)
         {
             _card = Ui.Rounded(parent, "HintCard", 960f, 540f, 480f, 110f, Paper, Color.black, 4f, 18);
@@ -65,6 +70,20 @@ namespace Meditation.View
         public Text Label => _label;
 
         public bool IsShown => _card.gameObject.activeSelf;
+
+        /// <summary>The card is one line tall, whatever the string (mock 4/7/9).</summary>
+        public const float CardHeight = 110f;
+
+        /// <summary>How wide this string makes the card — known before it is shown, so it can be placed.</summary>
+        public static float WidthFor(string text) =>
+            Mathf.Clamp((text == null ? 0 : text.Length) * 24f + 60f, 320f, 760f);
+
+        /// <summary>The design-space rectangle this string would occupy at <paramref name="centre"/>.</summary>
+        public static Rect RectFor(string text, Vector2 centre)
+        {
+            float width = WidthFor(text);
+            return new Rect(centre.x - width * 0.5f, centre.y - CardHeight * 0.5f, width, CardHeight);
+        }
 
         /// <summary>Design-space rect of the card, for overlap checks in tests.</summary>
         public Rect CardRect
@@ -98,8 +117,8 @@ namespace Meditation.View
             _card.gameObject.SetActive(true);
             _arrow.gameObject.SetActive(true);
 
-            float width = Mathf.Clamp(text.Length * 24f + 60f, 320f, 760f);
-            _card.rectTransform.sizeDelta = new Vector2(width, 110f);
+            float width = WidthFor(text);
+            _card.rectTransform.sizeDelta = new Vector2(width, CardHeight);
             Ui.MoveTo(_card.rectTransform, cardCentre);
             _card.color = ink;
             Image fill = _card.transform.GetChild(0).GetComponent<Image>();
@@ -108,11 +127,31 @@ namespace Meditation.View
             _label.text = text;
             _label.color = ink;
 
-            Vector2 from = EdgePointTowards(cardCentre, width, target);
+            _centre = cardCentre;
+            _width = width;
+            _standoff = standoff;
+            _ink = ink;
+
+            PointAt(target);
+        }
+
+        /// <summary>
+        /// Re-aim the arrow without moving the card.
+        ///
+        /// The teaching arrow points at a THING, and on beat 1 that thing moves: a detail that slips off
+        /// the thread flies back home across the frame, and the frame the gate looked at had the arrow
+        /// pointing into an empty road while the dandelion was 280 px away. The card stays where it was
+        /// placed — it is the arrow that follows.
+        /// </summary>
+        public void PointAt(Vector2 target)
+        {
+            if (!IsShown) return;
+
+            Vector2 from = EdgePointTowards(_centre, _width, target);
             Vector2 approach = target - from;
-            float travel = Mathf.Max(20f, approach.magnitude - Mathf.Max(0f, standoff));
+            float travel = Mathf.Max(20f, approach.magnitude - Mathf.Max(0f, _standoff));
             Vector2 to = from + approach.normalized * travel;
-            DrawArrow(from, to, ink);
+            DrawArrow(from, to, _ink);
         }
 
         /// <summary>Start the arrow on the card's border, not in the middle of the text.</summary>

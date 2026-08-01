@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Meditation.Mechanics;
+using Meditation.Stand;
 using Meditation.Tuning;
+using Meditation.View;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -174,12 +176,45 @@ namespace Meditation.Tests
 
         // ---- how the outcome screens read (walkthrough 16–17) ----------------------------------
 
+        /// <summary>
+        /// The defeat drain on the path the GAME uses: an art thought, which is a coloured sprite.
+        ///
+        /// The test below this one measures <c>LevelOneData.Faded</c> — the greybox stand's palette,
+        /// where a thought is a FILL colour. The shipped levels never go through it, and while it stayed
+        /// green the art path was tinting #5ADFE6 with (0.72, 0.79, 0.79), which multiplies the strong
+        /// channels as hard as the weak one and so RAISED the frame's measured saturation from 0.474 to
+        /// 0.492. A green test over the wrong path is the whole finding, so the right path gets its own.
+        /// </summary>
+        [Test]
+        public void DefeatDrainOfAnArtThought_LandsInTheMocksSaturationBand_AndDoesNotDarken()
+        {
+            // The drop's whole thought set is one turquoise; this is it.
+            var turquoise = new Color(90f / 255f, 223f / 255f, 230f / 255f);
+            Color drained = ArtThoughtView.Drain(turquoise);
+
+            float before = LevelOneData.SaturationOf(turquoise);
+            float after = LevelOneData.SaturationOf(drained);
+
+            Assert.Greater(before, 0.5f, "Бирюза дропа обязана быть насыщенной — иначе мерить нечего.");
+            Assert.Less(after, before,
+                "Десатурация поражения ПОВЫСИЛА насыщенность: " + before + " → " + after + ".");
+            AssertInBand(drained, "погашенная бирюза мыслей");
+
+            Assert.GreaterOrEqual(LevelOneData.Luminance(drained), LevelOneData.Luminance(turquoise),
+                "«Цвета гаснут» — не «картинка темнеет»: силуэт должен слегка высветляться.");
+
+            // …and the shader is handed exactly these numbers, so the picture cannot drift from the test.
+            Assert.That(ArtThoughtView.DefeatDesaturate, Is.InRange(0f, 1f));
+            Assert.That(ArtThoughtView.DefeatLighten, Is.InRange(0f, 0.5f));
+        }
+
         [Test]
         public void DefeatPalette_LandsInTheMocksSaturationBand()
         {
-            // Frame 17's wallpaper measures 0.07–0.26 HSV saturation: «цвета гаснут», but the pastel is
-            // still recognisable. A grey wash would pass a "colours are gone" eyeball test and lose the
-            // picture, so the band is asserted from both ends.
+            // The GREYBOX stand's palette — flat fills, not sprites. Frame 17's wallpaper measures
+            // 0.07–0.26 HSV saturation: «цвета гаснут», but the pastel is still recognisable. A grey
+            // wash would pass a "colours are gone" eyeball test and lose the picture, so the band is
+            // asserted from both ends.
             for (int i = 0; i < LevelOneData.ThoughtLabels.Length; i++)
             {
                 string label = LevelOneData.ThoughtLabels[i];
@@ -234,6 +269,127 @@ namespace Meditation.Tests
 
             Assert.Greater(LevelOneData.DimAlpha, LevelOneData.DimMockAlpha,
                 "A linear canvas needs MORE alpha than the SVG to reach the same picture.");
+        }
+
+        // ---- a detail under a thought is out of reach, whichever way picking works -------------------
+
+        /// <summary>
+        /// SCREENS spells the rule out for variant C («ближайшая видимая, не закрытая мыслями»), and
+        /// the other two variants have to mean the same thing: the fixed order reached straight through
+        /// a blob and the gaze noticed a detail it could not see. These three tests are the rule.
+        /// </summary>
+        private static CollectionRuntime TwoDetailsRuntime(out SilentView view)
+        {
+            TuningConfig.ThoughtDrift = false;   // deterministic: the blob stays where it is put
+            view = new SilentView();
+            return new CollectionRuntime(view,
+                new[] { CoveredHome, OpenHome },
+                new Vector2(960f, 900f),
+                new[] { "под мыслью", "на виду" });
+        }
+
+        private static readonly Vector2 CoveredHome = new Vector2(400f, 400f);
+        private static readonly Vector2 OpenHome = new Vector2(1500f, 400f);
+
+        [Test]
+        public void FixedOrder_WaitsWhileItsNextDetailIsUnderAThought_InsteadOfSkippingAhead()
+        {
+            TuningConfig.Notice = NoticeMode.FixedOrder;
+            CollectionRuntime runtime = TwoDetailsRuntime(out _);
+            runtime.Field.SpawnAt(ThoughtStrength.Weak, "мишка", CoveredHome);
+
+            for (int i = 0; i < 10; i++) runtime.Tick(Dt, Vector2.zero, 0, 0f, false);
+
+            Assert.AreEqual(-1, runtime.NoticedIndex,
+                "Цель под мыслью обязана ЖДАТЬ: ни собираться сквозь мысль, ни уступать очередь следующей.");
+
+            runtime.Field.Clear();
+            for (int i = 0; i < 3; i++) runtime.Tick(Dt, Vector2.zero, 0, 0f, false);
+            Assert.AreEqual(0, runtime.NoticedIndex, "Мысль ушла — очередь обязана продолжиться с той же детали.");
+        }
+
+        [Test]
+        public void AutoNearest_TakesTheOpenDetail_AndNothingWhenEveryDetailIsCovered()
+        {
+            TuningConfig.Notice = NoticeMode.AutoNearest;
+
+            CollectionRuntime runtime = TwoDetailsRuntime(out _);
+            runtime.Field.SpawnAt(ThoughtStrength.Weak, "мишка", CoveredHome);
+            for (int i = 0; i < 5; i++) runtime.Tick(Dt, Vector2.zero, 0, 0f, false);
+            Assert.AreEqual(1, runtime.NoticedIndex, "Автовыбор обязан взять открытую деталь.");
+
+            CollectionRuntime buried = TwoDetailsRuntime(out _);
+            buried.Field.SpawnAt(ThoughtStrength.Weak, "мишка", CoveredHome);
+            buried.Field.SpawnAt(ThoughtStrength.Weak, "гора посуды", OpenHome);
+            for (int i = 0; i < 5; i++) buried.Tick(Dt, Vector2.zero, 0, 0f, false);
+
+            Assert.AreEqual(-1, buried.NoticedIndex,
+                "Закрыты все — брать нечего; выход тут через тряску, а не через сбор сквозь мысль.");
+        }
+
+        [Test]
+        public void TheGaze_CannotNoticeADetailThroughAThought()
+        {
+            TuningConfig.Notice = NoticeMode.GazeJoystick;
+            TuningConfig.GazeDwellSeconds = 0.4f;
+            CollectionRuntime runtime = TwoDetailsRuntime(out _);
+            runtime.Field.SpawnAt(ThoughtStrength.Weak, "мишка", CoveredHome);
+            runtime.Gaze.Position = CoveredHome;
+
+            // Twice the dwell, resting straight on the covered detail.
+            for (int i = 0; i < 48; i++)
+            {
+                runtime.Tick(Dt, Vector2.zero, 0, 0f, false);
+                runtime.Gaze.Position = CoveredHome;
+            }
+
+            Assert.AreEqual(-1, runtime.NoticedIndex, "Взгляд заметил деталь сквозь мысль.");
+
+            runtime.Field.Clear();
+            for (int i = 0; i < 48 && runtime.NoticedIndex < 0; i++)
+            {
+                runtime.Tick(Dt, Vector2.zero, 0, 0f, false);
+                runtime.Gaze.Position = CoveredHome;
+            }
+
+            Assert.AreEqual(0, runtime.NoticedIndex, "Мысль ушла — взгляд обязан замечать деталь снова.");
+        }
+
+        [Test]
+        public void SuspendedCollection_NoticesNothing_AndTurnsNothing()
+        {
+            // What the tutorial's second beat sets: the thoughts live on and can be shaken off, but
+            // nothing is noticed and the crank does nothing at all.
+            TuningConfig.Notice = NoticeMode.FixedOrder;
+            TuningConfig.CollectSeconds = 3f;
+            CollectionRuntime runtime = TwoDetailsRuntime(out _);
+
+            for (int i = 0; i < 5; i++) runtime.Tick(Dt, Vector2.zero, 0, 0f, false);
+            Assert.AreEqual(0, runtime.NoticedIndex, "Без блокировки первая деталь замечается.");
+
+            runtime.CollectionSuspended = true;
+            for (int i = 0; i < 120; i++) runtime.Tick(Dt, Vector2.zero, 0, 400f, false);
+
+            Assert.AreEqual(-1, runtime.NoticedIndex, "Под блокировкой ничего не замечается.");
+            Assert.AreEqual(0f, runtime.Collector.Progress01, 1e-4f, "Под блокировкой кручение не считается.");
+            Assert.AreEqual(0, runtime.CollectedCount, "Под блокировкой ничего не собирается.");
+
+            runtime.CollectionSuspended = false;
+            for (int i = 0; i < 5; i++) runtime.Tick(Dt, Vector2.zero, 0, 400f, false);
+            Assert.AreEqual(0, runtime.NoticedIndex, "Блокировка снята — цикл обязан продолжиться.");
+        }
+
+        /// <summary>A view that answers the loop and remembers nothing: the rules are what is on trial.</summary>
+        private sealed class SilentView : ICollectionView
+        {
+            public void ResetCollected() { }
+            public void SetDetailProgress(int index, float progress01, bool spinning, bool active, bool slipped) { }
+            public void CollectDetail(int index) { }
+            public void SetThread(Vector2 from, Vector2 to, bool visible) { }
+            public void SetGaze(Vector2 position, float dwell01, bool visible) { }
+            public void SetPeak(bool peak) { }
+            public void SyncThoughts(IReadOnlyList<Thought> thoughts, float deltaTime) { }
+            public void TickPulse(float deltaTime, IReadOnlyList<bool> collected, int noticedIndex) { }
         }
     }
 }

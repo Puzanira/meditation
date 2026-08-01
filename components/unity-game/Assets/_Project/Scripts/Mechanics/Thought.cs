@@ -16,11 +16,36 @@ namespace Meditation.Mechanics
         public Vector2 DriftDirection;
 
         /// <summary>
-        /// Derived, never assigned: SCREENS.md fixes three sizes and only three. Screen coverage is
-        /// meant to be won by the NUMBER of thoughts rolling in (наплыв), so nothing — not gameplay,
-        /// not a test — is allowed to inflate a blob into a slab to force the peak.
+        /// The silhouette's own size once a level's art is behind the blob, or zero on the greybox
+        /// stand. Only ever set through <see cref="Meditation.View.ArtLibrary.FitThought"/>, which
+        /// fits the sprite INSIDE the class box — see <see cref="Size"/>.
         /// </summary>
-        public Vector2 Size => SizeOf(Strength);
+        public Vector2 ArtSize;
+
+        /// <summary>
+        /// SCREENS.md fixes three sizes and only three. Screen coverage is meant to be won by the
+        /// NUMBER of thoughts rolling in (наплыв), so nothing — not gameplay, not a test — is allowed
+        /// to inflate a blob into a slab to force the peak. Art does not change that: a level's
+        /// silhouette is fitted inside its class box and can only ever be SMALLER, which is why the
+        /// art size is clamped down to the class here rather than trusted.
+        /// </summary>
+        public Vector2 Size
+        {
+            get
+            {
+                Vector2 box = SizeOf(Strength);
+                if (ArtSize.x < 1f || ArtSize.y < 1f) return box;
+                return new Vector2(Mathf.Min(ArtSize.x, box.x), Mathf.Min(ArtSize.y, box.y));
+            }
+        }
+
+        /// <summary>
+        /// Part of the defeat wallpaper (<see cref="ThoughtField.CoverScreen"/>) rather than a thought
+        /// the player is fighting. The view draws these to COVER their cell instead of fitting inside
+        /// it, and gives them no pips: on the defeat screen the pips are not a readout of anything —
+        /// the crank wipes the screen by the turn — and forty rows of them drew dotted lines across it.
+        /// </summary>
+        public bool Wallpaper;
 
         /// <summary>Hits landed since the counter was last (re)set.</summary>
         public int HitsTaken;

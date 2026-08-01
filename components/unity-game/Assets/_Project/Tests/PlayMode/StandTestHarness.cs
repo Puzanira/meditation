@@ -215,6 +215,106 @@ namespace Meditation.Tests
             return worldSize * TuningPanel.PanelWidth / drawnWidth;
         }
 
+        // ---- screenshots -----------------------------------------------------------------------------
+
+        /// <summary>Where the design gate looks for its evidence (gitignored).</summary>
+        public static string ScreenshotFolder => Path.Combine(Application.dataPath, "..", "Screenshots");
+
+        /// <summary>
+        /// Render the live canvas at full design resolution and write it to disk.
+        ///
+        /// The canvas is re-pointed at an off-screen camera for the shot, because the editor's
+        /// screenshot API produces nothing in batch mode and the suite has to be runnable headless.
+        /// Shared by the stand's frames and the game's, so both sets are made the same way and can be
+        /// judged side by side.
+        /// </summary>
+        public static void Shoot(string shotName, Color letterbox)
+        {
+            Directory.CreateDirectory(ScreenshotFolder);
+
+            Texture2D shot = Capture(letterbox);
+            string path = Path.Combine(ScreenshotFolder, shotName + ".png");
+            File.WriteAllBytes(path, shot.EncodeToPNG());
+            Object.DestroyImmediate(shot);
+
+            Assert.IsTrue(File.Exists(path), "No frame was written for " + shotName);
+            Assert.Greater(new FileInfo(path).Length, 5000, shotName + " rendered an empty frame.");
+        }
+
+        /// <summary>
+        /// The same render, handed back as pixels instead of written to disk.
+        ///
+        /// Some claims are about the PICTURE and cannot be checked any other way: «этот силуэт читается
+        /// с метра» is a statement about ink and contrast in the rendered slot, and «десатурация гасит
+        /// цвет» is a statement about the saturation of the rendered blob. Measuring those off the same
+        /// path that produces the design gate's frames means the test and the evidence agree by
+        /// construction. The caller owns the texture.
+        /// </summary>
+        public static Texture2D Capture(Color letterbox)
+        {
+            DesignStage stage = Stage();
+
+            var camGo = new GameObject("ShotCamera", typeof(Camera));
+            var cam = camGo.GetComponent<Camera>();
+            cam.orthographic = true;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = letterbox;
+            cam.transform.position = new Vector3(0f, 0f, -100f);
+
+            var target = new RenderTexture(1920, 1080, 24);
+            cam.targetTexture = target;
+
+            RenderMode previousMode = stage.Canvas.renderMode;
+            stage.Canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            stage.Canvas.worldCamera = cam;
+            stage.Canvas.planeDistance = 50f;
+            Canvas.ForceUpdateCanvases();
+            stage.Fit();
+            Canvas.ForceUpdateCanvases();
+
+            cam.Render();
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = target;
+            var shot = new Texture2D(1920, 1080, TextureFormat.RGB24, false);
+            shot.ReadPixels(new Rect(0f, 0f, 1920f, 1080f), 0, 0);
+            shot.Apply();
+            RenderTexture.active = previous;
+
+            cam.targetTexture = null;
+            target.Release();
+            Object.DestroyImmediate(camGo);
+
+            stage.Canvas.renderMode = previousMode;
+            stage.Fit();
+
+            return shot;
+        }
+
+        /// <summary>
+        /// Where a widget's rectangle lands in the captured frame: pixels, origin top-left, like every
+        /// design coordinate in this project. <see cref="Capture"/> hands back a texture whose rows run
+        /// bottom-up, so this is also the place that flip is stated once.
+        /// </summary>
+        public static RectInt PixelRectOf(DesignStage stage, RectTransform rt)
+        {
+            Rect design = stage.DesignRectOf(rt);
+            int x = Mathf.Clamp(Mathf.RoundToInt(design.xMin), 0, 1920);
+            int y = Mathf.Clamp(Mathf.RoundToInt(design.yMin), 0, 1080);
+            int w = Mathf.Clamp(Mathf.RoundToInt(design.width), 0, 1920 - x);
+            int h = Mathf.Clamp(Mathf.RoundToInt(design.height), 0, 1080 - y);
+            return new RectInt(x, y, w, h);
+        }
+
+        /// <summary>Pixels of <paramref name="box"/> out of a captured frame, row order irrelevant.</summary>
+        public static Color[] PixelsOf(Texture2D frame, RectInt box)
+        {
+            if (box.width <= 0 || box.height <= 0) return new Color[0];
+            // Design Y counts down from the top; a texture's rows count up from the bottom.
+            int bottom = frame.height - (box.y + box.height);
+            return frame.GetPixels(box.x, bottom, box.width, box.height);
+        }
+
         /// <summary>The part of <paramref name="rect"/> that survives clipping; width/height 0 if none.</summary>
         public static Rect ClippedBy(Rect rect, Rect clip)
         {

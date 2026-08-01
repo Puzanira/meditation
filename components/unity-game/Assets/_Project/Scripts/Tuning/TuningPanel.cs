@@ -22,6 +22,16 @@ namespace Meditation.Tuning
     {
         public const float PanelWidth = 460f;
 
+        /// <summary>
+        /// «Чистый кадр» for the design gate: hide the panel's chrome as well as its body.
+        ///
+        /// Collapsing the panel already gave the frame the whole window, but the «параметры» button
+        /// stayed in the corner of every screenshot — stand chrome inside the evidence the gate judges
+        /// the composition by. In the live game the button stays: without it there is no way back to
+        /// the panel while playing.
+        /// </summary>
+        public static bool ScreenshotMode;
+
         /// <summary>Title + subtitle band at the top of the panel.</summary>
         public const float HeaderHeight = 82f;
 
@@ -44,6 +54,8 @@ namespace Meditation.Tuning
         private readonly List<RectTransform> _rowRects = new List<RectTransform>();
         private DesignStage _stage;
         private RectTransform _body;
+        private RectTransform _collapseHost;
+        private bool _chromeHidden;
         private RectTransform _rows;
         private Text _readoutLabel;
         private Text _toggleButtonLabel;
@@ -212,7 +224,7 @@ namespace Meditation.Tuning
             // Collapse button lives outside the body so it survives hiding the panel.
             // Bottom-right: with the panel collapsed this is the emptiest corner of the composition,
             // so a screenshot for the design gate is not spoiled by stand chrome.
-            var buttonHost = Ui.Layer(transform, "CollapseHost");
+            RectTransform buttonHost = _collapseHost = Ui.Layer(transform, "CollapseHost");
             buttonHost.anchorMin = new Vector2(1f, 0f);
             buttonHost.anchorMax = new Vector2(1f, 0f);
             buttonHost.pivot = new Vector2(1f, 0f);
@@ -459,6 +471,7 @@ namespace Meditation.Tuning
         {
             bool visible = TuningConfig.PanelVisible;
             _body.gameObject.SetActive(visible);
+            ApplyChrome();
             if (visible) LayoutZones();
             if (_toggleButtonLabel != null) _toggleButtonLabel.text = visible ? "скрыть панель" : "параметры";
             if (_stage != null)
@@ -474,8 +487,19 @@ namespace Meditation.Tuning
             for (int i = 0; i < _refreshers.Count; i++) _refreshers[i]();
         }
 
+        /// <summary>The «параметры» button: in the frame while playing, out of it while shooting.</summary>
+        private void ApplyChrome()
+        {
+            _chromeHidden = ScreenshotMode;
+            if (_collapseHost != null) _collapseHost.gameObject.SetActive(!ScreenshotMode);
+        }
+
         private void Update()
         {
+            // The flag can be flipped after the panel was built (a screenshot test sets it before the
+            // scene loads, and clears it in its teardown), so it is followed, not read once.
+            if (_chromeHidden != ScreenshotMode) ApplyChrome();
+
             if (!TuningConfig.PanelVisible) return;
 
             // The window is not fixed — the founder plays in a Game view of whatever size — so the

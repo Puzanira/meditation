@@ -33,6 +33,17 @@ namespace Meditation.Mechanics
         /// <summary>Seconds of breather left; no thoughts spawn while it runs.</summary>
         public float BreatherLeft { get; private set; }
 
+        /// <summary>
+        /// Hold the clock without switching the rules off.
+        ///
+        /// The level-1 tutorial stops the timer while it teaches [toggle], and the obvious way to do
+        /// that — tick the rules with a zero step — stops them watching for victory and defeat too. On
+        /// the tutorial's own beats nothing can be won or lost, so that never showed; it is still a
+        /// trapdoor left open under every future use of a held clock, so the pause is stated here
+        /// instead: time does not pass, everything else still does.
+        /// </summary>
+        public bool ClockPaused;
+
         public bool SpawningAllowed => Outcome == LevelOutcome.Playing && BreatherLeft <= 0f;
 
         public float TimeLeft01 => Mathf.Clamp01(TimeLeft / Mathf.Max(1f, TuningConfig.LevelSeconds));
@@ -45,6 +56,7 @@ namespace Meditation.Mechanics
             Outcome = LevelOutcome.Playing;
             LoseReason = string.Empty;
             BreatherLeft = 0f;
+            ClockPaused = false;
         }
 
         /// <summary>One more detail landed in the vessel; starts the breather if it is enabled.</summary>
@@ -61,7 +73,7 @@ namespace Meditation.Mechanics
             if (Outcome != LevelOutcome.Playing || deltaTime <= 0f) return;
 
             if (BreatherLeft > 0f) BreatherLeft = Mathf.Max(0f, BreatherLeft - deltaTime);
-            TimeLeft = Mathf.Max(0f, TimeLeft - deltaTime);
+            if (!ClockPaused) TimeLeft = Mathf.Max(0f, TimeLeft - deltaTime);
 
             // Victory wins ties: the last detail dropping in as the clock hits zero is a win.
             if (Collected >= TotalDetails)

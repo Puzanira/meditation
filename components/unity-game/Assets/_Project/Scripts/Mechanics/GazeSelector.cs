@@ -16,6 +16,14 @@ namespace Meditation.Mechanics
         /// <summary>Gaze centre in design px.</summary>
         public Vector2 Position = new Vector2(960f, 540f);
 
+        /// <summary>
+        /// How far down the gaze may travel. The stand's greybox details all live in the scene zone,
+        /// so 810 was enough there — but the art drop puts real details in the foreground strip (the
+        /// dandelion at y 958, the fish at 991, the mouse at 1029), and a gaze that stops at 810 simply
+        /// cannot reach them. Levels raise this to the full screen; the stand keeps the scene zone.
+        /// </summary>
+        public float MaxY = LevelOneData.SceneHeight;
+
         /// <summary>How long the gaze has rested on <see cref="HoveredIndex"/>, seconds.</summary>
         public float Dwell { get; private set; }
 
@@ -58,7 +66,7 @@ namespace Meditation.Mechanics
                 // Design space grows downwards, so the stick's Y is inverted here.
                 Position += new Vector2(stick.x, -stick.y) * (TuningConfig.GazeSpeedPxPerSec * deltaTime);
                 Position.x = Mathf.Clamp(Position.x, 0f, ThoughtField.ScreenWidth);
-                Position.y = Mathf.Clamp(Position.y, 0f, LevelOneData.SceneHeight);
+                Position.y = Mathf.Clamp(Position.y, 0f, MaxY);
             }
 
             int hovered = -1;

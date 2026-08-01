@@ -25,15 +25,31 @@ namespace Meditation.Mechanics
         public static readonly Vector2 VesselCentre = new Vector2(960f, 930f);
         public static readonly Vector2 VesselSize = new Vector2(240f, 150f);
 
-        /// <summary>Sun / timer dial: centre (1800, 100), r = 60.</summary>
+        /// <summary>
+        /// Sun / timer dial: centre (1800, 100), r = 60 — the SCREENS «Зоны» base position.
+        /// A real level may carry its own centre (<see cref="LevelDefinition.SunCentre"/>): where the
+        /// art drop put a detail under the widget, the HUD is what moves (founder, 2026-07-31).
+        /// </summary>
         public static readonly Vector2 SunCentre = new Vector2(1800f, 100f);
         public const float SunRadius = 60f;
 
-        /// <summary>Crank indicator: centre (140, 950), r = 70.</summary>
+        /// <summary>The «0:42» caption: centred under the sun, gap measured from the sun's edge.</summary>
+        public const float TimerLabelWidth = 300f;
+        public const float TimerLabelHeight = 40f;
+        public const float TimerLabelGap = 30f;
+
+        /// <summary>Crank indicator: centre (140, 950), r = 70 — SCREENS base, per-level in a level.</summary>
         public static readonly Vector2 CrankIndicatorCentre = new Vector2(140f, 950f);
         public const float CrankIndicatorRadius = 70f;
 
-        /// <summary>HUD detail slots: from (60, 40), 5 × 72 px, step 88.</summary>
+        /// <summary>
+        /// What the crank indicator really covers: the dial is r = 70, but the «хватает» arc sits at
+        /// r + 14 and the halo that lights up on a good spin at 86. Clearance has to be judged against
+        /// the widest thing drawn, not against the dial.
+        /// </summary>
+        public const float CrankHaloRadius = 86f;
+
+        /// <summary>HUD detail slots: from (60, 40), 5 × 72 px, step 88 (base; per-level in a level).</summary>
         public static readonly Vector2 SlotsOrigin = new Vector2(60f, 40f);
         public const float SlotSize = 72f;
         public const float SlotStep = 88f;

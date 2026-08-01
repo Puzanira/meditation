@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Meditation.Mechanics;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,17 +7,15 @@ namespace Meditation.View
     /// <summary>
     /// One thought on screen: rounded placeholder blob, its label, and a row of pips = hits left
     /// (SCREENS.md "Мысли (визуал состояния)"). Hits make it flinch; the last pip pops it.
+    ///
+    /// This is the preview stand's greybox blob. The game draws thoughts as the drop's turquoise
+    /// silhouettes instead — see <see cref="ArtThoughtView"/>; both share <see cref="PipRow"/>.
     /// </summary>
     public sealed class ThoughtView
     {
-        private const int MaxPips = 12;
-        private const float PipRadius = 9f;
-        private const float PipStep = 28f;
-
-        private readonly List<Image> _pips = new List<Image>(MaxPips);
         private readonly Image _root;
         private readonly Text _label;
-        private readonly RectTransform _pipRow;
+        private readonly PipRow _pips;
 
         private int _lastHitsTaken;
         private float _flinch;
@@ -33,24 +30,7 @@ namespace Meditation.View
             _label.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             _label.rectTransform.anchoredPosition = new Vector2(0f, 10f);
 
-            var rowGo = new GameObject("Pips", typeof(RectTransform));
-            rowGo.transform.SetParent(_root.transform, false);
-            _pipRow = (RectTransform)rowGo.transform;
-            _pipRow.anchorMin = new Vector2(0.5f, 0f);
-            _pipRow.anchorMax = new Vector2(0.5f, 0f);
-            _pipRow.pivot = new Vector2(0.5f, 0.5f);
-            _pipRow.sizeDelta = new Vector2(MaxPips * PipStep, PipRadius * 2f);
-            _pipRow.anchoredPosition = new Vector2(0f, -18f);
-
-            for (int i = 0; i < MaxPips; i++)
-            {
-                var pip = Ui.Circle(_pipRow, "Pip" + i, 0f, 0f, PipRadius, Color.black, Color.black);
-                pip.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-                pip.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-                pip.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                pip.gameObject.SetActive(false);
-                _pips.Add(pip);
-            }
+            _pips = new PipRow(_root.transform);
         }
 
         public RectTransform Rect => _root.rectTransform;
@@ -99,23 +79,7 @@ namespace Meditation.View
             Vector2 offset = _flinch > 0f ? _flinchOffset : Vector2.zero;
             Ui.MoveTo(_root.rectTransform, thought.Position + offset);
 
-            int durability = Mathf.Clamp(thought.Durability, 0, MaxPips);
-            int remaining = Mathf.Clamp(thought.HitsRemaining, 0, MaxPips);
-            _pipRow.anchoredPosition = new Vector2(0f, -18f);
-            for (int i = 0; i < MaxPips; i++)
-            {
-                bool used = i < durability;
-                _pips[i].gameObject.SetActive(used);
-                if (!used) continue;
-                float x = (i - (durability - 1) * 0.5f) * PipStep;
-                _pips[i].rectTransform.anchoredPosition = new Vector2(x, 0f);
-
-                // A spent pip is an EMPTY outlined circle (mock 13), not a faded dot: at museum
-                // distance a pale fill reads as "still there, just dimmer".
-                bool spent = i >= remaining;
-                _pips[i].sprite = spent ? UiSprites.Ring : UiSprites.Circle;
-                _pips[i].color = stroke;
-            }
+            _pips.Set(thought.Durability, thought.HitsRemaining, stroke);
         }
     }
 }

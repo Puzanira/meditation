@@ -16,6 +16,7 @@ namespace Meditation.View
         private static Sprite _ring;
         private static Sprite _dash;
         private static Sprite _dashedRing;
+        private static Sprite _vignette;
 
         /// <summary>Rounded rectangle with the default corner radius.</summary>
         public static Sprite Rounded => RoundedOf(14);
@@ -75,6 +76,48 @@ namespace Meditation.View
                 if (_dashedRing == null) _dashedRing = BuildDashedRing(256, 5f, 12f, 10f, 90f);
                 return _dashedRing;
             }
+        }
+
+        /// <summary>
+        /// Edge darkening of the chaos peak (SCREENS «Мысли»: «лёгкое затемнение краёв экрана»).
+        ///
+        /// A flat veil alone cannot say «пик» on a photographic plate: mock 16 composites #3a3050 over
+        /// a pale greybox sky, and the same rectangle over a night street changes the road by four
+        /// values out of 255 — the peak existed in the numbers and nowhere on the screen. The edges are
+        /// what makes it a state you can see, and they are what SCREENS asks for in the same sentence.
+        /// Black, transparent in the middle, opaque towards the corners.
+        /// </summary>
+        public static Sprite Vignette
+        {
+            get
+            {
+                if (_vignette == null) _vignette = BuildVignette(192, 108, 0.42f, 1f);
+                return _vignette;
+            }
+        }
+
+        private static Sprite BuildVignette(int w, int h, float clearRadius, float edgeAlpha)
+        {
+            Texture2D texture = NewTexture(w, h);
+            var pixels = new Color32[w * h];
+
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                // Distance from the centre in units of the half-diagonal, so corners reach 1.
+                float dx = (x + 0.5f) / w * 2f - 1f;
+                float dy = (y + 0.5f) / h * 2f - 1f;
+                float d = Mathf.Sqrt(dx * dx + dy * dy) / Mathf.Sqrt(2f);
+
+                float t = Mathf.InverseLerp(clearRadius, 1f, d);
+                float a = Mathf.SmoothStep(0f, 1f, t) * edgeAlpha;
+                pixels[y * w + x] = new Color(0f, 0f, 0f, a);
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            return Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(0.5f, 0.5f), 100f, 0,
+                SpriteMeshType.FullRect);
         }
 
         private static Sprite BuildRounded(int size, int radius)

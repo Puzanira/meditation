@@ -212,6 +212,10 @@ namespace Meditation.Tests
         [UnityTest]
         public IEnumerator TuningPanel_IsOnScreen_AndCollapsesToGiveTheFrameBack()
         {
+            // The panel ships COLLAPSED (TuningConfig.Defaults.PanelVisible — the game opens as a game
+            // on the cabinet), so a test about what the OPEN panel does has to open it, exactly like
+            // its siblings below. What is being pinned here is the collapse, not the starting state.
+            TuningConfig.PanelVisible = true;
             yield return StandTestHarness.LoadScene(PreviewScenes.CrankCollect);
             DesignStage stage = StandTestHarness.Stage();
 
@@ -350,6 +354,8 @@ namespace Meditation.Tests
         [UnityTest]
         public IEnumerator TuningPanel_ChangingASliderOnScreen_ChangesTheMechanicImmediately()
         {
+            // …and the same here: the founder drags a slider on the OPEN panel, so the test opens it.
+            TuningConfig.PanelVisible = true;
             yield return StandTestHarness.LoadScene(PreviewScenes.CrankCollect);
             FakeBackend fake = StandTestHarness.TakeOverInput();
             DesignStage stage = StandTestHarness.Stage();

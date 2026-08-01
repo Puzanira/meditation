@@ -3,6 +3,9 @@ namespace Meditation.Stand
     /// <summary>Scene names of the preview stand. The menu is the entry scene.</summary>
     public static class PreviewScenes
     {
+        /// <summary>The GAME's entry scene — first in Build Settings, the one the launcher opens.</summary>
+        public const string Game = "Game";
+
         public const string Menu = "PreviewMenu";
         public const string CrankCollect = "Scene1_CrankCollect";
         public const string ShakeAway = "Scene2_ShakeAway";

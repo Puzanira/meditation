@@ -39,6 +39,7 @@ namespace Meditation.Tests
             StandTestHarness.IsolateTuningFile();
             TuningConfig.ResetToDefaults();
             TuningConfig.PanelVisible = false;   // shoot the pure composition
+            TuningPanel.ScreenshotMode = true;   // …and without the «параметры» button in the corner
             Directory.CreateDirectory(Folder);
         }
 
@@ -46,6 +47,7 @@ namespace Meditation.Tests
         public void TearDown()
         {
             StandTestHarness.ReleaseTuningFile();
+            TuningPanel.ScreenshotMode = false;
             TuningConfig.ResetToDefaults();
         }
 
@@ -206,6 +208,8 @@ namespace Meditation.Tests
             // them exactly as the mock draws the peak.
             TuningConfig.ThoughtsCoverVessel = true;
             TuningConfig.LossOverlapPercent = 60f;
+            // The peak veil is its own [tune] now (SCREENS «Пик хаоса»), so the frame has to ask for it.
+            TuningConfig.PeakOverlapPercent = 60f;
             var peakSpots = new[]
             {
                 new Vector2(300f, 230f), new Vector2(780f, 230f), new Vector2(1260f, 230f),
@@ -382,51 +386,8 @@ namespace Meditation.Tests
             return false;
         }
 
-        /// <summary>Render the live canvas at full design resolution and write it to disk.</summary>
-        private static void Shoot(string shotName)
-        {
-            DesignStage stage = StandTestHarness.Stage();
-
-            var camGo = new GameObject("ShotCamera", typeof(Camera));
-            var cam = camGo.GetComponent<Camera>();
-            cam.orthographic = true;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.76f, 0.74f, 0.69f);
-            cam.transform.position = new Vector3(0f, 0f, -100f);
-
-            var target = new RenderTexture(1920, 1080, 24);
-            cam.targetTexture = target;
-
-            RenderMode previousMode = stage.Canvas.renderMode;
-            stage.Canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            stage.Canvas.worldCamera = cam;
-            stage.Canvas.planeDistance = 50f;
-            Canvas.ForceUpdateCanvases();
-            stage.Fit();
-            Canvas.ForceUpdateCanvases();
-
-            cam.Render();
-
-            RenderTexture previous = RenderTexture.active;
-            RenderTexture.active = target;
-            var shot = new Texture2D(1920, 1080, TextureFormat.RGB24, false);
-            shot.ReadPixels(new Rect(0f, 0f, 1920f, 1080f), 0, 0);
-            shot.Apply();
-            RenderTexture.active = previous;
-
-            string path = Path.Combine(Folder, shotName + ".png");
-            File.WriteAllBytes(path, shot.EncodeToPNG());
-
-            Object.DestroyImmediate(shot);
-            cam.targetTexture = null;
-            target.Release();
-            Object.DestroyImmediate(camGo);
-
-            stage.Canvas.renderMode = previousMode;
-            stage.Fit();
-
-            Assert.IsTrue(File.Exists(path), "No frame was written for " + shotName);
-            Assert.Greater(new FileInfo(path).Length, 5000, shotName + " rendered an empty frame.");
-        }
+        /// <summary>Write the frame through the shared capture in <see cref="StandTestHarness"/>.</summary>
+        private static void Shoot(string shotName) =>
+            StandTestHarness.Shoot(shotName, new Color(0.76f, 0.74f, 0.69f));
     }
 }

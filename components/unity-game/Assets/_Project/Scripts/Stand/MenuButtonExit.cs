@@ -20,6 +20,19 @@ namespace Meditation.Stand
         /// <summary>Set by tests / tools that want the press without a scene load.</summary>
         public bool ExitOnPress = true;
 
+        /// <summary>
+        /// Entry scene this button lands on. Empty = the preview stand's menu; the game's scene sets
+        /// its own, so «в меню» is a clean restart of whichever product the player is inside.
+        /// </summary>
+        public string ExitScene = "";
+
+        /// <summary>
+        /// What the press actually does, when the screen owns its own way out. The game sets it: its
+        /// exit is the cabinet's (hand the screen back to the launcher, tear the run down), and only
+        /// its fallback is a scene load. Unset — the stand's plain navigation below.
+        /// </summary>
+        public System.Action ExitAction;
+
         /// <summary>How many presses this component has seen (test observability).</summary>
         public int PressCount { get; private set; }
 
@@ -50,7 +63,11 @@ namespace Meditation.Stand
         private void OnPressed()
         {
             PressCount++;
-            if (ExitOnPress) PreviewStandNav.ExitToMenu();
+            if (!ExitOnPress) return;
+
+            if (ExitAction != null) ExitAction();
+            else if (string.IsNullOrEmpty(ExitScene)) PreviewStandNav.ExitToMenu();
+            else PreviewStandNav.ExitToScene(ExitScene);
         }
     }
 }

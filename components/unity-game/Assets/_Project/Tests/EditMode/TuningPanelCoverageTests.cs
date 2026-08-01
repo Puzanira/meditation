@@ -87,6 +87,102 @@ namespace Meditation.Tests
             "удержание взгляда"
         };
 
+        /// <summary>
+        /// The game's own panel (done contract §6–§7). Per-level rows are named «У{n} · …» so a number
+        /// on the panel belongs to exactly one level and cannot be mistaken for a global; everything
+        /// below is what stays the same wherever the player is.
+        /// </summary>
+        private static readonly string[] GameLevelRows =
+        {
+            "длительность уровня",
+            "интервал волн",
+            "в волне: слабых",
+            "в волне: средних",
+            "в волне: крепких",
+            "прочность: слабые",
+            "прочность: средние",
+            "прочность: крепкие",
+            "скорость дрейфа",
+            "сокращение интервала за волну"
+        };
+
+        private static readonly string[] GameSharedRows =
+        {
+            "порог кручения",
+            "grace-период",
+            "время сбора детали",
+            "при остановке",
+            "выбор детали",
+            "скорость взгляда",
+            "удержание взгляда",
+            "порог удара: амплитуда",
+            "порог удара: резкость",
+            "затухание счётчика ударов",
+            "пауза затухания",
+            "таргетинг ударов",
+            "дрейф мыслей к центру",
+            "мысли закрывают сосуд и деталь",
+            "порог пика хаоса",
+            "порог поражения (перекрытие)",
+            "передышка после детали",
+            "длина передышки",
+            "авто-ретрай после поражения",
+            "таймер в обучении стоит"
+        };
+
+        [Test]
+        public void GamePanel_HasASectionPerLevel_PlusTheSharedValues()
+        {
+            var expected = new List<string>();
+            for (int level = 1; level <= TuningConfig.LevelBands; level++)
+                foreach (string row in GameLevelRows) expected.Add("У" + level + " · " + row);
+            expected.AddRange(GameSharedRows);
+
+            AssertRows("Игра", TuningCatalog.Game(), expected.ToArray());
+        }
+
+        [Test]
+        public void GamePanel_KeepsTheSpecsRangesOnEveryLevelSection()
+        {
+            // Same lesson as the scenettes: the same parameter is declared once per level, so pinning
+            // one section would leave the other four free to drift.
+            var ranges = new Dictionary<string, (float Min, float Max)>
+            {
+                { "длительность уровня", (60f, 180f) },     // MECHANICS §5
+                { "прочность: слабые", (2f, 12f) },         // MECHANICS §3
+                { "прочность: средние", (2f, 12f) },
+                { "прочность: крепкие", (2f, 12f) },
+                { "скорость дрейфа", (20f, 60f) }           // SCREENS §Мысли
+            };
+
+            for (int level = 0; level < TuningConfig.LevelBands; level++)
+            {
+                IList<TuningParam> rows = TuningCatalog.GameLevel(level);
+                foreach (KeyValuePair<string, (float Min, float Max)> range in ranges)
+                {
+                    string label = "У" + (level + 1) + " · " + range.Key;
+                    var param = rows.OfType<FloatParam>().FirstOrDefault(p => p.Label == label);
+                    Assert.IsNotNull(param, "Нет строки «" + label + "».");
+                    Assert.AreEqual(range.Value.Min, param.Min, 1e-3f, label + ": нижняя граница не по спеку.");
+                    Assert.AreEqual(range.Value.Max, param.Max, 1e-3f, label + ": верхняя граница не по спеку.");
+                }
+            }
+        }
+
+        [Test]
+        public void EveryGamePanelRow_ReadsAndWritesTheLiveConfig()
+        {
+            TuningConfig.ResetToDefaults();
+            try
+            {
+                foreach (TuningParam param in TuningCatalog.Game()) RoundTrip(param);
+            }
+            finally
+            {
+                TuningConfig.ResetToDefaults();
+            }
+        }
+
         private static void AssertRows(string scenette, IList<TuningParam> actual, string[] expected)
         {
             List<string> labels = actual.Select(p => p.Label).ToList();
@@ -127,40 +223,46 @@ namespace Meditation.Tests
                              .Concat(TuningCatalog.TwoHands())
                              .Concat(TuningCatalog.FullLevel()))
                 {
-                    switch (param)
-                    {
-                        case FloatParam f:
-                            Assert.Less(f.Min, f.Max, f.Label + ": пустой диапазон слайдера.");
-                            float before = f.Get();
-                            float target = Mathf.Approximately(before, f.Max) ? f.Min : f.Max;
-                            f.Set(target);
-                            Assert.AreEqual(target, f.Get(), 1e-3f, f.Label + ": сеттер не пишет в конфиг.");
-                            f.Set(before);
-                            break;
-
-                        case BoolParam b:
-                            bool wasOn = b.Get();
-                            b.Set(!wasOn);
-                            Assert.AreEqual(!wasOn, b.Get(), b.Label + ": тогглер не пишет в конфиг.");
-                            b.Set(wasOn);
-                            break;
-
-                        case ChoiceParam c:
-                            Assert.GreaterOrEqual(c.Options.Length, 2, c.Label + ": вариантов меньше двух.");
-                            int wasIndex = c.Get();
-                            for (int i = 0; i < c.Options.Length; i++)
-                            {
-                                c.Set(i);
-                                Assert.AreEqual(i, c.Get(), c.Label + ": вариант не выбирается.");
-                            }
-                            c.Set(wasIndex);
-                            break;
-                    }
+                    RoundTrip(param);
                 }
             }
             finally
             {
                 TuningConfig.ResetToDefaults();
+            }
+        }
+
+        /// <summary>A row is only a getter/setter pair — prove it really reaches the config and back.</summary>
+        private static void RoundTrip(TuningParam param)
+        {
+            switch (param)
+            {
+                case FloatParam f:
+                    Assert.Less(f.Min, f.Max, f.Label + ": пустой диапазон слайдера.");
+                    float before = f.Get();
+                    float target = Mathf.Approximately(before, f.Max) ? f.Min : f.Max;
+                    f.Set(target);
+                    Assert.AreEqual(target, f.Get(), 1e-3f, f.Label + ": сеттер не пишет в конфиг.");
+                    f.Set(before);
+                    break;
+
+                case BoolParam b:
+                    bool wasOn = b.Get();
+                    b.Set(!wasOn);
+                    Assert.AreEqual(!wasOn, b.Get(), b.Label + ": тогглер не пишет в конфиг.");
+                    b.Set(wasOn);
+                    break;
+
+                case ChoiceParam c:
+                    Assert.GreaterOrEqual(c.Options.Length, 2, c.Label + ": вариантов меньше двух.");
+                    int wasIndex = c.Get();
+                    for (int i = 0; i < c.Options.Length; i++)
+                    {
+                        c.Set(i);
+                        Assert.AreEqual(i, c.Get(), c.Label + ": вариант не выбирается.");
+                    }
+                    c.Set(wasIndex);
+                    break;
             }
         }
 

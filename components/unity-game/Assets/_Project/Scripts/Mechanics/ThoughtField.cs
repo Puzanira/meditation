@@ -60,8 +60,15 @@ namespace Meditation.Mechanics
         /// <summary>Raised when a thought runs out of pips.</summary>
         public event Action<Thought> Popped;
 
-        /// <summary>Labels to cycle through (level 1 thoughts, WORLD.md).</summary>
+        /// <summary>Labels to cycle through — greybox names on the stand, art keys in the game.</summary>
         public string[] Labels = LevelOneData.ThoughtLabels;
+
+        /// <summary>
+        /// Optional: the size a freshly spawned thought is drawn at. The game sets it so a blob takes
+        /// its silhouette's aspect (fitted inside the S/M/L class), which keeps the coverage maths and
+        /// the picture talking about the same rectangle. Null on the stand — plain class sizes.
+        /// </summary>
+        public Func<Thought, Vector2> ArtSizer;
 
         public void Clear()
         {
@@ -143,6 +150,67 @@ namespace Meditation.Mechanics
             }
         }
 
+        /// <summary>
+        /// Columns and rows the defeat wallpaper is laid on. The grid deliberately runs half a cell
+        /// PAST every edge: mock 17 draws its blobs from −60 to 1980, i.e. the screen is covered by
+        /// thoughts that hang off it, not by a mosaic that stops politely at the frame. With the grid
+        /// inside the frame the defeat screen came out 79 % covered — a fifth of the level still
+        /// showing through the thing that is supposed to have taken it.
+        /// </summary>
+        public const int CoverColumns = 9;
+        public const int CoverRows = 6;
+
+        /// <summary>How far past the frame the wallpaper starts, as a share of one cell.</summary>
+        public const float CoverBleed = 0.5f;
+
+        /// <summary>Each wallpaper blob is drawn this much larger than its cell, so seams close.</summary>
+        public const float CoverCellOversize = 1.35f;
+
+        /// <summary>
+        /// Close the screen over with thoughts, filling only the parts that are still open.
+        ///
+        /// The defeat screen IS thoughts (SCREENS S5: «экран целиком закрыт мыслями»), and the retry is
+        /// wiping them off with the crank — so a level lost on the clock, where the screen may be almost
+        /// clear, still has to close over before it can be cleared. Ordinary <see cref="Spawn"/> cannot
+        /// do this: with drift on it puts a thought just OUTSIDE the frame so it can sail in, which
+        /// covers nothing at all. Here the blobs are placed on a grid, and cells that are already hidden
+        /// are skipped — so the thoughts that actually beat the player stay exactly where they beat them.
+        /// </summary>
+        /// <returns>How many thoughts were added.</returns>
+        public int CoverScreen(int cap = CoverColumns * CoverRows)
+        {
+            // The grid spans the frame plus a bleed on every side, so the wallpaper runs off the edges
+            // the way mock 17 draws it.
+            float spanW = ScreenWidth + 2f * CoverBleed * (ScreenWidth / CoverColumns);
+            float spanH = ScreenHeight + 2f * CoverBleed * (ScreenHeight / CoverRows);
+            float cellW = spanW / CoverColumns;
+            float cellH = spanH / CoverRows;
+            float originX = -CoverBleed * (ScreenWidth / CoverColumns);
+            float originY = -CoverBleed * (ScreenHeight / CoverRows);
+            int added = 0;
+
+            for (int row = 0; row < CoverRows; row++)
+            for (int col = 0; col < CoverColumns; col++)
+            {
+                if (_thoughts.Count >= cap) break;
+
+                var spot = new Vector2(originX + (col + 0.5f) * cellW, originY + (row + 0.5f) * cellH);
+                if (IsCovered(spot)) continue;
+
+                Thought blob = Spawn(ThoughtStrength.Strong);
+                blob.Position = spot;
+
+                // A silhouette fitted inside its class box leaves a gap around itself; the wallpaper
+                // needs the cell CLOSED, so a defeat blob is sized to its cell, not to its class.
+                blob.ArtSize = new Vector2(cellW, cellH) * CoverCellOversize;
+                blob.Wallpaper = true;
+                added++;
+            }
+
+            OverlapPercent = ComputeOverlapPercent();
+            return added;
+        }
+
         /// <summary>Remove a thought without a hit (used by the "crank away the defeat screen" retry).</summary>
         public bool RemoveOldest()
         {
@@ -190,7 +258,14 @@ namespace Meditation.Mechanics
         /// <summary>Spawn one thought: from a screen edge when drifting, on-screen when static.</summary>
         public Thought Spawn(ThoughtStrength strength)
         {
-            Vector2 size = Thought.SizeOf(strength);
+            var thought = new Thought { Strength = strength, Label = NextLabel() };
+
+            // The art size is decided before the spawn point, because where a blob enters the screen
+            // is measured off its own edge — a silhouette narrower than its class must not start with
+            // a gap between it and the frame.
+            if (ArtSizer != null) thought.ArtSize = ArtSizer(thought);
+
+            Vector2 size = thought.Size;
             Vector2 position;
 
             if (TuningConfig.ThoughtDrift)
@@ -213,13 +288,27 @@ namespace Meditation.Mechanics
 
             var centre = new Vector2(ScreenWidth * 0.5f, ScreenHeight * 0.5f);
             Vector2 toCentre = centre - position;
-            var thought = new Thought
-            {
-                Strength = strength,
-                Label = NextLabel(),
-                Position = position,
-                DriftDirection = toCentre.sqrMagnitude > 0.001f ? toCentre.normalized : Vector2.zero
-            };
+            thought.Position = position;
+            thought.DriftDirection = toCentre.sqrMagnitude > 0.001f ? toCentre.normalized : Vector2.zero;
+            _thoughts.Add(thought);
+            OverlapPercent = ComputeOverlapPercent();
+            return thought;
+        }
+
+        /// <summary>
+        /// A named thought at a named place. The level-1 tutorial needs exactly this: SCREENS puts the
+        /// plush bear ON TOP of the next detail so that the collection really is blocked until it is
+        /// shaken off — a random spawn could land anywhere and teach nothing.
+        /// </summary>
+        public Thought SpawnAt(ThoughtStrength strength, string label, Vector2 position)
+        {
+            var thought = new Thought { Strength = strength, Label = label, Position = position };
+            if (ArtSizer != null) thought.ArtSize = ArtSizer(thought);
+
+            Vector2 centre = new Vector2(ScreenWidth * 0.5f, ScreenHeight * 0.5f);
+            Vector2 toCentre = centre - position;
+            thought.DriftDirection = toCentre.sqrMagnitude > 0.001f ? toCentre.normalized : Vector2.zero;
+
             _thoughts.Add(thought);
             OverlapPercent = ComputeOverlapPercent();
             return thought;

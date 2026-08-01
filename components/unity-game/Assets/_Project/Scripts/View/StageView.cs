@@ -32,7 +32,7 @@ namespace Meditation.View
     /// scenery and sits under the travelling detail and its thread, exactly as frames 4–6 draw them;
     /// the vessel keeps its place above the thoughts, as the spec's z-order requires.
     /// </summary>
-    public sealed class StageView
+    public sealed class StageView : ICollectionView
     {
         /// <summary>Mock 18 draws the two surviving towers at <c>opacity="0.5"</c> behind the tableau.</summary>
         public const float VictoryBackgroundAlpha = 0.5f;
@@ -214,7 +214,8 @@ namespace Meditation.View
             // Halo behind the dial: green while the hand is in the zone, pink the moment a stall
             // starts costing a detail (walkthrough #dyn-on / frame 14).
             _crankHalo = Ui.Circle(HudLayer, "CrankHalo", LevelOneData.CrankIndicatorCentre.x,
-                LevelOneData.CrankIndicatorCentre.y, 86f, LevelOneData.CrankHaloOk, Color.clear);
+                LevelOneData.CrankIndicatorCentre.y, LevelOneData.CrankHaloRadius,
+                LevelOneData.CrankHaloOk, Color.clear);
             _crankHalo.gameObject.SetActive(false);
 
             CrankDial = Ui.Circle(HudLayer, "CrankDial", LevelOneData.CrankIndicatorCentre.x,
@@ -291,18 +292,30 @@ namespace Meditation.View
             if (!force && cover == _coverApplied) return;
             _coverApplied = cover;
 
-            int thoughtsIndex = ThoughtsLayer.GetSiblingIndex();
-            int vesselIndex = ForegroundLayer.GetSiblingIndex();
-            bool vesselOnTop = vesselIndex > thoughtsIndex;
-            if (cover == vesselOnTop)
-            {
-                if (cover) ForegroundLayer.SetSiblingIndex(thoughtsIndex);
-                else ForegroundLayer.SetSiblingIndex(thoughtsIndex + 1);
-            }
+            ApplyLayerOrder(cover);
 
             // Covered does not mean erased: the mock keeps the vessel readable at half opacity under
             // the blobs (frame 16), so the player can still see where the details are going.
             SetVesselAlpha(cover ? 0.5f : 1f);
+        }
+
+        /// <summary>
+        /// The whole stack from the toggle, not one layer nudged past another — the same fix as in
+        /// <see cref="LevelView"/>: «thoughtsIndex + 1» ignored that pulling the vessel out of the list
+        /// shifts the layers above it down, so on → off left the vessel above the peak veil.
+        /// </summary>
+        private void ApplyLayerOrder(bool cover)
+        {
+            RectTransform[] order = cover
+                ? new[] { SceneLayer, DetailsLayer, ThreadLayer, ForegroundLayer, ThoughtsLayer, PeakLayer, HudLayer, MessageLayer }
+                : new[] { SceneLayer, DetailsLayer, ThreadLayer, ThoughtsLayer, ForegroundLayer, PeakLayer, HudLayer, MessageLayer };
+
+            int first = int.MaxValue;
+            for (int i = 0; i < order.Length; i++)
+                first = Mathf.Min(first, order[i].GetSiblingIndex());
+
+            for (int i = 0; i < order.Length; i++)
+                order[i].SetSiblingIndex(first + i);
         }
 
         private void SetVesselAlpha(float alpha)

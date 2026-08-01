@@ -339,6 +339,70 @@ namespace Meditation.Tests
                 "A caption becomes available again exactly when its thought leaves the screen.");
         }
 
+        // ---- the defeat wallpaper (SCREENS S5: «экран ЦЕЛИКОМ закрыт мыслями») ----------------------
+
+        /// <summary>
+        /// «Целиком» was 79 % of the screen: the grid stopped at the frame, and each blob was a
+        /// silhouette fitted inside its class box, so the wallpaper had seams and a fifth of the level
+        /// showed through the thing that had just beaten the player. Mock 17 draws its blobs from −60
+        /// to 1980 — off the edges — and that is what is checked here.
+        /// </summary>
+        [Test]
+        public void TheDefeatWallpaper_ClosesTheWholeScreen_AndHangsOffItsEdges()
+        {
+            var field = new ThoughtField();
+            int added = field.CoverScreen();
+
+            Assert.Greater(added, 0, "Экран поражения не закрылся ничем.");
+            Assert.GreaterOrEqual(field.OverlapPercent, 99f,
+                "Экран поражения закрыт не целиком — сквозь мысли виден уровень.");
+
+            bool pastLeft = false, pastRight = false, pastTop = false, pastBottom = false;
+            foreach (Thought thought in field.Thoughts)
+            {
+                Rect r = thought.Rect;
+                pastLeft |= r.xMin < 0f;
+                pastRight |= r.xMax > ThoughtField.ScreenWidth;
+                pastTop |= r.yMin < 0f;
+                pastBottom |= r.yMax > ThoughtField.ScreenHeight;
+                Assert.IsTrue(thought.Wallpaper, "Обои поражения обязаны быть помечены как обои.");
+            }
+
+            Assert.IsTrue(pastLeft && pastRight && pastTop && pastBottom,
+                "Обои обязаны свисать за все четыре края кадра (кадр 17: −60…1980).");
+        }
+
+        [Test]
+        public void TheDefeatWallpaper_SkipsWhatIsAlreadyCovered()
+        {
+            // The thoughts that actually beat the player stay where they beat them.
+            var field = new ThoughtField();
+            Thought own = field.SpawnAt(ThoughtStrength.Strong, "гора посуды", new Vector2(960f, 540f));
+            field.CoverScreen();
+
+            CollectionAssert.Contains(field.Thoughts, own, "Мысль, выигравшая уровень, обязана остаться.");
+            Assert.IsFalse(own.Wallpaper, "Она не обои — её игрок и правда не отбил.");
+        }
+
+        // ---- pips belong to a thought you can see (SCREENS «Мысли») -----------------------------------
+
+        [Test]
+        public void PipsAreForThoughtsInTheFrame()
+        {
+            Vector2 size = Thought.SizeOf(ThoughtStrength.Medium);
+
+            Assert.AreEqual(1f, Meditation.View.ArtThoughtView.VisibleShare(new Vector2(960f, 540f), size),
+                1e-3f, "Мысль посреди кадра видна целиком.");
+            Assert.AreEqual(0f, Meditation.View.ArtThoughtView.VisibleShare(new Vector2(-400f, 540f), size),
+                1e-3f, "Мысль за кадром не видна вовсе — и пипсам там висеть неоткуда.");
+
+            float half = Meditation.View.ArtThoughtView.VisibleShare(
+                new Vector2(-size.x * 0.5f + size.x * 0.5f * 0.5f, 540f), size);
+            Assert.That(half, Is.InRange(0.2f, 0.35f), "Наполовину вышедшая мысль считается наполовину.");
+            Assert.Less(half, Meditation.View.ArtThoughtView.MinVisibleShareForPips,
+                "Едва торчащая из-за края мысль пипсов не показывает.");
+        }
+
         [Test]
         public void Labels_ConsecutiveSpawnsDifferEvenPastTheRegistrySize()
         {

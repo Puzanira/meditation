@@ -188,6 +188,37 @@ namespace Meditation.Mechanics
         public static float Luminance(Color colour) =>
             colour.r * 0.299f + colour.g * 0.587f + colour.b * 0.114f;
 
+        /// <summary>
+        /// WCAG relative luminance — the quantity a CONTRAST is computed from, unlike
+        /// <see cref="Luminance"/>, which is the perceptual weighting the mock's palette was judged by.
+        ///
+        /// It exists because the 2026-08-05 art made contrast the measurable question: the thoughts are
+        /// black marker on transparent, and «читается или сливается» is a ratio, not a difference.
+        /// </summary>
+        public static float RelativeLuminance(Color colour) =>
+            0.2126f * ToLinear(colour.r) + 0.7152f * ToLinear(colour.g) + 0.0722f * ToLinear(colour.b);
+
+        private static float ToLinear(float channel) =>
+            channel <= 0.04045f ? channel / 12.92f : Mathf.Pow((channel + 0.055f) / 1.055f, 2.4f);
+
+        /// <summary>WCAG contrast ratio of two colours, 1:1 … 21:1. Order does not matter.</summary>
+        public static float ContrastRatio(Color a, Color b)
+        {
+            float first = RelativeLuminance(a) + 0.05f;
+            float second = RelativeLuminance(b) + 0.05f;
+            return first > second ? first / second : second / first;
+        }
+
+        /// <summary>
+        /// The floor a thought has to clear against whatever is behind it — the walkthrough's own note
+        /// on the marker drop («если мысли сливаются… решать подложкой/обводкой»), read at the usual
+        /// 3:1 for a large shape. Measured before the backing landed: 1.6–3.5:1 median per level.
+        /// </summary>
+        public const float MinThoughtContrast = 3f;
+
+        /// <summary>Text against its plate on the outcome screens, at a museum metre.</summary>
+        public const float MinTextContrast = 4.5f;
+
         // ---- sRGB mock ↔ linear canvas ---------------------------------------------------------
 
         /// <summary>

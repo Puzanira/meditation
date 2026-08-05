@@ -184,28 +184,64 @@ namespace Meditation.Tests
         /// green the art path was tinting #5ADFE6 with (0.72, 0.79, 0.79), which multiplies the strong
         /// channels as hard as the weak one and so RAISED the frame's measured saturation from 0.474 to
         /// 0.492. A green test over the wrong path is the whole finding, so the right path gets its own.
+        ///
+        /// The 2026-08-05 drop changed what there is to measure: the thoughts are #0D0D0D marker
+        /// hatching, saturation 0, so «desaturation» is a no-op on them and the whole claim rests on
+        /// the second half of SCREENS S5 — «слегка ВЫСВЕТЛЯЕТСЯ», the half a multiply tint could never
+        /// do. That is what is asserted now, on the ink the drop actually ships.
         /// </summary>
         [Test]
-        public void DefeatDrainOfAnArtThought_LandsInTheMocksSaturationBand_AndDoesNotDarken()
+        public void DefeatDrainOfAnArtThought_LiftsTheMarkerInk_AndNeverDarkensIt()
         {
-            // The drop's whole thought set is one turquoise; this is it.
-            var turquoise = new Color(90f / 255f, 223f / 255f, 230f / 255f);
-            Color drained = ArtThoughtView.Drain(turquoise);
+            // Every one of the 25 thought PNGs is drawn in this one ink; measured off the files.
+            var ink = new Color(13f / 255f, 13f / 255f, 13f / 255f);
+            Color drained = ArtThoughtView.Drain(ink);
 
-            float before = LevelOneData.SaturationOf(turquoise);
-            float after = LevelOneData.SaturationOf(drained);
+            Assert.Less(LevelOneData.SaturationOf(ink), 0.01f,
+                "Мысли дропа 2026-08-05 обязаны быть нейтрально-чёрными — иначе это другой арт.");
+            Assert.Greater(LevelOneData.Luminance(drained), LevelOneData.Luminance(ink),
+                "«Цвета гаснут» — не «картинка темнеет»: штриховка на поражении обязана высветляться, " +
+                "а осталась " + LevelOneData.Luminance(drained).ToString("0.000") + ".");
+            Assert.Less(LevelOneData.SaturationOf(drained), 0.01f,
+                "Высветление подкрасило штриховку — на экране поражения не должно появиться цвета.");
 
-            Assert.Greater(before, 0.5f, "Бирюза дропа обязана быть насыщенной — иначе мерить нечего.");
-            Assert.Less(after, before,
-                "Десатурация поражения ПОВЫСИЛА насыщенность: " + before + " → " + after + ".");
-            AssertInBand(drained, "погашенная бирюза мыслей");
-
-            Assert.GreaterOrEqual(LevelOneData.Luminance(drained), LevelOneData.Luminance(turquoise),
-                "«Цвета гаснут» — не «картинка темнеет»: силуэт должен слегка высветляться.");
+            // …and it must not go so far that the wallpaper stops being hatching. The drain lightens;
+            // what makes the loss frame readable is the backing under the ink, not a grey wash.
+            Assert.Less(LevelOneData.Luminance(drained), 0.5f,
+                "Штриховка высветлена до полутона — от «начирканного маркером» ничего не осталось.");
 
             // …and the shader is handed exactly these numbers, so the picture cannot drift from the test.
             Assert.That(ArtThoughtView.DefeatDesaturate, Is.InRange(0f, 1f));
             Assert.That(ArtThoughtView.DefeatLighten, Is.InRange(0f, 0.5f));
+        }
+
+        /// <summary>
+        /// The light the hatching is read against, and the ink of the pips on it.
+        ///
+        /// Both are constants rather than art, so they are the one place the «чёрное по тёмному»
+        /// fix can silently rot — a backing quietly darkened to fit some other screen would take the
+        /// thoughts down with it, and no frame test names the reason. The ratio is the reason.
+        /// </summary>
+        [Test]
+        public void ThoughtBacking_CarriesBothTheHatchingAndItsPips()
+        {
+            var ink = new Color(13f / 255f, 13f / 255f, 13f / 255f);
+
+            Assert.GreaterOrEqual(LevelOneData.ContrastRatio(ArtThoughtView.BackingColour, ink),
+                LevelOneData.MinThoughtContrast * 2f,
+                "Подложка под штриховкой недостаточно светлая: контраст к чернилам " +
+                LevelOneData.ContrastRatio(ArtThoughtView.BackingColour, ink).ToString("0.0") + ":1.");
+
+            Assert.GreaterOrEqual(
+                LevelOneData.ContrastRatio(ArtThoughtView.BackingColour, ArtThoughtView.PipColour),
+                LevelOneData.MinThoughtContrast * 2f,
+                "Пипсы не читаются на своей подложке: контраст " +
+                LevelOneData.ContrastRatio(ArtThoughtView.BackingColour, ArtThoughtView.PipColour)
+                    .ToString("0.0") + ":1.");
+
+            // The halo has to be a halo: wide enough to see at a metre, narrow enough that it does not
+            // fill in the gaps the hatching is made of (SCREENS: экран под мыслями остаётся «дырявым»).
+            Assert.That(ArtThoughtView.BackingHaloPx, Is.InRange(2f, 6f));
         }
 
         [Test]

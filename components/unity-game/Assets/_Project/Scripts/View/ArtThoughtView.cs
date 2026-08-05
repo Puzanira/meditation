@@ -5,18 +5,47 @@ using UnityEngine.UI;
 namespace Meditation.View
 {
     /// <summary>
-    /// A thought as the art drop draws it: one of the level's turquoise silhouettes, with the row of
-    /// pips underneath. No label and no outlined box — the drop's own note is that the soft blurred
-    /// edge IS the style, and the text registry says the thoughts carry no text at all («без текста —
-    /// бирюзовые силуэты из арт-дропа»; the greybox captions are old placeholders that do not ship).
+    /// A thought as the art drop draws it: one of the level's black marker scribbles (drop
+    /// 2026-08-05 — before that, turquoise silhouettes), with the row of pips underneath. No label and
+    /// no outlined box — the text registry says the thoughts carry no text at all («без текста —
+    /// чёрная маркерная штриховка из дропа 2026-08-05»; the greybox captions are old placeholders
+    /// that do not ship).
     ///
-    /// The sprite is drawn at its own colour: the whole set is one turquoise (#5ADFE6) by design, so
-    /// tinting per thought would be inventing a distinction the designer removed on purpose.
+    /// The sprite is drawn at its own colour: the whole set is one ink by design, so tinting per
+    /// thought would be inventing a distinction the designer removed on purpose.
+    ///
+    /// What the ink DOES need is something to sit on. Measured on the rendered frames, the hatching
+    /// lands at 1.6–3.5:1 against the five plates (median; 40–97 % of it below 3:1, worst on the L4
+    /// embankment at 1.60) — «чёрное на тёмно-синем не разглядеть», which is why the designer put her
+    /// own sample strips in the walkthrough on a light backing. So every thought is drawn twice: the
+    /// hatching, and under it the same sprite as a light halo (<see cref="BackingColour"/>, dilated by
+    /// <see cref="BackingHaloPx"/> through <c>Meditation/ThoughtBacking</c>). A halo rather than a card
+    /// because SCREENS keeps thoughts «без обведённой рамки» and the screen under them «дырявым».
     /// </summary>
     public sealed class ArtThoughtView
     {
-        /// <summary>Pips under a silhouette: the drop's turquoise taken dark enough to read on it.</summary>
-        public static readonly Color PipColour = new Color(0.09f, 0.36f, 0.39f);
+        /// <summary>
+        /// The light the black hatching is read against — #F2F0EA, the colour the designer set behind
+        /// her own sample strips in <c>gameplay-walkthrough.html</c> («Арт уровней 1–5»). Off-white
+        /// rather than white: the same paper the marker would have been drawn on.
+        /// </summary>
+        public static readonly Color BackingColour = new Color(242f / 255f, 240f / 255f, 234f / 255f);
+
+        /// <summary>
+        /// How far the backing spreads past the ink, design px. Three is a hair over the width of a
+        /// hatch line at play size, which is what a halo has to be to separate the stroke from the
+        /// plate without closing the gaps the hatching is made of.
+        /// </summary>
+        public const float BackingHaloPx = 3f;
+
+        /// <summary>
+        /// Pips under a thought: the same ink as the hatching, on the same backing.
+        ///
+        /// The old value was the drop's turquoise taken dark enough to read ON the silhouette — but a
+        /// scribble has no fill, so the pips ended up on the bare plate, at 1.3–1.9:1. They now read
+        /// the way the thought above them does.
+        /// </summary>
+        public static readonly Color PipColour = new Color(0.06f, 0.06f, 0.07f);
 
         /// <summary>
         /// Defeat, «лёгкая десатурация» (SCREENS S5): how much of the silhouette is mixed with its own
@@ -80,12 +109,48 @@ namespace Meditation.View
             }
         }
 
+        /// <summary>
+        /// The backing material — one instance PER THOUGHT, unlike the shared fade material.
+        ///
+        /// The dilation radius is a property, and it has to be a different number for every thought:
+        /// the drop's canvases run from 454 to 1800 px and they are all drawn into the same 180–420 px
+        /// class boxes, so a radius fixed in texels would be a 2 px halo on one scribble and a 6 px one
+        /// on the next. A UGUI Image cannot carry a per-instance property block, so it carries its own
+        /// material instead.
+        ///
+        /// Null when the shader is missing, reported once — the fallback is a thought with no backing,
+        /// which is a red test rather than a crash.
+        /// </summary>
+        private static Material NewBackingMaterial()
+        {
+            var shader = Resources.Load<Shader>(Mechanics.LevelCatalog.ArtRoot + "shaders/thought-backing");
+            if (shader == null)
+            {
+                if (!_backingReported)
+                {
+                    _backingReported = true;
+                    Debug.LogError("[Meditation] Нет шейдера подложки: " +
+                                   Mechanics.LevelCatalog.ArtRoot + "shaders/thought-backing");
+                }
+                return null;
+            }
+
+            var material = new Material(shader) { hideFlags = HideFlags.DontSave };
+            material.SetColor(BackingProperty, BackingColour);
+            return material;
+        }
+
         private static readonly int DesaturateProperty = Shader.PropertyToID("_Desaturate");
         private static readonly int LightenProperty = Shader.PropertyToID("_Lighten");
+        private static readonly int BackingProperty = Shader.PropertyToID("_Backing");
+        private static readonly int SpreadProperty = Shader.PropertyToID("_SpreadUV");
 
         private static Material _fadeMaterial;
         private static bool _fadeReported;
+        private static bool _backingReported;
 
+        private readonly Image _backing;
+        private readonly Material _backingMaterial;
         private readonly Image _root;
         private readonly PipRow _pips;
 
@@ -97,19 +162,43 @@ namespace Meditation.View
 
         public ArtThoughtView(Transform parent)
         {
+            // The backing is a SIBLING created first, not a child: in UGUI a child always draws above
+            // its parent, and the whole point of this one is to be underneath.
+            _backing = Ui.NewImage(parent, "ThoughtBacking");
+            _backing.color = Color.white;
+            _backing.preserveAspect = true;
+            Ui.Place(_backing.rectTransform, 0f, 0f, 280f, 220f);
+            _backingMaterial = NewBackingMaterial();
+            _backing.material = _backingMaterial;
+            _backing.gameObject.SetActive(_backingMaterial != null);
+
             _root = Ui.NewImage(parent, "Thought");
             _root.color = Color.white;
             _root.preserveAspect = true;
             Ui.Place(_root.rectTransform, 0f, 0f, 280f, 220f);
 
-            _pips = new PipRow(_root.transform, -14f);
+            _pips = new PipRow(_root.transform, -14f, BackingColour);
         }
 
         public RectTransform Rect => _root.rectTransform;
 
         public GameObject GameObject => _root.gameObject;
 
-        public void SetActive(bool active) => _root.gameObject.SetActive(active);
+        /// <summary>
+        /// Drop the per-thought backing material. The view's GameObjects go with the level's root, but
+        /// a Material is not a component — five levels of pooled thoughts would leak a hundred of them,
+        /// and Unity reports that as a leaked-object warning in the middle of an unrelated test.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_backingMaterial != null) Object.Destroy(_backingMaterial);
+        }
+
+        public void SetActive(bool active)
+        {
+            _root.gameObject.SetActive(active);
+            _backing.gameObject.SetActive(active && _backingMaterial != null && _root.sprite != null);
+        }
 
         /// <param name="desaturated">Defeat screen: «цвета гаснут» (walkthrough frame 17).</param>
         public void Bind(Thought thought, float deltaTime, bool desaturated = false)
@@ -140,9 +229,20 @@ namespace Meditation.View
             // A silhouette normally sits INSIDE its class box (contain). The defeat wallpaper is the
             // one exception: there a blob has to close its cell, so it is scaled to COVER it — same
             // aspect, no squashing, just bigger than the hole it fills.
-            _root.rectTransform.sizeDelta = thought.Wallpaper
-                ? CoverFit(_root.sprite, thought.Size)
-                : thought.Size;
+            Vector2 box = thought.Wallpaper ? CoverFit(_root.sprite, thought.Size) : thought.Size;
+            _root.rectTransform.sizeDelta = box;
+            _backing.rectTransform.sizeDelta = box;
+            _backing.sprite = _root.sprite;
+            _backing.gameObject.SetActive(_backingMaterial != null && _root.sprite != null);
+            if (_backingMaterial != null && _root.sprite != null)
+            {
+                // The halo is asked for in DESIGN px and handed over in UV, because only this side
+                // knows how far down the sprite is being drawn (see NewBackingMaterial).
+                Vector2 drawn = ContainFit(_root.sprite, box);
+                _backingMaterial.SetVector(SpreadProperty, new Vector4(
+                    BackingHaloPx / Mathf.Max(1f, drawn.x),
+                    BackingHaloPx / Mathf.Max(1f, drawn.y), 0f, 0f));
+            }
 
             if (thought.HitsTaken > _lastHitsTaken)
             {
@@ -156,6 +256,7 @@ namespace Meditation.View
             Vector2 offset = _flinch > 0f ? _flinchOffset : Vector2.zero;
             Vector2 centre = thought.Position + offset;
             Ui.MoveTo(_root.rectTransform, centre);
+            Ui.MoveTo(_backing.rectTransform, centre);
 
             BindPips(thought, centre, desaturated);
         }
@@ -175,6 +276,21 @@ namespace Meditation.View
             if (native.x < 1f || native.y < 1f) return box;
 
             float factor = Mathf.Max(box.x / native.x, box.y / native.y);
+            return native * factor;
+        }
+
+        /// <summary>
+        /// The rect the sprite actually fills inside <paramref name="box"/> — what
+        /// <c>Image.preserveAspect</c> does. The backing needs it to state its halo in design px: the
+        /// rect a thought is given is a CLASS box (S/M/L), and a tall scribble leaves half of it empty.
+        /// </summary>
+        public static Vector2 ContainFit(Sprite sprite, Vector2 box)
+        {
+            if (sprite == null) return box;
+            Vector2 native = sprite.rect.size;
+            if (native.x < 1f || native.y < 1f) return box;
+
+            float factor = Mathf.Min(box.x / native.x, box.y / native.y);
             return native * factor;
         }
 

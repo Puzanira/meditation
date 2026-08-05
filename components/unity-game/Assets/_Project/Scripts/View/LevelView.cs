@@ -86,6 +86,9 @@ namespace Meditation.View
         /// </summary>
         public RectTransform VesselRect => _vesselWindow != null ? _vesselWindow : _vessel.rectTransform;
         public Image Background => _background;
+
+        /// <summary>The white card the outcome lines stand on (mock 17) — measured by the picture tests.</summary>
+        public RectTransform MessagePlateRect => _messagePlate.rectTransform;
         public Image Sun { get; private set; }
         public Image SunDial { get; private set; }
         public Text TimerLabel { get; private set; }
@@ -907,6 +910,9 @@ namespace Meditation.View
         /// <summary>Tear the whole level's UI down (the flow rebuilds it for the next level).</summary>
         public void Dispose()
         {
+            for (int i = 0; i < _thoughtPool.Count; i++) _thoughtPool[i].Dispose();
+            _thoughtPool.Clear();
+
             if (Root != null) Object.Destroy(Root.gameObject);
             Root = null;
         }

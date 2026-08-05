@@ -18,12 +18,22 @@ namespace Meditation.View
         private const float PipRadius = 9f;
         private const float PipStep = 28f;
 
+        /// <summary>How far the backing disc sticks out past the pip, design px.</summary>
+        private const float BackingHaloPx = 3f;
+
         private readonly List<Image> _pips = new List<Image>(MaxPips);
+        private readonly List<Image> _backings = new List<Image>(MaxPips);
         private readonly RectTransform _row;
 
         /// <param name="parent">The blob; the row anchors to its bottom edge.</param>
         /// <param name="offsetY">How far below the blob's bottom edge the row sits, design px.</param>
-        public PipRow(Transform parent, float offsetY = -18f)
+        /// <param name="backing">
+        /// A light disc under each pip, or null for none. The greybox stand does not need it — its
+        /// blobs are pastel FILLS and the pips sit on them. The art thoughts are hatching with nothing
+        /// behind it, so their pips land on the bare plate and need the same backing the strokes get
+        /// (see <see cref="ArtThoughtView.BackingColour"/>).
+        /// </param>
+        public PipRow(Transform parent, float offsetY = -18f, Color? backing = null)
         {
             var rowGo = new GameObject("Pips", typeof(RectTransform));
             rowGo.transform.SetParent(parent, false);
@@ -34,6 +44,22 @@ namespace Meditation.View
             _row.sizeDelta = new Vector2(MaxPips * PipStep, PipRadius * 2f);
             _row.anchoredPosition = new Vector2(0f, offsetY);
             OffsetY = offsetY;
+
+            // Every backing first, then every pip: siblings draw in order, so one row of discs has to
+            // be complete before the row of pips starts, or pip 3's disc would sit on top of pip 2.
+            if (backing.HasValue)
+            {
+                for (int i = 0; i < MaxPips; i++)
+                {
+                    Image disc = Ui.Circle(_row, "PipBacking" + i, 0f, 0f, PipRadius + BackingHaloPx,
+                        backing.Value, backing.Value);
+                    disc.rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                    disc.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                    disc.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                    disc.gameObject.SetActive(false);
+                    _backings.Add(disc);
+                }
+            }
 
             for (int i = 0; i < MaxPips; i++)
             {
@@ -79,10 +105,17 @@ namespace Meditation.View
                 _pips[i].gameObject.SetActive(used);
                 if (!used) continue;
 
-                _pips[i].rectTransform.anchoredPosition = new Vector2((i - (total - 1) * 0.5f) * PipStep, 0f);
+                Vector2 at = new Vector2((i - (total - 1) * 0.5f) * PipStep, 0f);
+                _pips[i].rectTransform.anchoredPosition = at;
                 _pips[i].sprite = i >= left ? UiSprites.Ring : UiSprites.Circle;
                 _pips[i].color = colour;
+
+                if (_backings.Count == 0) continue;
+                _backings[i].rectTransform.anchoredPosition = at;
             }
+
+            for (int i = 0; i < _backings.Count; i++)
+                _backings[i].gameObject.SetActive(i < total);
         }
     }
 }

@@ -464,7 +464,7 @@
 <div class="d">Сцена почти не видна, сосуд полузакрыт [toggle], края экрана темнеют. Перекрытие ≥ порога [tune] — проигрыш. Успел разгрести — сеттинг проступает обратно.</div></figcaption>
 </figure>
 
-<h2>Исходы уровня</h2>
+<h2>Исходы уровня — схема (итоговые экраны ниже, Э3–Э4)</h2>
 
 <!-- 17 поражение -->
 <figure>
@@ -520,8 +520,8 @@
 <div class="d">Все 5 деталей собраны до конца таймера: мысли растворяются (0.5 с), секунда чистой «тишины», сосуд ×2 в центре со всей добычей. Дальше карточка следующего уровня (как шаг 2).</div></figcaption>
 </figure>
 
-<h2>Уровни 2–5 — та же игра, новые сцены (greybox по раскадровкам)</h2>
-<div class="note">Кадры 19–22 — старый greybox: показывают механику и раскладку. Итоговый вид всех сцен — в секции «Арт уровней 1–5» ниже (арт = канон, 2026-07-31; вторым дропом доехали уровни 4–5 — в игре все пять).</div>
+<h2>Старый greybox уровней — только про механику</h2>
+<div class="note">Кадры 19–22 — старый greybox: нумерация уровней на них <b>устарела</b> (порядок изменён 2026-08-07), смотреть их стоит только как схему поведения. Итоговый вид сцен — в секции «Арт всех уровней» ниже.</div>
 
 <!-- 19 L2 -->
 <figure>
@@ -651,83 +651,137 @@
 <div class="lg"><span class="k">1</span>стикер на мониторе (900,420)<span class="k">2</span>растение на подоконнике (1530,390)<span class="k">3</span>скрепка (130,760)<span class="k">4</span>игрушка-антистресс (480,850)<span class="k">5</span>тапки из-под стола (1380,980)</div></figcaption>
 </figure>
 
-<h2>Арт уровней 1–5 — канон (дропы 2026-07-31, мысли обновлены 2026-08-05)</h2>
-<div class="note">Арт = канон, спека переписана под него (SCREENS.md «Сцены уровней»). Каждый отдельный спрайт объекта — деталь для сбора, декор запечён в фон. <b>Мысли обновлены 2026-08-05: чёрная маркерная штриховка вместо прежних бирюзовых силуэтов</b> — полоски под каждой сценой показывают новый вид. Сцены, объекты и позиции не менялись. Все файлы теперь в одной папке: docs/design/все уровни/.</div>
-<div class="note" style="background:#fdeaea;color:#8a1a1a">Проверить на плейтесте: чёрная штриховка ложится на тёмные сцены — вечернюю улицу (L1), метро (L3), тёмный офис (L5). Прежняя бирюза давала контраст сама по себе; если мысли «сливаются», решать подложкой/обводкой, а не переделкой арта. Там же — экран поражения: он был рассчитан на высветление бирюзы (SCREENS.md, S5).</div>
+<h2>Арт всех уровней — канон (дроп 2026-08-07)</h2>
+<div class="note"><b>Порядок уровней изменён:</b> вперёд вынесены сцены, где меньше объектов — набережная (5) → офис (5) → метро (6) → библиотека (8) → город (8). Спрайты те же, что были, поэтому расстановка не поехала. <b>Фоны затемнены</b> (×0.49), чтобы объекты читались. <b>Убраны две лужи</b> как интерактивные объекты — в городе и в метро.</div>
+<div class="note">Заказ основательницы: по деталям время от времени пробегает <b>луч-подсветка</b> — сделать можно, светит по спрайтам деталей, а не по фону; период, ширина и яркость выносятся на панель (SCREENS.md, «Детали в сцене»).</div>
 
 <figure>
-<img src="все уровни/L1/превью.png" style="width:100%;border-radius:6px;display:block" alt="Уровень 1 — авторская сборка">
-<figcaption><div class="t">А1 · Уровень 1 — улица, вечер</div>
-<div class="d">10 деталей: воробей на крыше · облако у столба · облако у провода · луна · летучая мышь · шторы в окне · горшок с цветком · лоза на стене · одуванчик · лужа у двери. Сосуд — портфель на тротуаре.</div>
+<img src="арт/уровни/L1/превью.png" style="width:100%;border-radius:6px;display:block" alt="А1 · Уровень 1 — набережная, закат">
+<figcaption><div class="t">А1 · Уровень 1 — набережная, закат</div>
+<div class="d">5 деталей: самолёт в небе · чайка · кораблик · акулий плавник · ракушка. Сосуд — ведёрко на асфальте. Дальние чайки, зарево и мокрые следы — декор в фоне.</div>
 <div style="display:flex;gap:8px;margin-top:10px;align-items:center;background:#f2f0ea;border:1px solid #ddd;border-radius:6px;padding:8px">
-  <img src="все уровни/L1/мысли/overlay-teddy-bear.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="мишка">
-  <img src="все уровни/L1/мысли/overlay-empty-bed.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="кровать">
-  <img src="все уровни/L1/мысли/overlay-cake.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="пирожное">
-  <img src="все уровни/L1/мысли/overlay-question-marks.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="вопросики">
-  <img src="все уровни/L1/мысли/overlay-coin-purse.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="кошелёк">
+  <img src="арт/уровни/L1/мысли/cat.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="кот">
+  <img src="арт/уровни/L1/мысли/guitar.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="гитара">
+  <img src="арт/уровни/L1/мысли/winebottle.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="вино">
+  <img src="арт/уровни/L1/мысли/butterfly.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="бабочка">
+  <img src="арт/уровни/L1/мысли/umbrella.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="зонт">
 </div>
-<div class="d">Мысли уровня 1: мишка · пустая кровать · пирожное · клубок вопросиков · кошелёк</div>
+<div class="d">Мысли уровня: кот · гитара · вино · бабочка · зонт</div>
 </figcaption>
 </figure>
 
 <figure>
-<img src="все уровни/L2/превью.png" style="width:100%;border-radius:6px;display:block" alt="Уровень 2 — авторская сборка">
-<figcaption><div class="t">А2 · Уровень 2 — библиотека</div>
-<div class="d">8 деталей: солнце на постере · кот на подоконнике · бюст · раскрытая книга · лампа · очки на скамье · валентинка · мышь с книжкой. Сосуд — рюкзак на полу.</div>
+<img src="арт/уровни/L2/превью.png" style="width:100%;border-radius:6px;display:block" alt="А2 · Уровень 2 — офис, вечер">
+<figcaption><div class="t">А2 · Уровень 2 — офис, вечер</div>
+<div class="d">5 деталей: цветок в окне · скрепка · стикер на мониторе · улитка-игрушка · тапки. Сосуд — кружка на столе. Внимание: два жёлтых стикера в фоне — декор-обманки, не детали.</div>
 <div style="display:flex;gap:8px;margin-top:10px;align-items:center;background:#f2f0ea;border:1px solid #ddd;border-radius:6px;padding:8px">
-  <img src="все уровни/L2/мысли/marker-alarm-clock-legs.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="будильник">
-  <img src="все уровни/L2/мысли/marker-burger.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="гамбургер">
-  <img src="все уровни/L2/мысли/marker-baby-head.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="младенец">
-  <img src="все уровни/L2/мысли/marker-mushroom.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="гриб">
-  <img src="все уровни/L2/мысли/marker-speech-bubble-dots.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="пузырь">
+  <img src="арт/уровни/L2/мысли/banknote.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="купюра">
+  <img src="арт/уровни/L2/мысли/cake.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="торт">
+  <img src="арт/уровни/L2/мысли/glasses.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="очки">
+  <img src="арт/уровни/L2/мысли/palm.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="пальма">
+  <img src="арт/уровни/L2/мысли/paperplane.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="самолётик">
 </div>
-<div class="d">Мысли уровня 2: будильник с ногами · гамбургер · младенец с бантом · гриб · пузырь «печатает…»</div>
+<div class="d">Мысли уровня: купюра · торт · очки · пальма · самолётик</div>
 </figcaption>
 </figure>
 
 <figure>
-<img src="все уровни/L3/превью.png" style="width:100%;border-radius:6px;display:block" alt="Уровень 3 — авторская сборка">
+<img src="арт/уровни/L3/превью.png" style="width:100%;border-radius:6px;display:block" alt="А3 · Уровень 3 — метро">
 <figcaption><div class="t">А3 · Уровень 3 — метро</div>
-<div class="d">7 деталей: гусь из-за края · плакат «Пляжи Сызрани» · стикер на поручне · газета в воздухе · перчатка на сиденье · лужа · рыба на полу. Сосуд — сумка пассажира (запечена в фон — реализатору: наполнение оверлеем или отдельным спрайтом от дизайнера).</div>
+<div class="d">6 деталей: гусь из-за края · плакат «Пляжи Сызрани» · стикер на поручне · газета · перчатка · рыба на полу. Сосуд — сумка пассажира (запечена в фон). Лужа на полу больше не деталь.</div>
 <div style="display:flex;gap:8px;margin-top:10px;align-items:center;background:#f2f0ea;border:1px solid #ddd;border-radius:6px;padding:8px">
-  <img src="все уровни/L3/мысли/phone_call.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="звонок">
-  <img src="все уровни/L3/мысли/soccer_ball.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="мяч">
-  <img src="все уровни/L3/мысли/exclamations.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="восклицания">
-  <img src="все уровни/L3/мысли/beetle.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="жук">
-  <img src="все уровни/L3/мысли/sock.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="носок">
+  <img src="арт/уровни/L3/мысли/phone_call.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="звонок">
+  <img src="арт/уровни/L3/мысли/soccer_ball.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="мяч">
+  <img src="арт/уровни/L3/мысли/exclamations.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="восклицания">
+  <img src="арт/уровни/L3/мысли/beetle.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="жук">
+  <img src="арт/уровни/L3/мысли/sock.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="носок">
 </div>
-<div class="d">Мысли уровня 3: телефонный звонок · футбольный мяч · восклицания · жук · носок</div>
+<div class="d">Мысли уровня: звонок · мяч · восклицания · жук · носок</div>
 </figcaption>
 </figure>
 
 <figure>
-<img src="все уровни/L4/превью.png" style="width:100%;border-radius:6px;display:block" alt="Уровень 4 — авторская сборка">
-<figcaption><div class="t">А4 · Уровень 4 — набережная (Питер), закат</div>
-<div class="d">5 деталей: самолёт в небе · чайка · кораблик · акулий плавник в воде · ракушка на асфальте. Сосуд — ведёрко на асфальте. Дальние чайки, зарево и мокрые следы — декор в фоне.</div>
+<img src="арт/уровни/L4/превью.png" style="width:100%;border-radius:6px;display:block" alt="А4 · Уровень 4 — библиотека">
+<figcaption><div class="t">А4 · Уровень 4 — библиотека</div>
+<div class="d">8 деталей: солнце на постере · кот · бюст · раскрытая книга · лампа · очки · валентинка · мышь с книжкой. Сосуд — рюкзак на полу.</div>
 <div style="display:flex;gap:8px;margin-top:10px;align-items:center;background:#f2f0ea;border:1px solid #ddd;border-radius:6px;padding:8px">
-  <img src="все уровни/L4/мысли/cat.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="кот">
-  <img src="все уровни/L4/мысли/guitar.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="гитара">
-  <img src="все уровни/L4/мысли/winebottle.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="вино">
-  <img src="все уровни/L4/мысли/butterfly.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="бабочка">
-  <img src="все уровни/L4/мысли/umbrella.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="зонт">
+  <img src="арт/уровни/L4/мысли/marker-alarm-clock-legs.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="будильник">
+  <img src="арт/уровни/L4/мысли/marker-burger.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="гамбургер">
+  <img src="арт/уровни/L4/мысли/marker-baby-head.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="младенец">
+  <img src="арт/уровни/L4/мысли/marker-mushroom.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="гриб">
+  <img src="арт/уровни/L4/мысли/marker-speech-bubble-dots.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="пузырь">
 </div>
-<div class="d">Мысли уровня 4: кот · гитара · бутылка вина · бабочка · зонт</div>
+<div class="d">Мысли уровня: будильник · гамбургер · младенец · гриб · пузырь</div>
 </figcaption>
 </figure>
 
 <figure>
-<img src="все уровни/L5/превью.png" style="width:100%;border-radius:6px;display:block" alt="Уровень 5 — авторская сборка">
-<figcaption><div class="t">А5 · Уровень 5 — офис, вечер</div>
-<div class="d">5 деталей: цветок в окне · скрепка · стикер на мониторе (центрально-правый стол) · улитка-игрушка · тапки. Сосуд — кружка на столе. Внимание: два жёлтых стикера в фоне (лэптоп слева-сверху, правый монитор) — декор-обманки, не детали. Постер «рост прибыли босса» запечён.</div>
+<img src="арт/уровни/L5/превью.png" style="width:100%;border-radius:6px;display:block" alt="А5 · Уровень 5 — город, вечер">
+<figcaption><div class="t">А5 · Уровень 5 — город, вечер</div>
+<div class="d">8 деталей: воробей · облако у столба · луна · летучая мышь · шторы · горшок с цветком · лоза · одуванчик. Сосуд — дипломат на тротуаре. Лужа у двери убрана; облако у провода остаётся декором — оно впечено в фон.</div>
 <div style="display:flex;gap:8px;margin-top:10px;align-items:center;background:#f2f0ea;border:1px solid #ddd;border-radius:6px;padding:8px">
-  <img src="все уровни/L5/мысли/banknote.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="купюра">
-  <img src="все уровни/L5/мысли/cake.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="торт">
-  <img src="все уровни/L5/мысли/glasses.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="очки">
-  <img src="все уровни/L5/мысли/palm.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="пальма">
-  <img src="все уровни/L5/мысли/paperplane.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="самолётик">
+  <img src="арт/уровни/L5/мысли/overlay-teddy-bear.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="мишка">
+  <img src="арт/уровни/L5/мысли/overlay-empty-bed.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="кровать">
+  <img src="арт/уровни/L5/мысли/overlay-cake.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="пирожное">
+  <img src="арт/уровни/L5/мысли/overlay-question-marks.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="вопросики">
+  <img src="арт/уровни/L5/мысли/overlay-coin-purse.png" style="height:84px;min-width:0;flex:1;object-fit:contain" alt="кошелёк">
 </div>
-<div class="d">Мысли уровня 5: купюра · торт · очки · пальма · бумажный самолётик</div>
+<div class="d">Мысли уровня: мишка · кровать · пирожное · вопросики · кошелёк</div>
 </figcaption>
+</figure>
+
+<h2>Готовые экраны (дроп 2026-08-07) — заменяют старые greybox-кадры 1, 2, 17, 18, 23</h2>
+<div class="note">Тексты запечены в картинки — поверх ничего не пишем, старые формулировки из реестра выведены из игры. Рендеры 3840×2160 → даунскейл ×0.5.</div>
+
+<figure>
+<img src="арт/экраны/Title/превью.png" style="width:100%;border-radius:6px;display:block" alt="Титул">
+<figcaption><div class="t">Э1 · Титул</div>
+<div class="d">«Медитация в спешке» · «Замечай жизнь в деталях и не давай мыслям унести тебя» · кнопка НАЧАТЬ. Старт по-прежнему двумя оборотами динамо — кнопка это призыв, а не клик (мыши на стойке нет).</div></figcaption>
+</figure>
+
+<figure>
+<img src="арт/экраны/level-1-start-screen.png" style="width:100%;border-radius:6px;display:block" alt="Карточка уровня 1">
+<figcaption><div class="t">Э2 · Карточка уровня (пример — уровень 1)</div>
+<div class="d">«Уровень 1 · Набережная» · «Собирай детали в ведёрко и отгоняй мешающие мысли». Свои карточки у всех пяти: кружка · карман пассажира · рюкзак · дипломат. 2.5 с, автопереход.</div></figcaption>
+</figure>
+
+<figure>
+<img src="арт/экраны/level-complete.png" style="width:100%;border-radius:6px;display:block" alt="Победа уровня">
+<figcaption><div class="t">Э3 · Победа уровня</div>
+<div class="d">«Отлично! Ты был здесь и сейчас и заметил всё. Двигаемся дальше!» Перед этим экраном предлагаю оставить прежний бит награды: сосуд выезжает в центр и в нём лежит всё собранное (1.5 с) — иначе игрок ни разу не видит свою добычу.</div></figcaption>
+</figure>
+
+<figure>
+<img src="арт/экраны/game-over-screen.png" style="width:100%;border-radius:6px;display:block" alt="Поражение">
+<figcaption><div class="t">Э4 · Поражение</div>
+<div class="d">«Мысли захватили тебя, ты не заметил жизнь вокруг. Попробуй ещё раз!» Экран нарисован — вопрос «как гасить мысли на поражении» закрыт. Ретрай кручением: каждый оборот стирает ~10 % штриховки.</div></figcaption>
+</figure>
+
+<figure>
+<img src="арт/экраны/final-screen.png" style="width:100%;border-radius:6px;display:block" alt="Финал">
+<figcaption><div class="t">Э5 · Финал</div>
+<div class="d">«Ура! Ты смог замечать эту жизнь в деталях, несмотря ни на что!» Все локации в одном кадре. Через 20 с или по любому вводу — выход в лаунчер.</div></figcaption>
+</figure>
+
+<figure>
+<div style="display:flex;flex-direction:column;gap:10px;align-items:center;background:#f2f0ea;border:1px solid #ddd;border-radius:6px;padding:14px">
+  <img src="арт/кнопки/title-start-button.png" style="max-width:34%" alt="НАЧАТЬ">
+  <img src="арт/кнопки/button-navodi.png" style="max-width:46%" alt="НАВОДИ">
+  <img src="арт/кнопки/button-kruti-ruchku.png" style="max-width:64%" alt="КРУТИ РУЧКУ">
+  <img src="арт/кнопки/button-tashi.png" style="max-width:38%" alt="ТАЩИ">
+</div>
+<figcaption><div class="t">Э6 · Кнопки-подсказки</div>
+<div class="d">НАЧАТЬ — на титуле. НАВОДИ · КРУТИ РУЧКУ · ТАЩИ — три бита обучения на первом уровне. <b>Не хватает четвёртой — «ТРЯСИ»</b>: бит «отгони мысль» остался без кнопки, до неё показываем стрелку на джойстик без текста.</div></figcaption>
+</figure>
+
+<figure>
+<div style="background:#f2f0ea;border:1px solid #ddd;border-radius:6px;padding:14px;font-size:14px;line-height:1.7;color:#444">
+<b>Фон уровня</b> — свой трек на каждый: набережная · офис · метро · библиотека · город.<br>
+<b>«Медитация»</b> — включается вместо фона, пока сбор идёт успешно; сорвал деталь — обратно фон.<br>
+<b>«Мысли»</b> — играет всегда, громкость растёт с числом мыслей на экране.
+</div>
+<figcaption><div class="t">Э7 · Звук</div>
+<div class="d">Семь треков в <code>арт/звук/</code>. Кроссфейды, потолок громкости и порог «сколько мыслей = максимум» вынесены на панель тюнинга — докрутите на плейтесте (MECHANICS §8).</div></figcaption>
 </figure>
 
 <h2>Финал</h2>
@@ -752,7 +806,7 @@
   <use href="#joy" transform="translate(1360,1170)" opacity="0.45"/>
   <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: —</text>
 </svg>
-<figcaption><div class="t">23 · Финал после уровня 5 — пять сосудов в ряд</div>
+<figcaption><div class="t">23 · Финал — старый greybox, заменён экраном Э5</div>
 <div class="d">Все 5 сосудов с добычей за день. Любой ввод или 20 с тишины — чистый выход в лаунчер.</div></figcaption>
 </figure>
 
@@ -794,21 +848,21 @@
 
 <figure>
 <table>
-<tr><th>Где</th><th>Текст (точная строка)</th><th>Кегль</th><th>Когда показывается</th></tr>
-<tr><td class="s">Титул</td><td><b>МЕДИТАЦИЯ В СПЕШКЕ</b></td><td class="s">100</td><td>всегда на титуле</td></tr>
-<tr><td class="s">Титул, карточка слева</td><td><b>КРУТИ</b> / собирай детали</td><td class="s">36 / 28</td><td>всегда на титуле</td></tr>
-<tr><td class="s">Титул, карточка справа</td><td><b>ТРЯСИ</b> / отгоняй мысли</td><td class="s">36 / 28</td><td>всегда на титуле</td></tr>
-<tr><td class="s">Титул, низ</td><td>Крути ручку, чтобы начать</td><td class="s">40</td><td>всегда на титуле; после 2 оборотов — старт</td></tr>
-<tr><td class="s">Карточка уровня</td><td>Уровень 1 / Улица · Уровень 2 / Библиотека · Уровень 3 / Метро · Уровень 4 / Набережная · Уровень 5 / Офис</td><td class="s">64</td><td>2.5 с перед каждым уровнем</td></tr>
-<tr><td class="s">Обучение, бит 1</td><td>Крути ручку!</td><td class="s">44</td><td>уровень 1, старт; исчезает после первой детали в сосуде</td></tr>
-<tr><td class="s">Обучение, бит 2</td><td>Тряси джойстик!</td><td class="s">44</td><td>уровень 1, при первой мысли; исчезает, когда она отбита</td></tr>
-<tr><td class="s">Обучение, бит 3</td><td>Оглядись — наклони стик</td><td class="s">44</td><td>уровень 1, один раз после отбитой первой мысли; исчезает при первом «замечании»</td></tr>
-<tr><td class="s">Победа уровня</td><td>Собрано: &lt;название сеттинга&gt;</td><td class="s">52</td><td>3 с на экране победы</td></tr>
-<tr><td class="s">Поражение</td><td>Мысли захватили всё. Вдохни. / Крути ручку — попробуй снова</td><td class="s">60 / 40</td><td>до расчистки экрана кручением (или авто-ретрая [toggle])</td></tr>
-<tr><td class="s">Финал</td><td>Ты заметил(а) всё. Даже в спешке. / портфель · рюкзак · сумка · ведёрко · кружка</td><td class="s">56 / 32</td><td>после уровня 5, до выхода в лаунчер</td></tr>
-<tr><td class="s">Тексты, запечённые в арт</td><td>L1: Pipo · DENNY WUZ HERE · B+K · HELLO stranger — граффити на фоне; L2: Kozemirych (постер); L3: «Отдыхайте на пляжах Сызрани» (плакат-деталь) · Kilroy (стикер-деталь); L5: «рост прибыли босса» (постер)</td><td class="s">—</td><td>часть фонов/спрайтов, отдельно не рендерятся</td></tr>
-<tr><td class="s">Мысли</td><td>без текста — чёрная маркерная штриховка из дропа 2026-08-05 (секция «Арт уровней 1–5»); подписи на greybox-кадрах — старые плейсхолдеры, в игру не идут</td><td class="s">—</td><td>арт = канон</td></tr>
-<tr><td class="s">Служебное</td><td>кнопка «в меню» — БЕЗ текста и подтверждений: мгновенный чистый выход в лаунчер из любого экрана</td><td class="s">—</td><td>контракт стойки</td></tr>
+<tr><th>Где</th><th>Текст (точная строка)</th><th>Откуда</th><th>Когда показывается</th></tr>
+<tr><td class="s">Титул</td><td><b>Медитация в спешке</b> / Замечай жизнь в деталях и не давай мыслям унести тебя / кнопка <b>НАЧАТЬ</b></td><td class="s">запечён в арт</td><td>всегда на титуле; старт — 2 оборота динамо</td></tr>
+<tr><td class="s">Карточка уровня 1</td><td><b>Уровень 1 · Набережная</b> / Собирай детали в ведёрко и отгоняй мешающие мысли</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
+<tr><td class="s">Карточка уровня 2</td><td><b>Уровень 2 · Офис</b> / …в кружку…</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
+<tr><td class="s">Карточка уровня 3</td><td><b>Уровень 3 · Метро</b> / …в карман пассажира…</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
+<tr><td class="s">Карточка уровня 4</td><td><b>Уровень 4 · Библиотека</b> / …в рюкзак…</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
+<tr><td class="s">Карточка уровня 5</td><td><b>Уровень 5 · Город</b> / …в дипломат…</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
+<tr><td class="s">Обучение, биты</td><td>картинки-кнопки: <b>НАВОДИ</b> → <b>КРУТИ РУЧКУ</b> → <b>ТАЩИ</b>; для «отгони мысль» кнопки нет — запрос дизайнеру</td><td class="s">арт/кнопки/</td><td>уровень 1, таймер стоит</td></tr>
+<tr><td class="s">Победа уровня</td><td>Отлично! Ты был здесь и сейчас и заметил всё. Двигаемся дальше!</td><td class="s">запечён в арт</td><td>после беата «сосуд с деталями»</td></tr>
+<tr><td class="s">Поражение</td><td>Мысли захватили тебя, ты не заметил жизнь вокруг. Попробуй ещё раз!</td><td class="s">запечён в арт</td><td>до расчистки экрана кручением (или авто-ретрая)</td></tr>
+<tr><td class="s">Финал</td><td>Ура! Ты смог замечать эту жизнь в деталях, несмотря ни на что!</td><td class="s">запечён в арт</td><td>после уровня 5, до выхода в лаунчер</td></tr>
+<tr><td class="s">Тексты внутри сцен</td><td>город: Pipo · DENNY WUZ HERE · B+K · HELLO stranger; библиотека: Kozemirych (постер); метро: «Отдыхайте на пляжах Сызрани» (плакат-деталь) · Kilroy (стикер-деталь); офис: «рост прибыли босса» (постер)</td><td class="s">запечён в арт</td><td>часть фонов/спрайтов, отдельно не рендерятся</td></tr>
+<tr><td class="s">Мысли</td><td>без текста — чёрная маркерная штриховка</td><td class="s">арт</td><td>всегда</td></tr>
+<tr><td class="s">Служебное</td><td>кнопка «в меню» — БЕЗ текста и подтверждений: мгновенный чистый выход в лаунчер из любого экрана</td><td class="s">контракт стойки</td><td>всегда</td></tr>
+<tr><td class="s">Выведено из игры</td><td>«МЕДИТАЦИЯ В СПЕШКЕ» капслоком · «Крути ручку, чтобы начать» · «Собрано: …» · «Мысли захватили всё. Вдохни.» · «Ты заметил(а) всё. Даже в спешке.» · тексты обучения строками</td><td class="s">—</td><td>заменено отрисованными экранами и кнопками 2026-08-07</td></tr>
 </table>
 <figcaption><div class="t">25 · Реестр текстов</div>
 <div class="d">Других текстов в игре нет: ни своего меню, ни пауз, ни настроек — стойка запускает и завершает игру сама. Любой новый текст сначала добавляется сюда.</div></figcaption>

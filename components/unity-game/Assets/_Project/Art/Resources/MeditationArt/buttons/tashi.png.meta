@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ab032ecf3fa224ea6bbfaa20c636be34
+guid: 6b5da9a5d3d474ee5994af51c0f87bd1
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8732635013323328055
-    second: cake_0
+      213: 6982013708806355923
+    second: tashi_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: cake_0
+      name: tashi_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 913
-        height: 1786
+        width: 756
+        height: 264
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 73a8642f64d803970800000000000000
-      internalID: 8732635013323328055
+      spriteID: 3db7f42d97815e060800000000000000
+      internalID: 6982013708806355923
       vertices: []
       indices: 
       edges: []

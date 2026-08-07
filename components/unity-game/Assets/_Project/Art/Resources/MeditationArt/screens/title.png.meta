@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 911047f4199ef4a01929f3d0b9e9f808
+guid: 12dff482ffe99445684f16e8cc653017
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5160882468792293898
-    second: puddle_0
+      213: 4369572136041557648
+    second: title_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: puddle_0
+      name: title_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 440
-        height: 131
+        width: 1920
+        height: 1080
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 6f52818fcbcd068b0800000000000000
-      internalID: -5160882468792293898
+      spriteID: 09ea33de4b6d3ac30800000000000000
+      internalID: 4369572136041557648
       vertices: []
       indices: 
       edges: []

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 31c8d70e0b8f04df9982a362f9f825db
+guid: e088a69e41f144cd48c23bba59a6d145
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5160882468792293898
-    second: puddle_0
+      213: 1552609842605766892
+    second: kruti-ruchku_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: puddle_0
+      name: kruti-ruchku_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 520
-        height: 104
+        width: 1404
+        height: 264
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 6f52818fcbcd068b0800000000000000
-      internalID: -5160882468792293898
+      spriteID: ce8ba4ffc6afb8510800000000000000
+      internalID: 1552609842605766892
       vertices: []
       indices: 
       edges: []

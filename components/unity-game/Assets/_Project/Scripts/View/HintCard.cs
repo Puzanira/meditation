@@ -8,7 +8,16 @@ namespace Meditation.View
     {
         /// <summary>Динамо / сбор — зелёный #1a6e46.</summary>
         Crank = 0,
-        /// <summary>Тряска — красный #8f2f2c.</summary>
+        /// <summary>
+        /// Тряска — бирюза дропа #8fd7d6.
+        ///
+        /// Was the mock's brick red #8f2f2c, and the mock was greybox: a white card with a word on it,
+        /// standing on flat rectangles. This beat is now the ONLY hint with no button — the drop ships
+        /// no «ТРЯСИ» — so its arrow is all the player sees of it, and a red stroke belongs to nothing
+        /// in the frame. The drop's own three hint buttons are painted in exactly this turquoise
+        /// (measured off навoди / крути ручку / тащи: 45 756 px of #8fd7d6, their single dominant
+        /// colour), so the arrow reads as the fourth button's line rather than as an alarm.
+        /// </summary>
         Shake = 1,
         /// <summary>Взгляд — синий #39587a.</summary>
         Gaze = 2
@@ -17,22 +26,18 @@ namespace Meditation.View
     /// <summary>
     /// The teaching card of the mock: a white rounded card (rx=18) with a 4 px coloured border and
     /// 44 pt text, standing NEXT TO the thing it talks about, with a curved arrow pointing at it.
-    /// Colour says which hand: green = crank, red = shake, blue = gaze.
+    /// Colour says which hand: green = crank, turquoise = shake, blue = gaze.
     ///
     /// The stand had a grey centred line instead; the colour pairing is a through-line of the mock,
     /// so it is rebuilt here rather than approximated.
     /// </summary>
     public sealed class HintCard
     {
-        private const int ArrowSegments = 7;
-
         private static readonly Color Paper = new Color(1f, 1f, 1f, 0.97f);
 
         private readonly Image _card;
         private readonly Text _label;
-        private readonly RectTransform _arrow;
-        private readonly Image[] _segments = new Image[ArrowSegments];
-        private readonly Image[] _head = new Image[2];
+        private readonly HintArrow _arrow;
 
         private Vector2 _centre;
         private float _width;
@@ -49,19 +54,7 @@ namespace Meditation.View
             labelRt.offsetMin = new Vector2(16f, 8f);
             labelRt.offsetMax = new Vector2(-16f, -8f);
 
-            var arrowGo = new GameObject("HintArrow", typeof(RectTransform));
-            arrowGo.transform.SetParent(parent, false);
-            _arrow = (RectTransform)arrowGo.transform;
-            _arrow.anchorMin = Vector2.zero;
-            _arrow.anchorMax = Vector2.one;
-            _arrow.offsetMin = Vector2.zero;
-            _arrow.offsetMax = Vector2.zero;
-
-            for (int i = 0; i < ArrowSegments; i++)
-                _segments[i] = Ui.Segment(_arrow, "ArrowSeg" + i, Color.black, 6f);
-            for (int i = 0; i < 2; i++)
-                _head[i] = Ui.Segment(_arrow, "ArrowHead" + i, Color.black, 6f);
-
+            _arrow = new HintArrow(parent);
             Hide();
         }
 
@@ -99,7 +92,7 @@ namespace Meditation.View
         public void Hide()
         {
             _card.gameObject.SetActive(false);
-            _arrow.gameObject.SetActive(false);
+            _arrow.Hide();
         }
 
         /// <param name="text">Exact string from the walkthrough's text registry.</param>
@@ -115,7 +108,6 @@ namespace Meditation.View
             Color ink = ToneColour(tone);
 
             _card.gameObject.SetActive(true);
-            _arrow.gameObject.SetActive(true);
 
             float width = WidthFor(text);
             _card.rectTransform.sizeDelta = new Vector2(width, CardHeight);
@@ -150,8 +142,7 @@ namespace Meditation.View
             Vector2 from = EdgePointTowards(_centre, _width, target);
             Vector2 approach = target - from;
             float travel = Mathf.Max(20f, approach.magnitude - Mathf.Max(0f, _standoff));
-            Vector2 to = from + approach.normalized * travel;
-            DrawArrow(from, to, _ink);
+            _arrow.Draw(from, from + approach.normalized * travel, _ink);
         }
 
         /// <summary>Start the arrow on the card's border, not in the middle of the text.</summary>
@@ -167,49 +158,12 @@ namespace Meditation.View
             return centre + direction * Mathf.Min(scaleX, scaleY);
         }
 
-        /// <summary>A quadratic bend, drawn as short straight segments — the mock's curved arrow.</summary>
-        private void DrawArrow(Vector2 from, Vector2 to, Color colour)
-        {
-            Vector2 straight = to - from;
-            Vector2 perpendicular = new Vector2(-straight.y, straight.x).normalized;
-            Vector2 control = (from + to) * 0.5f + perpendicular * (straight.magnitude * 0.18f);
-
-            Vector2 previous = from;
-            Vector2 last = from;
-            for (int i = 0; i < ArrowSegments; i++)
-            {
-                float t = (i + 1f) / ArrowSegments;
-                Vector2 point = Bezier(from, control, to, t);
-                _segments[i].color = colour;
-                Ui.StretchLine(_segments[i].rectTransform, previous, point);
-                last = previous;
-                previous = point;
-            }
-
-            Vector2 incoming = (to - last).normalized;
-            for (int i = 0; i < 2; i++)
-            {
-                float angle = (i == 0 ? 150f : -150f) * Mathf.Deg2Rad;
-                Vector2 barb = new Vector2(
-                    incoming.x * Mathf.Cos(angle) - incoming.y * Mathf.Sin(angle),
-                    incoming.x * Mathf.Sin(angle) + incoming.y * Mathf.Cos(angle));
-                _head[i].color = colour;
-                Ui.StretchLine(_head[i].rectTransform, to, to + barb * 26f);
-            }
-        }
-
-        private static Vector2 Bezier(Vector2 a, Vector2 control, Vector2 b, float t)
-        {
-            float inv = 1f - t;
-            return inv * inv * a + 2f * inv * t * control + t * t * b;
-        }
-
         public static Color ToneColour(HintTone tone)
         {
             switch (tone)
             {
                 case HintTone.Crank: return Mechanics.LevelOneData.Hex("1a6e46");
-                case HintTone.Shake: return Mechanics.LevelOneData.Hex("8f2f2c");
+                case HintTone.Shake: return Mechanics.LevelOneData.Hex("8fd7d6");
                 default: return Mechanics.LevelOneData.Hex("39587a");
             }
         }

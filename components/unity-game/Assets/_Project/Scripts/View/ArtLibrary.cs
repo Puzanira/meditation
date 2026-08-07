@@ -73,10 +73,34 @@ namespace Meditation.View
             return icon;
         }
 
+        /// <summary>
+        /// A track of the drop's sound folder — <c>audio/level-3</c>, <c>audio/meditation</c>,
+        /// <c>audio/thoughts</c> (MECHANICS §8).
+        ///
+        /// Same contract as <see cref="Get"/>: cached for the session, missing keys reported once. The
+        /// clips are imported streaming and not preloaded, so this call costs a lookup rather than the
+        /// 18 MB the library's track weighs — the load happens when the source starts playing.
+        /// </summary>
+        public static AudioClip Clip(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return null;
+            if (Clips.TryGetValue(key, out AudioClip cached)) return cached;
+
+            AudioClip clip = Resources.Load<AudioClip>(LevelCatalog.ArtRoot + key);
+            if (clip == null && Reported.Add(key))
+                Debug.LogError("[Meditation] Звуковой трек не найден: " + LevelCatalog.ArtRoot + key);
+
+            Clips[key] = clip;
+            return clip;
+        }
+
+        private static readonly Dictionary<string, AudioClip> Clips = new Dictionary<string, AudioClip>();
+
         /// <summary>Drop every cached sprite (used between test scenes).</summary>
         public static void Clear()
         {
             Cache.Clear();
+            Clips.Clear();
             Reported.Clear();
         }
 

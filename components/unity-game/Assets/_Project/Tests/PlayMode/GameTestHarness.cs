@@ -172,9 +172,9 @@ namespace Meditation.Tests
         /// Crank one detail all the way into the vessel.
         /// </summary>
         /// <param name="pickForMe">
-        /// Switch to the fixed-order variant so cranking alone is enough. Off when the test is about
-        /// the tutorial: variant A always has something noticed, which would retire the «Оглядись»
-        /// card the moment it appeared and hide the very beat under test.
+        /// Switch to the fixed-order variant so cranking alone is enough. Off when the test drives the
+        /// choice itself — the tutorial's first beat is «НАВОДИ», and a variant that always has
+        /// something noticed walks straight past it.
         /// </param>
         public static IEnumerator CollectOneDetail(FakeBackend fake, LevelScreen screen,
             bool pickForMe = true)
@@ -184,6 +184,21 @@ namespace Meditation.Tests
 
             int before = screen.Runtime.CollectedCount;
             yield return CrankUntil(fake, () => screen.Runtime.CollectedCount > before, "деталь в сосуде");
+        }
+
+        /// <summary>
+        /// Notice a detail the way the tutorial's first beat asks for one to be noticed.
+        ///
+        /// The beat is «НАВОДИ» and the shipped way of aiming is the gaze, which a test cannot steer
+        /// precisely enough to land on a 40 px paperclip inside a patience window. So the choice is
+        /// handed to the fixed-order variant — the LOOP is the same either way, and what the tests
+        /// after this point are about is what the beat does once something IS noticed.
+        /// </summary>
+        public static IEnumerator NoticeSomething(FakeBackend fake, LevelScreen screen)
+        {
+            TuningConfig.Notice = NoticeMode.FixedOrder;
+            yield return Idle(fake, 2);
+            yield return Until(() => screen.Runtime.NoticedIndex >= 0, "деталь замечена");
         }
 
         // ---- situations that would otherwise take real minutes ------------------------------------------
@@ -198,10 +213,75 @@ namespace Meditation.Tests
         }
 
         /// <summary>
-        /// Crowd the screen the way PLAY crowds it: ordinary thoughts of the level's own set, spread
-        /// over the frame, each still fitted inside its size class. Not <see cref="BuryTheScreen"/> —
-        /// that one lays the defeat WALLPAPER, whose blobs are sized to close their cells, and a peak
-        /// staged with it comes out looking like a defeat with the level painted over.
+        /// Reach a coverage percentage by PLAYING the level: real waves, of the level's own thoughts,
+        /// drifting in from the edges the way <see cref="ThoughtField.Spawn"/> sends them.
+        ///
+        /// This is what a peak frame has to be staged with. <see cref="CrowdTheScreen"/> lays its blobs
+        /// on a 5×3 lattice with one label per cell, and the game has no way of producing that — the
+        /// frame the design gate was given showed a mosaic nobody will ever see (gate, 2026-08-07).
+        /// The numbers below are the panel's own knobs, which is the same thing the founder turns: the
+        /// wave clock is wound to its floor and the composition made dense, and then the level is simply
+        /// left to run until the coverage arrives.
+        /// </summary>
+        public static IEnumerator CrowdTheScreenByPlaying(FakeBackend fake, LevelScreen screen,
+            float percent, float patienceSeconds = 90f)
+        {
+            // The live values, not the per-level band: the level is already open, and ApplyLevel has
+            // already copied its band in. This is exactly what moving a slider mid-level does.
+            TuningConfig.WaveIntervalSeconds = 0.4f;
+            TuningConfig.WaveWeak = 2;
+            TuningConfig.WaveMedium = 2;
+            TuningConfig.WaveStrong = 1;
+            // The ramp shortens an interval that is already at its floor — one less thing in the way.
+            TuningConfig.PressureRamp = false;
+            screen.Runtime.Field.ResetWaveTimer(0f);
+
+            // Hands off the joystick: shaking would pop the waves as fast as they roll in.
+            fake.Next = new BackendSnapshot();
+
+            yield return Until(
+                () => screen.Runtime.Field.OverlapPercent >= percent || screen.Stage != LevelStage.Play,
+                "волны закрыли " + percent.ToString("0") + " % экрана", patienceSeconds);
+
+            Assert.AreEqual(LevelStage.Play, screen.Stage,
+                "Уровень кончился раньше, чем кадр набрался — на нём уже не пик.");
+            AssertNotAGrid(screen);
+        }
+
+        /// <summary>
+        /// The frame is a naplyv, not a mosaic: a lattice betrays itself by putting many centres on the
+        /// same column and the same row, to the pixel. Live thoughts enter from random points of random
+        /// edges and drift, so their columns and rows are all their own.
+        /// </summary>
+        public static void AssertNotAGrid(LevelScreen screen)
+        {
+            System.Collections.Generic.IReadOnlyList<Thought> live = screen.Runtime.Field.Thoughts;
+            Assert.GreaterOrEqual(live.Count, 6,
+                "Мыслей слишком мало, чтобы судить, сетка это или наплыв.");
+
+            var columns = new System.Collections.Generic.HashSet<int>();
+            var rows = new System.Collections.Generic.HashSet<int>();
+            for (int i = 0; i < live.Count; i++)
+            {
+                columns.Add(Mathf.RoundToInt(live[i].Position.x));
+                rows.Add(Mathf.RoundToInt(live[i].Position.y));
+            }
+
+            float bar = live.Count * 0.7f;
+            Assert.Greater(columns.Count, bar,
+                "Мысли стоят по колонкам (" + columns.Count + " на " + live.Count +
+                ") — это сетка, а не живой наплыв.");
+            Assert.Greater(rows.Count, bar,
+                "Мысли стоят по рядам (" + rows.Count + " на " + live.Count +
+                ") — это сетка, а не живой наплыв.");
+        }
+
+        /// <summary>
+        /// Put a named number of thoughts on the screen on a lattice — for tests that only need the
+        /// coverage NUMBER to cross a threshold (does the peak flag flip, does the vessel layer swap).
+        ///
+        /// Never for a frame. The game does not spawn on a lattice, so a screenshot staged with this
+        /// shows a composition that cannot happen; use <see cref="CrowdTheScreenByPlaying"/> there.
         /// </summary>
         /// <returns>The coverage reached, in per cent.</returns>
         public static float CrowdTheScreen(LevelScreen screen, int count)

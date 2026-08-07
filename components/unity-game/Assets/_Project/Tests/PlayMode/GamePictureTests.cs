@@ -45,13 +45,6 @@ namespace Meditation.Tests
         /// <summary>How far from the backdrop a pixel has to be to count as the object itself.</summary>
         private const float SolidlyDrawn = 0.35f;
 
-        /// <summary>
-        /// …and how bright, for a silhouette shot on black: below this it is an edge or a pip.
-        /// Kept for the vessel/haul measurements; the defeat gate stopped using it with the marker
-        /// drop, because black hatching has no pixel above it at all.
-        /// </summary>
-        private const float BlobBody = 0.55f;
-
         /// <summary>The part of the frame the drained-thought measurement scans (blobs are crowded in).</summary>
         private static readonly RectInt ScanBox = new RectInt(360, 140, 1200, 800);
 
@@ -142,14 +135,16 @@ namespace Meditation.Tests
         // ---- N2 + B2: the victory picture — filled slots, and a haul inside the vessel's SILHOUETTE ----
 
         /// <summary>
-        /// The victory screen judged whole, on one staging: every slot of the filled row reads, and
-        /// every cell of the haul is inside the vessel's silhouette.
+        /// The reward beat, measured against the vessel's SILHOUETTE: every cell of the haul really
+        /// lies inside the vessel, not merely inside its bounding rectangle.
         ///
-        /// One test rather than two because staging it costs a scene load and a full-frame render per
-        /// level, and a gate that takes minutes starts failing on patience rather than on the picture.
+        /// This gate matters more than it did, not less. The row of filled slots that used to stand
+        /// under «Собрано: …» is gone with the drop (the drawn «Отлично!» screen replaced both), so the
+        /// vessel with its haul is now the ONLY place in the whole run where the player is shown what
+        /// they collected — and it is on screen for a second and a half.
         /// </summary>
         [UnityTest]
-        public IEnumerator TheVictoryPicture_ReadsAtAMetre_AndKeepsTheHaulInTheVessel(
+        public IEnumerator TheRewardBeat_KeepsTheWholeHaulInsideTheVessel(
             [Values(0, 1, 2, 3, 4)] int levelIndex)
         {
             yield return GameTestHarness.LoadGame();
@@ -163,24 +158,7 @@ namespace Meditation.Tests
             StageTheVictory(screen);
             yield return GameTestHarness.SettleScreen(fake);
 
-            // S9 + N2: the row of filled slots, on the picture as it ships.
-            Texture2D victory = StandTestHarness.Capture(Color.black);
-            try
-            {
-                for (int i = 0; i < screen.Level.DetailCount; i++)
-                {
-                    RectTransform slot = StandTestHarness.Find(stage, "VictorySlot" + (i + 1));
-                    AssertSlotReads(victory, stage, slot,
-                        screen.Level.Title + " · слот победы " + (i + 1) + " («" +
-                        screen.Level.Details[i].Name + "», заполненный)");
-                }
-            }
-            finally
-            {
-                Object.DestroyImmediate(victory);
-            }
-
-            // B2: where the haul is, before anything is hidden.
+            // Where the haul is, before anything is hidden.
             var cells = new RectInt[view.VesselContents.Count];
             for (int i = 0; i < cells.Length; i++)
                 cells[i] = StandTestHarness.PixelRectOf(stage, view.VesselContents[i].rectTransform);
@@ -218,31 +196,37 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
-        // ---- M13: the defeat screen READS (art drop 2026-08-05) -----------------------------------------
+        // ---- S5: the defeat screen IS the drawn screen, and the crank wipes it ------------------------
 
         /// <summary>
-        /// The defeat screen with the marker thoughts on it: «Вдохни» readable, the picture not black.
+        /// The loss frame, measured on the rendered pixel.
         ///
-        /// This used to be a saturation band — 0.07…0.26, mock 17 measured on the turquoise silhouettes.
-        /// The drop of 2026-08-05 made that unmeasurable rather than merely wrong: black hatching has
-        /// saturation 0 by construction, and the old measurement did not even find it (it counted only
-        /// pixels brighter than <see cref="BlobBody"/>, of which a black scribble has none — the test
-        /// failed with «на кадре нет мыслей», which is the truest thing it could have said).
+        /// Two earlier versions of this gate are worth remembering, because both were measuring the
+        /// wrong thing by the time they ran. The first fixed a saturation band (0.07…0.26) taken off
+        /// mock 17's turquoise silhouettes; the drop of 2026-08-05 made that unmeasurable rather than
+        /// merely wrong — black hatching has saturation 0 by construction. The second measured the
+        /// contrast of «Мысли захватили всё. Вдохни.» against its own white plate; that line is
+        /// withdrawn, and the sentence on this screen is now pixels the designer set.
         ///
-        /// So the claim is restated as the one the founder actually cares about and SCREENS S5 spells
-        /// out: the loss frame is a screen you can read a sentence on, not a black rectangle.
+        /// What is left to check is what the flow is actually responsible for: the drawn screen really
+        /// covers the frame, it is not a black rectangle, and the crank really wipes it back to the
+        /// level underneath. Everything about how it LOOKS is the render's business now.
         /// </summary>
         [UnityTest]
-        public IEnumerator DefeatScreen_ReadsAtAMetre_OnTheRenderedPixel()
+        public IEnumerator DefeatScreen_CoversTheFrame_AndTheCrankWipesItBackToTheLevel()
         {
             TuningConfig.AutoRetry = false;
 
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
-            yield return GameTestHarness.EnterLevel(fake, 0);
+            yield return GameTestHarness.EnterLevel(fake, 1);
 
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
             yield return GameTestHarness.Until(() => screen.Stage == LevelStage.Play, "уровень пошёл");
+
+            // The level as it stands, for the «wiped back to» comparison.
+            yield return GameTestHarness.SettleScreen(fake);
+            Texture2D beforeLoss = StandTestHarness.Capture(Color.black);
 
             GameTestHarness.BuryTheScreen(screen);
             yield return GameTestHarness.Idle(fake, 4);
@@ -250,81 +234,100 @@ namespace Meditation.Tests
             yield return GameTestHarness.Frames(2);
             Canvas.ForceUpdateCanvases();
 
-            DesignStage stage = StandTestHarness.Stage();
-            Texture2D frame = StandTestHarness.Capture(Color.black);
+            Texture2D lost = StandTestHarness.Capture(Color.black);
+            Texture2D wiped = null;
             try
             {
-                // 1. The sentence against the plate it stands on. The plate is read off the frame, not
-                //    off the constant, so a change to either side is caught by the same number.
-                RectInt plate = StandTestHarness.PixelRectOf(stage, screen.View.MessagePlateRect);
-                Color[] pixels = StandTestHarness.PixelsOf(frame, plate);
-                Assert.Greater(pixels.Length, 1000, "Подложка сообщения не попала в кадр.");
+                // 1. It really is a different picture — the drawn screen is on, whole.
+                float changed = MeanDifference(beforeLoss, lost);
+                Assert.Greater(changed, MinDefeatChange,
+                    "Кадр поражения почти не отличается от кадра уровня (" + changed.ToString("0.000") +
+                    ") — готовый экран не встал.");
 
-                Color paper = Brightest(pixels, 0.9f);
-                Color ink = Brightest(pixels, 0.02f);
-                float textContrast = LevelOneData.ContrastRatio(paper, ink);
+                // 2. …and it is not «просто чёрный экран». Measured at the 95th percentile, not at
+                //    the median: the designer's loss screen IS mostly dark (a wall of black hatching
+                //    over the scene — median luminance 0.006 in the file itself), and what makes it a
+                //    screen rather than a void is the light that survives it: the glowing sentence and
+                //    the green leaf. A missing sprite falls back to flat black, where every percentile
+                //    is zero, and that is the failure this catches.
+                float light = LuminanceQuantile(lost, 0.95f);
+                Assert.GreaterOrEqual(light, MinDefeatHighlight,
+                    "На экране поражения не осталось света: 95-й процентиль яркости " +
+                    light.ToString("0.000") + " при поле " + MinDefeatHighlight.ToString("0.000") + ".");
 
-                Assert.GreaterOrEqual(textContrast, LevelOneData.MinTextContrast,
-                    "«" + GameTexts.DefeatBig + "» не читается на своей подложке: контраст " +
-                    textContrast.ToString("0.0") + ":1 при пороге " +
-                    LevelOneData.MinTextContrast.ToString("0.0") + ":1.");
+                // 3. Five turns, half the screen: the retry is a dissolve the player drives, and it
+                //    has to be visible on the PIXEL, not only in the number. What it dissolves back
+                //    into is the level as it was LOST — thoughts and all — so the comparison is
+                //    against the loss frame rather than against the clean level.
+                yield return GameTestHarness.CrankDegrees(fake, 360f * 5f);
+                yield return GameTestHarness.Frames(2);
+                Canvas.ForceUpdateCanvases();
 
-                // 2. …and the picture around it is not «просто чёрный экран» (SCREENS S5, заметка про
-                //    арт 2026-08-05). Median, not mean: a bright plate in the middle must not be able to
-                //    carry a black frame.
-                float dark = MedianLuminanceOutside(frame, plate);
-                Assert.GreaterOrEqual(dark, MinDefeatLuminance,
-                    "Экран поражения ушёл в чёрный: медианная яркость сцены " + dark.ToString("0.000") +
-                    " при полу " + MinDefeatLuminance.ToString("0.000") + ".");
+                Assert.That(screen.DefeatCoverLeft01, Is.InRange(0.3f, 0.7f),
+                    "Пять оборотов должны стереть примерно половину экрана поражения.");
+
+                wiped = StandTestHarness.Capture(Color.black);
+                float wipedAway = MeanDifference(lost, wiped);
+                Assert.Greater(wipedAway, MinDefeatChange,
+                    "Пять оборотов не изменили картинку (" + wipedAway.ToString("0.000") +
+                    ") — экран поражения не стирается, а только считается стёртым.");
             }
             finally
             {
-                Object.DestroyImmediate(frame);
+                Object.DestroyImmediate(beforeLoss);
+                Object.DestroyImmediate(lost);
+                if (wiped != null) Object.DestroyImmediate(wiped);
             }
 
             LogAssert.NoUnexpectedReceived();
         }
 
         /// <summary>
-        /// The floor under the defeat picture, WCAG relative luminance. Frame 17 draws the wallpaper in
-        /// light pastels (≈0.60); the marker wallpaper measures 0.096 with the backing under it and
-        /// 0.077 without, so the floor is set at half of what the shipped frame does — enough headroom
-        /// for a tuning pass, tight enough that a genuinely black loss screen fails.
+        /// How different two frames have to be before «другая картинка» is a fair description. The
+        /// shipped pair measures far above it; the floor is set where a half-transparent overlay would
+        /// still pass and a missing sprite (nothing drawn at all) would not.
         /// </summary>
-        private const float MinDefeatLuminance = 0.045f;
+        private const float MinDefeatChange = 0.08f;
 
-        /// <summary>The colour at a percentile of brightness — the plate's paper (high) or its ink (low).</summary>
-        private static Color Brightest(Color[] pixels, float quantile)
+        /// <summary>Mean absolute difference of two captured frames, 0..1, sampled every 8th pixel.</summary>
+        private static float MeanDifference(Texture2D a, Texture2D b)
         {
-            var byLight = new float[pixels.Length];
-            for (int i = 0; i < pixels.Length; i++) byLight[i] = LevelOneData.RelativeLuminance(pixels[i]);
-
-            var order = new int[pixels.Length];
-            for (int i = 0; i < order.Length; i++) order[i] = i;
-            System.Array.Sort(byLight, order);
-
-            int at = Mathf.Clamp(Mathf.RoundToInt(quantile * (order.Length - 1)), 0, order.Length - 1);
-            return pixels[order[at]];
-        }
-
-        /// <summary>Median relative luminance of the frame with <paramref name="hole"/> cut out of it.</summary>
-        private static float MedianLuminanceOutside(Texture2D frame, RectInt hole)
-        {
-            // Every eighth pixel in both axes: a median does not need 2 M samples, and a full GetPixels
-            // of a 1920×1080 frame is 33 MB of garbage.
-            var samples = new List<float>(1 << 16);
-            for (int y = 0; y < frame.height; y += 8)
+            double sum = 0;
+            int count = 0;
+            for (int y = 0; y < a.height; y += 8)
+            for (int x = 0; x < a.width; x += 8)
             {
-                for (int x = 0; x < frame.width; x += 8)
-                {
-                    if (hole.Contains(new Vector2Int(x, y))) continue;
-                    samples.Add(LevelOneData.RelativeLuminance(frame.GetPixel(x, y)));
-                }
+                Color p = a.GetPixel(x, y);
+                Color q = b.GetPixel(x, y);
+                sum += Mathf.Abs(p.r - q.r) + Mathf.Abs(p.g - q.g) + Mathf.Abs(p.b - q.b);
+                count += 3;
             }
 
-            samples.Sort();
-            return samples[samples.Count / 2];
+            return count == 0 ? 0f : (float)(sum / count);
         }
+
+        /// <summary>Relative luminance at a percentile of a whole frame, sampled every 8th pixel.</summary>
+        private static float LuminanceQuantile(Texture2D frame, float quantile)
+        {
+            // Every eighth pixel in both axes: a median does not need 2 M samples, and a full
+            // GetPixels of a 1920×1080 frame is 33 MB of garbage.
+            var samples = new List<float>(1 << 16);
+            for (int y = 0; y < frame.height; y += 8)
+            for (int x = 0; x < frame.width; x += 8)
+                samples.Add(LevelOneData.RelativeLuminance(frame.GetPixel(x, y)));
+
+            samples.Sort();
+            int at = Mathf.Clamp(Mathf.RoundToInt(quantile * (samples.Count - 1)), 0, samples.Count - 1);
+            return samples[at];
+        }
+
+        /// <summary>
+        /// The light that has to survive on the defeat picture, WCAG relative luminance at the 95th
+        /// percentile. The render itself measures 0.072 there and 0.166 at the 99th; a black frame
+        /// measures zero at every percentile. Half of what the shipped screen does leaves room for a
+        /// darker render without letting a blank one through.
+        /// </summary>
+        private const float MinDefeatHighlight = 0.035f;
 
         // ---- N3: the marker thoughts read against every plate -------------------------------------------
 
@@ -510,17 +513,6 @@ namespace Meditation.Tests
             // The haul itself has to go too, or every cell would be «inside» its own picture.
             for (int i = 0; i < view.VesselContents.Count; i++)
                 if (view.VesselContents[i] != null) view.VesselContents[i].enabled = !alone;
-        }
-
-        private static void ShowOnlyTheThoughts(LevelView view, bool alone)
-        {
-            view.SceneLayer.gameObject.SetActive(!alone);
-            view.DetailsLayer.gameObject.SetActive(!alone);
-            view.ThreadLayer.gameObject.SetActive(!alone);
-            view.VesselLayer.gameObject.SetActive(!alone);
-            view.PeakLayer.gameObject.SetActive(!alone);
-            view.HudLayer.gameObject.SetActive(!alone);
-            view.MessageLayer.gameObject.SetActive(!alone);
         }
 
         // ---- pixel arithmetic --------------------------------------------------------------------------

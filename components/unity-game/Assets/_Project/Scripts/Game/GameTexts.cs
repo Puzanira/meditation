@@ -1,56 +1,54 @@
 namespace Meditation.Game
 {
     /// <summary>
-    /// Every string the game shows, copied verbatim from the text registry —
-    /// <c>docs/design/gameplay-walkthrough.html</c>, frame 25 «Реестр текстов».
+    /// The game's text registry — which since the drop of 2026-08-07 is a list of what the game must
+    /// NOT say.
     ///
-    /// One place on purpose: the registry says «Других текстов в игре нет… Любой новый текст сначала
-    /// добавляется сюда», so a line that is not in this file is a line that was never approved.
-    /// The font sizes travel with the strings because the registry fixes those too.
+    /// This class used to hold every string the game showed, copied verbatim from
+    /// <c>docs/design/gameplay-walkthrough.html</c> (frame 25 «Реестр текстов»), because the registry
+    /// says «Других текстов в игре нет… Любой новый текст сначала добавляется сюда». The drop replaced
+    /// the title, the five level cards and all three outcome screens with finished renders that carry
+    /// their own typography, and the registry's own row «Выведено из игры» lists the lines that left
+    /// with them. So the one-place rule survives, inverted: these are the strings the game is no longer
+    /// allowed to render, and <c>GameFlowTests</c> walks every screen of the flow to prove none of them
+    /// is on it.
+    ///
+    /// That is not pedantry. A withdrawn line does not disappear by being deleted from one screen — it
+    /// comes back the next time somebody needs «a caption here», and it comes back in a font the
+    /// designer did not choose, over a picture that already says it.
+    ///
+    /// The only text the game still renders itself is the level timer's «NN с», and that is a HUD
+    /// readout with a box drawn under it in SCREENS «Зоны», not a line of copy.
     /// </summary>
     public static class GameTexts
     {
-        // ---- S1 Титул ---------------------------------------------------------------------------
-        public const string Title = "МЕДИТАЦИЯ В СПЕШКЕ";
-        public const int TitleSize = 100;
+        /// <summary>
+        /// «Выведено из игры» — walkthrough frame 25. Every one of these is now pixels in
+        /// <c>арт/экраны/</c> or <c>арт/кнопки/</c>, drawn by the designer.
+        /// </summary>
+        public static readonly string[] Withdrawn =
+        {
+            "МЕДИТАЦИЯ В СПЕШКЕ",
+            "Крути ручку, чтобы начать",
+            "Мысли захватили всё. Вдохни.",
+            "Крути ручку — попробуй снова",
+            "Ты заметил(а) всё. Даже в спешке.",
+            "Крути ручку!",
+            "Тряси джойстик!",
+            "Оглядись — наклони стик",
+            "КРУТИ",
+            "ТРЯСИ",
+            "собирай детали",
+            "отгоняй мысли"
+        };
 
-        public const string CrankCardTitle = "КРУТИ";
-        public const string CrankCardSubtitle = "собирай детали";
-        public const string ShakeCardTitle = "ТРЯСИ";
-        public const string ShakeCardSubtitle = "отгоняй мысли";
-        public const int CardTitleSize = 36;
-        public const int CardSubtitleSize = 28;
+        /// <summary>
+        /// «Собрано: …» took a setting's name, so it cannot be listed as a constant — this is the same
+        /// line, recognisable by its stem.
+        /// </summary>
+        public const string WithdrawnCollectedPrefix = "Собрано:";
 
-        public const string TitleStartHint = "Крути ручку, чтобы начать";
-        public const int TitleStartHintSize = 40;
-
-        // ---- S2 Карточка уровня -----------------------------------------------------------------
-        public const int LevelCardSize = 64;
-
-        /// <summary>«Уровень N» — first line of the card.</summary>
-        public static string LevelNumber(int number) => "Уровень " + number;
-
-        // ---- Обучение (уровень 1) ---------------------------------------------------------------
-        public const string TutorialCrank = "Крути ручку!";
-        public const string TutorialShake = "Тряси джойстик!";
-        public const string TutorialGaze = "Оглядись — наклони стик";
-        public const int TutorialSize = 44;
-
-        // ---- S4 Победа уровня -------------------------------------------------------------------
-        public const int CollectedSize = 52;
-
-        /// <summary>«Собрано: &lt;название сеттинга&gt;».</summary>
-        public static string Collected(string setting) => "Собрано: " + setting;
-
-        // ---- S5 Поражение -----------------------------------------------------------------------
-        public const string DefeatBig = "Мысли захватили всё. Вдохни.";
-        public const string DefeatSmall = "Крути ручку — попробуй снова";
-        public const int DefeatBigSize = 60;
-        public const int DefeatSmallSize = 40;
-
-        // ---- S6 Финал ---------------------------------------------------------------------------
-        public const string FinaleBig = "Ты заметил(а) всё. Даже в спешке.";
-        public const int FinaleBigSize = 56;
-        public const int FinaleSmallSize = 32;
+        /// <summary>«Уровень N» — the card's first line, now baked into the card's own render.</summary>
+        public const string WithdrawnLevelPrefix = "Уровень ";
     }
 }

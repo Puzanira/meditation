@@ -123,12 +123,34 @@ namespace Meditation.Tuning
             public const float LossOverlapPercent = 92f;
             public const float PeakOverlapPercent = 70f;
 
-            public const float LevelSeconds = 112f;
+            public const float LevelSeconds = 80f;
             public const bool BreatherEnabled = true;
             public const float BreatherSeconds = 2f;
             public const bool AutoRetry = true;
 
             public const bool TutorialTimerPaused = true;
+
+            // ---- §8 Звук (заказ founder 2026-08-07) -------------------------------------------
+            // Three layers, three groups of knobs. Every number below is the spec's own starting
+            // value, not a guess — MECHANICS §8 lists each one with its slider range.
+            public const float AudioBackgroundVolume = 0.6f;
+            public const float AudioMeditationFadeInSeconds = 0.4f;
+            public const float AudioMeditationFadeOutSeconds = 0.6f;
+            public const float AudioMeditationTailSeconds = 1.5f;
+            public const bool AudioMeditationReplacesBackground = true;
+            public const float AudioThoughtsMaxVolume = 0.8f;
+            public const float AudioThoughtsAtCount = 8f;
+            public const float AudioThoughtsSmoothingSeconds = 0.5f;
+            public const bool AudioThoughtsByOverlap = false;
+            public const bool AudioSilentOffLevel = true;
+
+            // ---- Луч-подсветка деталей (SCREENS «Детали в сцене», заказ founder 2026-08-07) ----
+            public const float SweepPeriodSeconds = 8f;
+            public const float SweepDurationSeconds = 1.2f;
+            public const float SweepWidthPx = 320f;
+            public const float SweepStrength = 0.45f;
+            public const bool SweepOnlyUnnoticed = true;
+            public const bool SweepRarerOnLateLevels = true;
 
             /// <summary>
             /// Is the tuning panel expanded on start? FALSE since the playtest: the panel is the
@@ -141,7 +163,18 @@ namespace Meditation.Tuning
             // «с каждым уровнем больше мыслей, выше прочность, быстрее наплыв». The shipped ladder
             // is monotonic in every dimension — that monotonicity is what LevelProgressionTests
             // pins, so re-tuning a number after the playtest cannot quietly flatten the curve.
-            public const float L1LevelSeconds = 112f;
+            //
+            // Everything that describes PRESSURE (wave interval, wave composition, durability, drift,
+            // ramp) is keyed to the level NUMBER rather than to the setting, so the renumbering of
+            // 2026-08-07 left those columns exactly where the playtest of 2026-08-01 put them.
+            //
+            // The TIMERS are the one thing that had to be recomputed, and they are a starting point for
+            // the next playtest rather than a decision (MECHANICS §6). The old 112·110·100·92·85 were
+            // measured when the FIRST level held nine details and the last held five; the new order
+            // turns that around (5·5·6·8·8), so those numbers would have given 112 s for five details
+            // at the start and 85 s for eight at the end. Recomputed as «детали × секунд на деталь»
+            // with the seconds per detail falling level by level (16·15·14·13·12): 80·75·84·104·96.
+            public const float L1LevelSeconds = 80f;
             public const float L1WaveIntervalSeconds = 7f;
             public const int L1WaveWeak = 1;
             public const int L1WaveMedium = 0;
@@ -152,7 +185,7 @@ namespace Meditation.Tuning
             public const float L1DriftPxPerSec = 25f;
             public const float L1PressureRampPercent = 0f;
 
-            public const float L2LevelSeconds = 110f;
+            public const float L2LevelSeconds = 75f;
             public const float L2WaveIntervalSeconds = 5.5f;
             public const int L2WaveWeak = 1;
             public const int L2WaveMedium = 1;
@@ -163,7 +196,7 @@ namespace Meditation.Tuning
             public const float L2DriftPxPerSec = 35f;
             public const float L2PressureRampPercent = 8f;
 
-            public const float L3LevelSeconds = 100f;
+            public const float L3LevelSeconds = 84f;
             public const float L3WaveIntervalSeconds = 4.5f;
             public const int L3WaveWeak = 1;
             public const int L3WaveMedium = 1;
@@ -174,10 +207,9 @@ namespace Meditation.Tuning
             public const float L3DriftPxPerSec = 45f;
             public const float L3PressureRampPercent = 15f;
 
-            // Levels 4 and 5 carry the same ladder on: fewer details to find (five each), so the
-            // pressure rather than the length is what makes them harder. Every number stays inside the
-            // slider range the panel declares (MECHANICS §7), so the founder can tune in both directions.
-            public const float L4LevelSeconds = 92f;
+            // Levels 4 and 5 carry the same ladder on. Every number stays inside the slider range the
+            // panel declares (MECHANICS §7), so the founder can tune in both directions.
+            public const float L4LevelSeconds = 104f;
             public const float L4WaveIntervalSeconds = 4f;
             public const int L4WaveWeak = 1;
             public const int L4WaveMedium = 2;
@@ -188,7 +220,7 @@ namespace Meditation.Tuning
             public const float L4DriftPxPerSec = 52f;
             public const float L4PressureRampPercent = 20f;
 
-            public const float L5LevelSeconds = 85f;
+            public const float L5LevelSeconds = 96f;
             public const float L5WaveIntervalSeconds = 3.5f;
             public const int L5WaveWeak = 2;
             public const int L5WaveMedium = 2;
@@ -289,6 +321,42 @@ namespace Meditation.Tuning
 
         /// <summary>Does the level-1 tutorial hold the timer while it teaches? [toggle] (SCREENS §Обучение)</summary>
         public static bool TutorialTimerPaused = Defaults.TutorialTimerPaused;
+
+        // ---- §8 Звук --------------------------------------------------------------------------
+        /// <summary>Ceiling of the level's own background track, 0..1. [tune]</summary>
+        public static float AudioBackgroundVolume = Defaults.AudioBackgroundVolume;
+        /// <summary>Crossfade background → «медитация» when a collection is going well, s. [tune 0.1–1.5]</summary>
+        public static float AudioMeditationFadeInSeconds = Defaults.AudioMeditationFadeInSeconds;
+        /// <summary>Crossfade «медитация» → background when the detail slips, s. [tune 0.1–1.5]</summary>
+        public static float AudioMeditationFadeOutSeconds = Defaults.AudioMeditationFadeOutSeconds;
+        /// <summary>How long «медитация» plays on after the detail lands, s. [tune 0–4]</summary>
+        public static float AudioMeditationTailSeconds = Defaults.AudioMeditationTailSeconds;
+        /// <summary>Does «медитация» replace the background, or lie over a ducked one? [toggle]</summary>
+        public static bool AudioMeditationReplacesBackground = Defaults.AudioMeditationReplacesBackground;
+        /// <summary>Ceiling of the «мысли» layer, 0..1. [tune]</summary>
+        public static float AudioThoughtsMaxVolume = Defaults.AudioThoughtsMaxVolume;
+        /// <summary>How many thoughts on screen mean the ceiling. [tune 4–15]</summary>
+        public static float AudioThoughtsAtCount = Defaults.AudioThoughtsAtCount;
+        /// <summary>Smoothing of the «мысли» volume so it does not jump per popped blob, s. [tune 0.1–2]</summary>
+        public static float AudioThoughtsSmoothingSeconds = Defaults.AudioThoughtsSmoothingSeconds;
+        /// <summary>Drive the «мысли» layer by screen coverage instead of by count? [toggle]</summary>
+        public static bool AudioThoughtsByOverlap = Defaults.AudioThoughtsByOverlap;
+        /// <summary>Silence on the screens that are not a level (S2/S4/S5/S6). [toggle]</summary>
+        public static bool AudioSilentOffLevel = Defaults.AudioSilentOffLevel;
+
+        // ---- Луч-подсветка деталей (SCREENS «Детали в сцене») ------------------------------------
+        /// <summary>Seconds between two passes of the light. [tune 4–20]</summary>
+        public static float SweepPeriodSeconds = Defaults.SweepPeriodSeconds;
+        /// <summary>How long one pass takes, s. [tune 0.6–2.5]</summary>
+        public static float SweepDurationSeconds = Defaults.SweepDurationSeconds;
+        /// <summary>Width of the band, design px. [tune 150–600]</summary>
+        public static float SweepWidthPx = Defaults.SweepWidthPx;
+        /// <summary>How bright the band makes a detail, 0..1. [tune 0.1–1]</summary>
+        public static float SweepStrength = Defaults.SweepStrength;
+        /// <summary>Light only the details the player has not noticed yet? [toggle]</summary>
+        public static bool SweepOnlyUnnoticed = Defaults.SweepOnlyUnnoticed;
+        /// <summary>Longer gaps on later levels (period ×1.5 per level) — fewer hints as it gets hard. [toggle]</summary>
+        public static bool SweepRarerOnLateLevels = Defaults.SweepRarerOnLateLevels;
 
         // ---- §6 Прогрессия сложности — [tune per level] ---------------------------------------
         // Flat fields, one per level, rather than an array of bands: TuningStore persists every
@@ -399,6 +467,24 @@ namespace Meditation.Tuning
             BreatherSeconds = Defaults.BreatherSeconds;
             AutoRetry = Defaults.AutoRetry;
             TutorialTimerPaused = Defaults.TutorialTimerPaused;
+
+            AudioBackgroundVolume = Defaults.AudioBackgroundVolume;
+            AudioMeditationFadeInSeconds = Defaults.AudioMeditationFadeInSeconds;
+            AudioMeditationFadeOutSeconds = Defaults.AudioMeditationFadeOutSeconds;
+            AudioMeditationTailSeconds = Defaults.AudioMeditationTailSeconds;
+            AudioMeditationReplacesBackground = Defaults.AudioMeditationReplacesBackground;
+            AudioThoughtsMaxVolume = Defaults.AudioThoughtsMaxVolume;
+            AudioThoughtsAtCount = Defaults.AudioThoughtsAtCount;
+            AudioThoughtsSmoothingSeconds = Defaults.AudioThoughtsSmoothingSeconds;
+            AudioThoughtsByOverlap = Defaults.AudioThoughtsByOverlap;
+            AudioSilentOffLevel = Defaults.AudioSilentOffLevel;
+
+            SweepPeriodSeconds = Defaults.SweepPeriodSeconds;
+            SweepDurationSeconds = Defaults.SweepDurationSeconds;
+            SweepWidthPx = Defaults.SweepWidthPx;
+            SweepStrength = Defaults.SweepStrength;
+            SweepOnlyUnnoticed = Defaults.SweepOnlyUnnoticed;
+            SweepRarerOnLateLevels = Defaults.SweepRarerOnLateLevels;
 
             L1LevelSeconds = Defaults.L1LevelSeconds;
             L1WaveIntervalSeconds = Defaults.L1WaveIntervalSeconds;

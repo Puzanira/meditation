@@ -380,7 +380,10 @@ namespace Meditation.View
             Ui.MoveTo(_detailImages[index].rectTransform, position);
 
             Image ring = _detailRings[index];
-            ring.gameObject.SetActive(active);
+            // Same rule the game holds (<see cref="LevelView.RingHasSomethingToShow"/>): a ring at
+            // fill 0 is a red tick, not a progress reading. The stand has no thoughts of its own to
+            // bury a detail under, so that half of the rule has nothing to do here.
+            ring.gameObject.SetActive(active && LevelView.RingHasSomethingToShow(progress01, slipped));
             SetDragged(active ? index : -1);
             if (!active) return;
 

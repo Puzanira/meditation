@@ -70,6 +70,14 @@ namespace Meditation.Game
         /// <summary>What the tuning panel's readout block shows while this screen is up.</summary>
         public virtual string Readout() => string.Empty;
 
+        /// <summary>
+        /// What this screen sounds like (MECHANICS §8). The flow owns the three <c>AudioSource</c>s —
+        /// they have to outlive a screen or every card would cut the music — so each screen only
+        /// DESCRIBES its own state and the mix decides what that means. Silence off the level is the
+        /// default because that is what the spec starts at.
+        /// </summary>
+        public virtual Mechanics.AudioScene Audio => Mechanics.AudioScene.Quiet(0);
+
         public virtual void Dispose()
         {
             if (Root != null) Object.Destroy(Root.gameObject);

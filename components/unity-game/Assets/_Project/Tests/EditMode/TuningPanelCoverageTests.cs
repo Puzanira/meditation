@@ -127,8 +127,94 @@ namespace Meditation.Tests
             "передышка после детали",
             "длина передышки",
             "авто-ретрай после поражения",
-            "таймер в обучении стоит"
+            "таймер в обучении стоит",
+
+            // MECHANICS §8 «Звук» — заказ founder 2026-08-07: три слоя, все ручки на панель.
+            "звук: громкость фона",
+            "звук: кроссфейд в медитацию",
+            "звук: кроссфейд из медитации",
+            "звук: хвост медитации",
+            "звук: медитация заменяет фон",
+            "звук: потолок слоя мыслей",
+            "звук: мыслей до максимума",
+            "звук: сглаживание громкости",
+            "звук: мысли по перекрытию, а не по числу",
+            "звук: тишина вне уровня",
+
+            // SCREENS «Детали в сцене» — луч-подсветка, тот же заказ.
+            "луч: период",
+            "луч: длительность прохода",
+            "луч: ширина полосы",
+            "луч: сила подсветки",
+            "луч: только по незамеченным",
+            "луч: реже на поздних уровнях"
         };
+
+        /// <summary>
+        /// Ranges of the two new groups, straight out of the spec that ordered them. Same lesson as
+        /// the scenettes: a slider whose range nobody pinned is a slider that drifts, and these two
+        /// groups are the ones the founder will be moving at the gate.
+        /// </summary>
+        private static readonly Dictionary<string, (float Min, float Max)> SharedRanges =
+            new Dictionary<string, (float, float)>
+            {
+                { "звук: громкость фона", (0f, 1f) },                    // MECHANICS §8
+                { "звук: кроссфейд в медитацию", (0.1f, 1.5f) },
+                { "звук: кроссфейд из медитации", (0.1f, 1.5f) },
+                { "звук: хвост медитации", (0f, 4f) },
+                { "звук: потолок слоя мыслей", (0f, 1f) },
+                { "звук: мыслей до максимума", (4f, 15f) },
+                { "звук: сглаживание громкости", (0.1f, 2f) },
+                { "луч: период", (4f, 20f) },                            // SCREENS «Детали в сцене»
+                { "луч: длительность прохода", (0.6f, 2.5f) },
+                { "луч: ширина полосы", (150f, 600f) },
+                { "луч: сила подсветки", (0.1f, 1f) }
+            };
+
+        [Test]
+        public void TheSoundAndSweepRows_KeepTheirSpecRanges()
+        {
+            IList<TuningParam> rows = TuningCatalog.GameShared();
+
+            foreach (KeyValuePair<string, (float Min, float Max)> range in SharedRanges)
+            {
+                var param = rows.OfType<FloatParam>().FirstOrDefault(p => p.Label == range.Key);
+                Assert.IsNotNull(param, "Нет строки «" + range.Key + "» на панели игры.");
+                Assert.AreEqual(range.Value.Min, param.Min, 1e-3f,
+                    range.Key + ": нижняя граница не по спеку.");
+                Assert.AreEqual(range.Value.Max, param.Max, 1e-3f,
+                    range.Key + ": верхняя граница не по спеку.");
+            }
+        }
+
+        /// <summary>
+        /// …and the shipped starting values are the ones the spec names, inside those ranges. §8 gives
+        /// a start for every knob it declares, and a start outside its own slider is a value the
+        /// founder cannot get back to after moving it.
+        /// </summary>
+        [Test]
+        public void TheSoundAndSweepDefaults_AreTheSpecsStartingValues()
+        {
+            TuningConfig.ResetToDefaults();
+
+            Assert.AreEqual(0.6f, TuningConfig.AudioBackgroundVolume, 1e-3f);
+            Assert.AreEqual(0.4f, TuningConfig.AudioMeditationFadeInSeconds, 1e-3f);
+            Assert.AreEqual(0.6f, TuningConfig.AudioMeditationFadeOutSeconds, 1e-3f);
+            Assert.AreEqual(1.5f, TuningConfig.AudioMeditationTailSeconds, 1e-3f);
+            Assert.IsTrue(TuningConfig.AudioMeditationReplacesBackground);
+            Assert.AreEqual(0.8f, TuningConfig.AudioThoughtsMaxVolume, 1e-3f);
+            Assert.AreEqual(8f, TuningConfig.AudioThoughtsAtCount, 1e-3f);
+            Assert.AreEqual(0.5f, TuningConfig.AudioThoughtsSmoothingSeconds, 1e-3f);
+            Assert.IsFalse(TuningConfig.AudioThoughtsByOverlap);
+            Assert.IsTrue(TuningConfig.AudioSilentOffLevel);
+
+            Assert.AreEqual(8f, TuningConfig.SweepPeriodSeconds, 1e-3f);
+            Assert.AreEqual(1.2f, TuningConfig.SweepDurationSeconds, 1e-3f);
+            Assert.AreEqual(320f, TuningConfig.SweepWidthPx, 1e-3f);
+            Assert.AreEqual(0.45f, TuningConfig.SweepStrength, 1e-3f);
+            Assert.IsTrue(TuningConfig.SweepOnlyUnnoticed);
+            Assert.IsTrue(TuningConfig.SweepRarerOnLateLevels);
+        }
 
         [Test]
         public void GamePanel_HasASectionPerLevel_PlusTheSharedValues()

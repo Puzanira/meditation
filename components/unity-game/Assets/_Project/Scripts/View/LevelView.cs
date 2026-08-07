@@ -15,8 +15,9 @@ namespace Meditation.View
     /// <see cref="ICollectionView"/>, so the collection loop underneath them is literally the same code.
     ///
     /// Z-order (SCREENS «Зоны», with the walkthrough's refinement): background → details → thread →
-    /// thoughts → vessel → peak veil → HUD → messages. The vessel keeps its place above the thoughts
-    /// unless the [toggle] «мысли закрывают сосуд и деталь» says otherwise (MECHANICS §4).
+    /// thoughts → vessel → peak veil → HUD → hints → outcome screen. The vessel keeps its place above
+    /// the thoughts unless the [toggle] «мысли закрывают сосуд и деталь» says otherwise (MECHANICS §4);
+    /// the outcome layer is above even the HUD, because a drawn finished screen covers the frame whole.
     /// </summary>
     public sealed class LevelView : ICollectionView
     {
@@ -31,13 +32,29 @@ namespace Meditation.View
         private readonly LevelDefinition _level;
 
         private readonly List<ArtThoughtView> _thoughtPool = new List<ArtThoughtView>();
+
+        // The burst («последний пипс — мысль лопается») and the bookkeeping that spots one. A popped
+        // thought is gone from the model the instant it pops, so the only way the view learns about it
+        // is by remembering which thoughts it drew last frame — see SyncThoughts.
+        private readonly List<ArtThoughtView> _popPool = new List<ArtThoughtView>();
+        private readonly List<bool> _popSlotBusy = new List<bool>();
+        private readonly List<ThoughtPop> _pops = new List<ThoughtPop>();
+        private readonly List<Thought> _drawnLastFrame = new List<Thought>();
+
         private readonly List<Image> _detailImages = new List<Image>();
         private readonly List<Image> _detailRings = new List<Image>();
         private readonly List<Image> _slots = new List<Image>();
         private readonly List<Image> _slotFills = new List<Image>();
         private readonly List<Image> _vesselContents = new List<Image>();
         private readonly List<Vector2> _vesselContentSizes = new List<Vector2>();
-        private readonly List<Image> _victorySlotFills = new List<Image>();
+        private readonly List<Material> _sweepMaterials = new List<Material>();
+
+        /// <summary>
+        /// The thoughts as of the last <see cref="SyncThoughts"/> — kept only so a progress ring can
+        /// ask whether the detail it circles is buried (see <see cref="FullyUnderAThought"/>). Held by
+        /// reference, like everything else the field hands out; the view never edits it.
+        /// </summary>
+        private IReadOnlyList<Thought> _liveThoughts;
 
         private Image _background;
         private Image _vessel;
@@ -45,7 +62,7 @@ namespace Meditation.View
         private Image _vesselFillLevel;
         private CanvasGroup _thoughtsGroup;
         private CanvasGroup _vesselGroup;
-        private Image _messagePlate;
+        private Image _outcome;
         private Image _crankHalo;
         private Image _timerPlate;
         private RectTransform _vesselWindow;
@@ -78,6 +95,9 @@ namespace Meditation.View
         public RectTransform HudLayer { get; private set; }
         public RectTransform MessageLayer { get; private set; }
 
+        /// <summary>Above everything, including the HUD: a finished screen covers the frame whole.</summary>
+        public RectTransform OutcomeLayer { get; private set; }
+
         public Image Vessel => _vessel;
 
         /// <summary>
@@ -87,8 +107,6 @@ namespace Meditation.View
         public RectTransform VesselRect => _vesselWindow != null ? _vesselWindow : _vessel.rectTransform;
         public Image Background => _background;
 
-        /// <summary>The white card the outcome lines stand on (mock 17) — measured by the picture tests.</summary>
-        public RectTransform MessagePlateRect => _messagePlate.rectTransform;
         public Image Sun { get; private set; }
         public Image SunDial { get; private set; }
         public Text TimerLabel { get; private set; }
@@ -104,15 +122,35 @@ namespace Meditation.View
         /// <summary>The peak's darkened edges — the half of it that is visible on a photograph.</summary>
         public Image PeakEdges { get; private set; }
 
-        /// <summary>The row of filled slots under «Собрано: …» (S4, mock 18).</summary>
-        public RectTransform VictorySlots { get; private set; }
-        public HintCard Hint { get; private set; }
-        public Text BigMessage { get; private set; }
-        public Text SmallMessage { get; private set; }
+        /// <summary>The beat's own button — НАВОДИ, КРУТИ РУЧКУ — with its arrow.</summary>
+        public ButtonHint Hint { get; private set; }
+
+        /// <summary>
+        /// The second button of a beat. Beat 2 shows two at once (SCREENS §Обучение п.2): «КРУТИ
+        /// РУЧКУ» at the dynamo indicator and «ТАЩИ» beside the detail on its thread — one names the
+        /// hand, the other names what the hand is doing to.
+        /// </summary>
+        public ButtonHint SecondHint { get; private set; }
+
+        /// <summary>
+        /// The drawn outcome screen on top of everything — <c>screens/level-complete</c> after a win,
+        /// <c>screens/game-over</c> after a loss (drop 2026-08-07, S4/S5). Its alpha is the retry's own
+        /// progress bar: every turn of the handle wipes a share of it away.
+        /// </summary>
+        public Image OutcomeScreen => _outcome;
 
         public IReadOnlyList<Image> Slots => _slots;
         public IReadOnlyList<Image> DetailImages => _detailImages;
         public IReadOnlyList<ArtThoughtView> ThoughtViews => _thoughtPool;
+
+        /// <summary>
+        /// Thoughts that are only finishing their 200 ms burst — out of the model, still on the screen
+        /// (<see cref="ThoughtPop"/>). Empty at every other moment.
+        /// </summary>
+        public IReadOnlyList<ThoughtPop> Pops => _pops;
+
+        /// <summary>The views the bursts are drawn through; reused, so most of them are off.</summary>
+        public IReadOnlyList<ArtThoughtView> PopViews => _popPool;
 
         /// <summary>The vessel's fill indicator — present on level 3, where the bag is baked in.</summary>
         public Image VesselFillLevel => _vesselFillLevel;
@@ -134,6 +172,7 @@ namespace Meditation.View
             PeakLayer = Ui.Layer(Root, "PeakLayer");
             HudLayer = Ui.Layer(Root, "HudLayer");
             MessageLayer = Ui.Layer(Root, "MessageLayer");
+            OutcomeLayer = Ui.Layer(Root, "OutcomeLayer");
 
             BuildBackground();
             BuildDetails();
@@ -161,7 +200,8 @@ namespace Meditation.View
 
             BuildVessel();
             BuildHud();
-            BuildMessages();
+            BuildHint();
+            BuildOutcome();
 
             ApplyCoverToggle(true);
         }
@@ -186,9 +226,13 @@ namespace Meditation.View
                 image.preserveAspect = true;
                 image.color = image.sprite != null ? Color.white : Color.magenta;
                 Ui.Place(image.rectTransform, spec.Home.x, spec.Home.y, spec.Size.x, spec.Size.y);
+                GiveItsOwnSweepMaterial(image);
                 _detailImages.Add(image);
 
-                Image ring = Ui.Ring(DetailsLayer, "Ring_" + spec.Name, spec.Home.x, spec.Home.y,
+                // The ring goes round the INK, not round the rectangle: the plane is drawn with 600 px
+                // of contrail behind it, so a ring centred on its box circles empty sky.
+                Vector2 anchor = LevelCatalog.AnchorOf(spec);
+                Image ring = Ui.Ring(DetailsLayer, "Ring_" + spec.Name, anchor.x, anchor.y,
                     RingRadius(spec.Size), LevelOneData.VesselStroke);
                 ring.fillAmount = 0f;
                 ring.gameObject.SetActive(false);
@@ -201,8 +245,14 @@ namespace Meditation.View
         /// everything because every placeholder was 50 px; the art drop's details run from a 46 px
         /// flowerpot to an 802 px vine, and a fixed 55 px ring would sit inside most of them.
         /// </summary>
-        private static float RingRadius(Vector2 size) =>
+        public static float RingRadius(Vector2 size) =>
             Mathf.Clamp(Mathf.Max(size.x, size.y) * 0.62f, 36f, 96f);
+
+        /// <summary>The ring drawn around detail <paramref name="index"/> of this level, design px.</summary>
+        public float RingRadiusOf(int index) =>
+            index >= 0 && index < _level.DetailCount
+                ? RingRadius(_level.Details[index].Size)
+                : 0f;
 
         private void BuildGaze()
         {
@@ -385,69 +435,59 @@ namespace Meditation.View
             CrankNeedle.anchoredPosition = Vector2.zero;
         }
 
-        private void BuildMessages()
+        private void BuildHint()
         {
-            BuildVictorySlots();
-            Hint = new HintCard(MessageLayer);
-
-            _messagePlate = Ui.Rounded(MessageLayer, "MessagePlate", 960f, 565f, 1320f, 330f,
-                new Color(1f, 1f, 1f, 0.88f), Color.clear, 0f, 20);
-            _messagePlate.gameObject.SetActive(false);
-
-            BigMessage = Ui.Label(MessageLayer, "BigMessage", "", 960f, 480f, 1600f, 90f,
-                GameTextSizes.Big, new Color(0.23f, 0.23f, 0.21f));
-            SmallMessage = Ui.Label(MessageLayer, "SmallMessage", "", 960f, 620f, 1600f, 60f,
-                GameTextSizes.Small, new Color(0.4f, 0.4f, 0.4f));
-            BigMessage.gameObject.SetActive(false);
-            SmallMessage.gameObject.SetActive(false);
+            Hint = new ButtonHint(MessageLayer);
+            SecondHint = new ButtonHint(MessageLayer, "SecondHint");
         }
-
-        /// <summary>Y of the victory slot row: under «Собрано: …», which stands at y 800.</summary>
-        public const float VictorySlotsY = 925f;
-
-        /// <summary>Slot side of the victory row — the HUD's own slot, a touch larger to be read.</summary>
-        public const float VictorySlotSize = 78f;
 
         /// <summary>
-        /// S4 asks for two things, and only the line was there: «текст + ряд заполненных слотов»
-        /// (SCREENS S4, mock 18). The row is the proof of what the level was about — every slot filled,
-        /// with the silhouette of the detail it holds — so it is built with the screen and shown by
-        /// <see cref="StageVictory"/> rather than borrowed from the HUD, which the victory hides.
+        /// The finished outcome screens of the drop (S4 «level-complete», S5 «game-over»), full frame,
+        /// above everything the level draws — including the HUD, because a finished screen covers the
+        /// frame whole.
+        ///
+        /// Built empty and hidden: which one is shown is the level's decision, and the ALPHA is what
+        /// the retry acts on — «каждый оборот динамо стирает ~10 % штриховки с экрана» (SCREENS S5) is
+        /// this image dissolving back into the level the player just lost.
         /// </summary>
-        private void BuildVictorySlots()
+        private void BuildOutcome()
         {
-            int count = _level.DetailCount;
-            VictorySlots = Ui.Layer(MessageLayer, "VictorySlots");
+            _outcome = Ui.NewImage(OutcomeLayer, "OutcomeScreen");
+            _outcome.color = new Color(1f, 1f, 1f, 0f);
+            _outcome.raycastTarget = false;
+            Ui.Place(_outcome.rectTransform, 960f, 540f, 1920f, 1080f);
+            _outcome.gameObject.SetActive(false);
+        }
 
-            float step = Mathf.Min(VictorySlotSize + 16f, 1600f / Mathf.Max(1, count));
-            float side = Mathf.Min(VictorySlotSize, step - 10f);
+        /// <summary>Put a drawn screen over the level, fully opaque.</summary>
+        public void ShowOutcomeScreen(string artKey)
+        {
+            _outcome.sprite = ArtLibrary.Get(artKey);
+            // A missing render must not be an invisible «screen»: black is what the flow means here,
+            // and it is loud enough that the design gate cannot miss it.
+            _outcome.color = _outcome.sprite != null ? Color.white : Color.black;
+            _outcome.gameObject.SetActive(true);
+        }
 
-            for (int i = 0; i < count; i++)
+        /// <summary>How much of the outcome screen is still up, 1 = whole, 0 = wiped away.</summary>
+        public float OutcomeAlpha
+        {
+            get { return _outcome != null && _outcome.gameObject.activeSelf ? _outcome.color.a : 0f; }
+            set
             {
-                float x = 960f + (i - (count - 1) * 0.5f) * step;
-                Image slot = Ui.Rounded(VictorySlots, "VictorySlot" + (i + 1), x, VictorySlotsY,
-                    side, side, new Color(1f, 1f, 1f, 0.9f), new Color(0.35f, 0.35f, 0.35f, 0.9f), 3f, 10);
-
-                _victorySlotFills.Add(BuildSlotPicture(slot, "VictorySlotArt" + (i + 1),
-                    ArtLibrary.IconOf(_level.Details[i]), side - SlotPadding * 2f,
-                    _level.Details[i].SilhouetteRadius));
+                if (_outcome == null) return;
+                Color c = _outcome.color;
+                c.a = Mathf.Clamp01(value);
+                _outcome.color = c;
             }
-
-            VictorySlots.gameObject.SetActive(false);
         }
 
-        /// <summary>Sizes the outcome lines are drawn at (text registry, walkthrough frame 25).</summary>
-        private static class GameTextSizes
+        public void HideOutcomeScreen()
         {
-            public const int Big = 60;
-            public const int Small = 40;
+            if (_outcome == null) return;
+            _outcome.gameObject.SetActive(false);
+            _outcome.sprite = null;
         }
-
-        private static readonly Color DarkInk = new Color(0.23f, 0.23f, 0.21f);
-        private static readonly Color DimInk = new Color(0.4f, 0.4f, 0.4f);
-
-        /// <summary>Ink for a line standing on the location itself, where every plate is dark.</summary>
-        private static readonly Color LightInk = new Color(0.97f, 0.96f, 0.92f);
 
         // ---- state -------------------------------------------------------------------------------
 
@@ -623,8 +663,8 @@ namespace Meditation.View
         private void ApplyLayerOrder(bool cover)
         {
             RectTransform[] order = cover
-                ? new[] { SceneLayer, DetailsLayer, ThreadLayer, VesselLayer, ThoughtsLayer, PeakLayer, HudLayer, MessageLayer }
-                : new[] { SceneLayer, DetailsLayer, ThreadLayer, ThoughtsLayer, VesselLayer, PeakLayer, HudLayer, MessageLayer };
+                ? new[] { SceneLayer, DetailsLayer, ThreadLayer, VesselLayer, ThoughtsLayer, PeakLayer, HudLayer, MessageLayer, OutcomeLayer }
+                : new[] { SceneLayer, DetailsLayer, ThreadLayer, ThoughtsLayer, VesselLayer, PeakLayer, HudLayer, MessageLayer, OutcomeLayer };
 
             int first = int.MaxValue;
             for (int i = 0; i < order.Length; i++)
@@ -689,15 +729,60 @@ namespace Meditation.View
             Ui.MoveTo(_detailImages[index].rectTransform, position);
 
             Image ring = _detailRings[index];
-            ring.gameObject.SetActive(active);
+            ring.gameObject.SetActive(active && RingHasSomethingToShow(progress01, slipped) &&
+                                     !FullyUnderAThought(HintPlacement.Centred(position, spec.Size)));
             SetDragged(active ? index : -1);
             if (!active) return;
 
-            Ui.MoveTo(ring.rectTransform, position);
+            // …and it keeps circling the ink as the detail travels: the sprite moves, its centroid
+            // moves with it, so the offset between the two is constant.
+            Ui.MoveTo(ring.rectTransform, position + LevelCatalog.AnchorOffsetOf(spec));
 
             // A slip is a CLOSED red ring (mock 14) — a red arc would read as "red progress 60 %".
             ring.fillAmount = slipped ? 1f : Mathf.Clamp01(progress01);
             ring.color = spinning && !slipped ? LevelOneData.VesselStroke : LevelOneData.Alarm;
+        }
+
+        /// <summary>
+        /// Fill below which the ring's arc is a hair rather than an arc — half a degree of 360.
+        /// </summary>
+        public const float RingMinimumFill = 1f / 720f;
+
+        /// <summary>
+        /// Has this ring anything to say? A ring at fill 0 is not «прогресс 0 %», it is a 2×14 px tick
+        /// of the alarm colour standing in the sky.
+        ///
+        /// That is exactly what frames 27 and 29 shipped (design gate, 2026-08-07): the gull had been
+        /// noticed, the teaching cat had landed on it and the dynamo had wound down, so the ring was
+        /// drawn at fill 0 in <see cref="LevelOneData.Alarm"/> — a red hair on the plate, over a detail
+        /// that had lost nothing because it had collected nothing. A slip is the one zero-progress state
+        /// that still has something to show, and it draws a CLOSED ring rather than an arc.
+        /// </summary>
+        public static bool RingHasSomethingToShow(float progress01, bool slipped) =>
+            slipped || progress01 > RingMinimumFill;
+
+        /// <summary>
+        /// Is the detail buried under a thought? Then its ring is drawing on top of the thing that hid
+        /// it — «кольцо не рисуется, пока деталь полностью закрыта мыслью» (founder, 2026-08-07).
+        ///
+        /// FULLY covered, not merely touched: the field's own <see cref="ThoughtField.IsCovered"/> asks
+        /// about a point because it is deciding whether the gaze may still reach a detail, and borrowing
+        /// that here would take the ring away mid-haul the moment a blob drifted across the centroid —
+        /// which is the one moment the crank's only feedback has to be on screen.
+        /// </summary>
+        private bool FullyUnderAThought(Rect detail)
+        {
+            if (_liveThoughts == null) return false;
+            for (int i = 0; i < _liveThoughts.Count; i++)
+            {
+                Thought thought = _liveThoughts[i];
+                if (thought == null) continue;
+
+                Rect over = thought.Rect;
+                if (over.xMin <= detail.xMin && over.yMin <= detail.yMin &&
+                    over.xMax >= detail.xMax && over.yMax >= detail.yMax) return true;
+            }
+            return false;
         }
 
         private void SetDragged(int index)
@@ -739,8 +824,6 @@ namespace Meditation.View
             copy.color = copy.sprite != null ? Color.white : Color.magenta;
             _vesselContents.Add(copy);
             _vesselContentSizes.Add(LevelCatalog.IconSizeOf(spec));
-
-            if (index < _victorySlotFills.Count) _victorySlotFills[index].color = Color.white;
 
             LayoutVesselContents();
             UpdateVesselFill();
@@ -786,8 +869,6 @@ namespace Meditation.View
 
             for (int i = 0; i < _slotFills.Count; i++)
                 _slotFills[i].color = SlotPictureHidden;
-            for (int i = 0; i < _victorySlotFills.Count; i++)
-                _victorySlotFills[i].color = SlotPictureHidden;
 
             for (int i = 0; i < _detailImages.Count; i++)
             {
@@ -818,7 +899,10 @@ namespace Meditation.View
 
         public void SyncThoughts(IReadOnlyList<Thought> thoughts, float deltaTime)
         {
+            _liveThoughts = thoughts;
             ApplyCoverToggle();
+            StartPopsForWhateverJustBurst(thoughts);
+
             while (_thoughtPool.Count < thoughts.Count)
                 _thoughtPool.Add(new ArtThoughtView(ThoughtsLayer));
 
@@ -829,19 +913,138 @@ namespace Meditation.View
                 if (used) _thoughtPool[i].Bind(thoughts[i], deltaTime, _desaturated);
             }
 
+            TickPops(deltaTime);
+
             PeakVignette.rectTransform.SetAsLastSibling();
             PeakEdges.rectTransform.SetAsLastSibling();
         }
 
-        public void ShowHint(string text, HintTone tone, Vector2 cardCentre, Vector2 target,
+        // ---- «последний пипс — мысль лопается» ---------------------------------------------------
+
+        /// <summary>
+        /// Whatever left the field since the last frame BECAUSE it ran out of pips starts its burst
+        /// (<see cref="ThoughtPop"/>).
+        ///
+        /// The test is «gone from the list AND spent», not «gone from the list»: thoughts also leave
+        /// through <see cref="ThoughtField.Clear"/> at the victory dissolve and through
+        /// <see cref="ThoughtField.RemoveOldest"/> when the handle wipes the defeat screen, and neither
+        /// of those is a thought the player burst — they must not pop. Wallpaper blobs are excluded for
+        /// the same reason the pips skip them: on the defeat screen they are not a fight, they are the
+        /// picture the retry rubs off.
+        /// </summary>
+        private void StartPopsForWhateverJustBurst(IReadOnlyList<Thought> thoughts)
+        {
+            for (int i = 0; i < _drawnLastFrame.Count; i++)
+            {
+                Thought gone = _drawnLastFrame[i];
+                if (gone.Wallpaper || !gone.IsPopped || Holds(thoughts, gone)) continue;
+                BeginPop(gone);
+            }
+
+            _drawnLastFrame.Clear();
+            for (int i = 0; i < thoughts.Count; i++) _drawnLastFrame.Add(thoughts[i]);
+        }
+
+        private static bool Holds(IReadOnlyList<Thought> thoughts, Thought one)
+        {
+            for (int i = 0; i < thoughts.Count; i++)
+                if (ReferenceEquals(thoughts[i], one)) return true;
+            return false;
+        }
+
+        private void BeginPop(Thought thought)
+        {
+            int slot = TakePopSlot();
+            _popPool[slot].SetActive(true);
+            _popPool[slot].Bind(thought, 0f, _desaturated);
+            _popPool[slot].SetScale(ThoughtPop.StartScale);
+            _pops.Add(new ThoughtPop(thought, slot));
+        }
+
+        /// <summary>
+        /// A burst view, reused. Popping is the commonest event in the game — a fresh
+        /// <see cref="ArtThoughtView"/> is two images, a material and a row of twenty-four pip discs,
+        /// and building that set every time a thought dies would litter the peak.
+        /// </summary>
+        private int TakePopSlot()
+        {
+            for (int i = 0; i < _popSlotBusy.Count; i++)
+            {
+                if (_popSlotBusy[i]) continue;
+                _popSlotBusy[i] = true;
+                return i;
+            }
+
+            _popPool.Add(new ArtThoughtView(ThoughtsLayer));
+            _popSlotBusy.Add(true);
+            return _popPool.Count - 1;
+        }
+
+        /// <summary>
+        /// Advance the bursts. They are re-bound rather than frozen so the flinch of the killing hit
+        /// («мысль вздрагивает, ±6 px, 80 мс») plays out on top of the shrink instead of being frozen
+        /// into a permanent 6 px offset; the thought itself no longer moves, it is out of the field.
+        /// </summary>
+        private void TickPops(float deltaTime)
+        {
+            for (int i = _pops.Count - 1; i >= 0; i--)
+            {
+                ThoughtPop pop = _pops[i];
+                pop.Advance(deltaTime);
+                ArtThoughtView view = _popPool[pop.Slot];
+
+                if (pop.Finished)
+                {
+                    // 200 ms are up: the thought is off the screen, and its view goes back in the box
+                    // at its own size, ready for the next one.
+                    view.SetActive(false);
+                    view.SetScale(1f);
+                    _popSlotBusy[pop.Slot] = false;
+                    _pops.RemoveAt(i);
+                    continue;
+                }
+
+                view.Bind(pop.Thought, deltaTime, _desaturated);
+                view.SetScale(pop.Scale);
+            }
+        }
+
+        /// <summary>Put a drawn button of the tutorial beside <paramref name="target"/> and aim at it.</summary>
+        public void ShowHint(string buttonKey, HintTone tone, Vector2 centre, Vector2 target,
             float standoff = 50f)
         {
-            Hint.Show(text, tone, cardCentre, target, standoff);
+            Hint.Show(ArtLibrary.Get(buttonKey), tone, centre, target, standoff);
+        }
+
+        /// <summary>The second button of the beat (ТАЩИ), beside the detail that is moving.</summary>
+        public void ShowSecondHint(string buttonKey, HintTone tone, Vector2 centre, Vector2 target,
+            float standoff = 50f)
+        {
+            SecondHint.Show(ArtLibrary.Get(buttonKey), tone, centre, target, standoff);
+        }
+
+        /// <summary>Walk the second button to a new spot and re-aim it — «рядом с едущей деталью».</summary>
+        public void MoveSecondHint(Vector2 centre, Vector2 target)
+        {
+            SecondHint.MoveTo(centre);
+            SecondHint.PointAt(target);
+        }
+
+        public void HideSecondHint() => SecondHint.Hide();
+
+        /// <summary>The beat the drop has no button for: an arrow and nothing else.</summary>
+        public void ShowArrowHint(HintTone tone, Vector2 from, Vector2 target)
+        {
+            Hint.ShowArrowOnly(tone, from, target);
         }
 
         public void HideHint() => Hint.Hide();
 
-        /// <summary>Mock 18: the vessel lifts to the centre at ×2 with the whole haul inside it.</summary>
+        /// <summary>
+        /// The reward beat of S4 (kept by the founder's own note on the drop): the vessel slides to the
+        /// centre with the whole haul inside it — «единственный момент, где игрок видит добычу» — and
+        /// then the drawn <c>level-complete</c> screen comes over it.
+        /// </summary>
         public void StageVictory()
         {
             if (_victoryStaged) return;
@@ -860,9 +1063,6 @@ namespace Meditation.View
 
             // The fill indicator belongs to the bag where it stands, not to the tableau.
             if (_vesselFillTrack != null) _vesselFillTrack.gameObject.SetActive(false);
-
-            // S4 is «текст + ряд заполненных слотов» — the row is half of the screen.
-            if (VictorySlots != null) VictorySlots.gameObject.SetActive(true);
         }
 
         private void ClearVictoryStaging()
@@ -874,7 +1074,6 @@ namespace Meditation.View
             SetThoughtsAlpha(1f);
             SetBackgroundAlpha(1f);
             if (_vesselFillTrack != null) _vesselFillTrack.gameObject.SetActive(true);
-            if (VictorySlots != null) VictorySlots.gameObject.SetActive(false);
         }
 
         private void SetBackgroundAlpha(float alpha)
@@ -884,27 +1083,71 @@ namespace Meditation.View
             _background.color = c;
         }
 
-        /// <summary>
-        /// The outcome lines. The colour is the caller's, because the two outcomes sit on opposite
-        /// backgrounds: the defeat lines are on a white plate (mock 17) and have to be dark, while
-        /// «Собрано: …» stands straight on the location — and every one of the three plates is a dusk
-        /// or an interior, where the mock's dark green went invisible.
-        /// </summary>
-        public void ShowMessage(string big, string small, bool plate = false, float bigY = 480f,
-            int bigSize = 60, int smallSize = 40, bool lightInk = false)
-        {
-            _messagePlate.gameObject.SetActive(plate);
-            Ui.MoveTo(BigMessage.rectTransform, new Vector2(960f, bigY));
-            Ui.MoveTo(SmallMessage.rectTransform, new Vector2(960f, bigY + 140f));
+        // ---- луч-подсветка деталей (SCREENS «Детали в сцене») --------------------------------------
 
-            BigMessage.fontSize = bigSize;
-            SmallMessage.fontSize = smallSize;
-            BigMessage.color = lightInk ? LightInk : DarkInk;
-            SmallMessage.color = lightInk ? LightInk : DimInk;
-            BigMessage.text = big ?? string.Empty;
-            SmallMessage.text = small ?? string.Empty;
-            BigMessage.gameObject.SetActive(!string.IsNullOrEmpty(big));
-            SmallMessage.gameObject.SetActive(!string.IsNullOrEmpty(small));
+        /// <summary>
+        /// Slant of the band inside a sprite's own UV — «мягкая НАКЛОННАЯ полоса света».
+        ///
+        /// In UV rather than in degrees on purpose: a fixed angle on a 484 px contrail and on a 40 px
+        /// paperclip is two different pictures, while a quarter of the sprite's own width is the same
+        /// lean on both.
+        /// </summary>
+        private const float SweepSlant = 0.25f;
+
+        /// <summary>
+        /// Give a detail its own material instance of <c>Meditation/DetailSweep</c>.
+        ///
+        /// Per instance, like <see cref="ArtThoughtView"/>'s backing and for the same reason: a UGUI
+        /// <c>Image</c> carries no per-instance property block, and the band's position has to be
+        /// expressed in EACH sprite's own UV (the details run from a 40 px paperclip to a 484 px
+        /// contrail — one shared number would be half of the first and a twentieth of the second).
+        /// The instances are destroyed with the level.
+        /// </summary>
+        private void GiveItsOwnSweepMaterial(Image image)
+        {
+            // Resources, not Shader.Find: the shader ships inside the game's own Resources folder
+            // (like the thought shaders), and Shader.Find only sees what a build decided to include.
+            var shader = Resources.Load<Shader>(LevelCatalog.ArtRoot + "shaders/detail-sweep");
+            if (shader == null) return;   // no shader = no sweep, never a magenta detail
+
+            var material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+            material.SetFloat(SweepStrengthId, 0f);
+            material.SetFloat(SweepSlantId, SweepSlant);
+            image.material = material;
+            _sweepMaterials.Add(material);
+        }
+
+        private static readonly int SweepCentreId = Shader.PropertyToID("_SweepU");
+        private static readonly int SweepWidthId = Shader.PropertyToID("_SweepWidthU");
+        private static readonly int SweepStrengthId = Shader.PropertyToID("_SweepStrength");
+        private static readonly int SweepSlantId = Shader.PropertyToID("_SweepSlant");
+
+        /// <summary>
+        /// Put the light band on the details, in each one's own UV.
+        ///
+        /// <paramref name="skipIndex"/> is the detail the player has already noticed — the toggle
+        /// «луч: только по незамеченным» — and a collected detail is not drawn at all, so it needs no
+        /// special case. The band's design-px centre comes from <see cref="Mechanics.DetailSweep"/>.
+        /// </summary>
+        public void ApplySweep(bool active, float centreX, float widthPx, float strength, int skipIndex)
+        {
+            for (int i = 0; i < _detailImages.Count; i++)
+            {
+                Material material = _detailImages[i].material;
+                if (material == null || !_sweepMaterials.Contains(material)) continue;
+
+                if (!active || i == skipIndex)
+                {
+                    material.SetFloat(SweepStrengthId, 0f);
+                    continue;
+                }
+
+                Rect box = LevelCatalog.RectOf(_level.Details[i]);
+                float width = Mathf.Max(1f, box.width);
+                material.SetFloat(SweepCentreId, (centreX - box.xMin) / width);
+                material.SetFloat(SweepWidthId, Mathf.Max(0.02f, widthPx * 0.5f / width));
+                material.SetFloat(SweepStrengthId, Mathf.Clamp01(strength));
+            }
         }
 
         /// <summary>Tear the whole level's UI down (the flow rebuilds it for the next level).</summary>
@@ -912,6 +1155,16 @@ namespace Meditation.View
         {
             for (int i = 0; i < _thoughtPool.Count; i++) _thoughtPool[i].Dispose();
             _thoughtPool.Clear();
+
+            for (int i = 0; i < _popPool.Count; i++) _popPool[i].Dispose();
+            _popPool.Clear();
+            _popSlotBusy.Clear();
+            _pops.Clear();
+            _drawnLastFrame.Clear();
+
+            for (int i = 0; i < _sweepMaterials.Count; i++)
+                if (_sweepMaterials[i] != null) Object.DestroyImmediate(_sweepMaterials[i]);
+            _sweepMaterials.Clear();
 
             if (Root != null) Object.Destroy(Root.gameObject);
             Root = null;

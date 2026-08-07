@@ -200,6 +200,24 @@ namespace Meditation.View
             _backing.gameObject.SetActive(active && _backingMaterial != null && _root.sprite != null);
         }
 
+        /// <summary>
+        /// The size the whole thought is drawn at, 1 = its own. SCREENS «Мысли (визуал состояния)»:
+        /// «Последний пипс — мысль лопается (масштаб 1.1 → 0, 200 мс)» — see <see cref="ThoughtPop"/>.
+        ///
+        /// Ink, halo and pips go together, and only the first two are set here: the row of pips is a
+        /// CHILD of the ink and rides it, while the backing is a sibling (it has to draw underneath),
+        /// so a halo left alone would hang in the air around a scribble shrinking out of it.
+        /// </summary>
+        public void SetScale(float scale)
+        {
+            var s = new Vector3(scale, scale, 1f);
+            _root.rectTransform.localScale = s;
+            _backing.rectTransform.localScale = s;
+        }
+
+        /// <summary>What the thought is currently drawn at (see <see cref="SetScale"/>).</summary>
+        public float Scale => _root.rectTransform.localScale.x;
+
         /// <param name="desaturated">Defeat screen: «цвета гаснут» (walkthrough frame 17).</param>
         public void Bind(Thought thought, float deltaTime, bool desaturated = false)
         {

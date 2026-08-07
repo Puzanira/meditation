@@ -50,6 +50,14 @@ namespace Meditation.Game
 
         public TuningPanel Panel { get; private set; }
 
+        /// <summary>
+        /// The three sound layers of MECHANICS §8. They live on the FLOW, not on a screen: a card or a
+        /// victory screen lasts two seconds, and a background track that is rebuilt on every one of
+        /// them is a gap in the music five times a run. The screens only describe what they sound like
+        /// (<see cref="GameScreen.Audio"/>) and the mix decides what that means.
+        /// </summary>
+        public GameAudio Audio { get; private set; }
+
         public GamePhase Phase { get; private set; } = GamePhase.Title;
 
         /// <summary>0-based index of the level being played (or about to be).</summary>
@@ -83,6 +91,7 @@ namespace Meditation.Game
             _fade = Ui.BoxCentred(Stage.Frame, "ScreenFade", 960f, 540f, 1920f, 1080f,
                 new Color(0f, 0f, 0f, 0f));
 
+            Audio = new GameAudio(transform);
             Panel = TuningPanel.Create(Stage, "Медитация в спешке", TuningCatalog.Game(), Readout);
 
             var exit = GetComponent<MenuButtonExit>();
@@ -98,6 +107,8 @@ namespace Meditation.Game
         {
             _screen?.Dispose();
             _screen = null;
+            Audio?.Dispose();
+            Audio = null;
         }
 
         private void Update()
@@ -118,6 +129,11 @@ namespace Meditation.Game
 
             TickFade(deltaTime);
             _screen?.Advance(deltaTime, hands);
+
+            // …and after the screen has had its frame, because what it sounds like is a consequence of
+            // what it just did (a detail that landed this frame starts the meditation layer's tail).
+            if (Audio != null)
+                Audio.Tick(deltaTime, _screen != null ? _screen.Audio : AudioScene.Quiet(LevelIndex));
         }
 
         // ---- transitions ---------------------------------------------------------------------------
@@ -244,6 +260,11 @@ namespace Meditation.Game
         public void ExitToLauncher()
         {
             if (Exited) return;
+
+            // «Кнопка „в меню“ — мгновенная тишина вместе с выходом» (MECHANICS §8). Before anything
+            // else: the launcher takes the screen back at once, and music playing over somebody else's
+            // menu is the loudest possible way to leave a room.
+            Audio?.SilenceNow();
 
             if (PreviewStandNav.RequestExit())
             {

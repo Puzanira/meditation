@@ -20,6 +20,7 @@ namespace Meditation.Stand
     {
         private readonly ICollectionView _view;
         private readonly List<Vector2> _homes = new List<Vector2>();
+        private readonly List<Vector2> _threadOffsets = new List<Vector2>();
         private readonly List<bool> _selectable = new List<bool>();
         private readonly string[] _names;
         private readonly Vector2 _vesselCentre;
@@ -49,6 +50,30 @@ namespace Meditation.Stand
 
             Collected = new bool[homes.Count];
         }
+
+        /// <summary>
+        /// Where each detail's THREAD is tied, as an offset from its home — the sprite's alpha centroid
+        /// on a real level, zero on the greybox stand where every placeholder is its own centre.
+        ///
+        /// The end of the thread is a claim about the picture: level 1's plane is 484 px of sky with the
+        /// aircraft in the left quarter, and a thread leaving the middle of that rectangle starts 145 px
+        /// off the thing it is supposed to be pulling (design gate, 2026-08-07). It is an offset rather
+        /// than a second set of positions so that a detail on its way to the vessel carries its own
+        /// anchor with it instead of sliding along a different line than its sprite.
+        /// </summary>
+        public void SetThreadOffsets(IReadOnlyList<Vector2> offsets)
+        {
+            _threadOffsets.Clear();
+            if (offsets == null) return;
+            for (int i = 0; i < offsets.Count; i++) _threadOffsets.Add(offsets[i]);
+        }
+
+        /// <summary>Where the thread is tied on detail <paramref name="index"/> at rest, design px.</summary>
+        public Vector2 ThreadAnchor(int index) =>
+            index >= 0 && index < _homes.Count ? _homes[index] + OffsetOf(index) : _vesselCentre;
+
+        private Vector2 OffsetOf(int index) =>
+            index >= 0 && index < _threadOffsets.Count ? _threadOffsets[index] : Vector2.zero;
 
         public ThoughtField Field { get; } = new ThoughtField();
 
@@ -269,7 +294,8 @@ namespace Meditation.Stand
             if (NoticedIndex >= 0)
             {
                 _view.SetDetailProgress(NoticedIndex, _displayProgress, Collector.IsSpinning, true, Slipping);
-                Vector2 from = Vector2.Lerp(_homes[NoticedIndex], _vesselCentre, _displayProgress);
+                Vector2 from = Vector2.Lerp(_homes[NoticedIndex], _vesselCentre, _displayProgress) +
+                               OffsetOf(NoticedIndex);
                 _view.SetThread(from, _vesselCentre, true);
             }
             else

@@ -6,8 +6,10 @@ namespace Meditation.EditorTools
     /// <summary>
     /// Import rules for the art drop, applied by the importer instead of by hand.
     ///
-    /// The drop is 45 PNGs — backgrounds at 1920×1080 and sprites the designer exported at 2–4× their
-    /// game size — and every one of them needs the same handful of settings. Doing that through an
+    /// The drop is a folder of PNGs — plates and finished screens at 1920×1080, sprites and buttons the
+    /// designer exported at 2–4× their game size — plus, since 2026-08-07, seven MP3s (see
+    /// <see cref="OnPreprocessAudio"/>). Every file of a kind needs the same handful of settings, and
+    /// the settings differ per kind rather than per file. Doing that through an
     /// <see cref="AssetPostprocessor"/> rather than clicking means a re-import, a fresh clone or a new
     /// file from the designer all land on the same settings, and the reason for each one is written
     /// down here rather than living only in a .meta.
@@ -39,6 +41,36 @@ namespace Meditation.EditorTools
                 _artRoot = (package != null ? package.assetPath : "Assets/_Project") + "/Art/";
                 return _artRoot;
             }
+        }
+
+        /// <summary>
+        /// The seven tracks of MECHANICS §8, imported the way the spec asks for: **streaming**, not
+        /// decompress-on-load.
+        ///
+        /// Not a preference. The library's track is 18 MB of MP3 and the metro's is 11; decompressed
+        /// into memory that is hundreds of megabytes of PCM sitting in a cabinet process that hosts
+        /// seven games, and Unity would decode all of it before the first level card. Streaming reads
+        /// it off disk as it plays, which is exactly what a looping ambience wants, and
+        /// <c>preloadAudioData = false</c> keeps the level's own track from being loaded until that
+        /// level starts.
+        /// </summary>
+        private void OnPreprocessAudio()
+        {
+            if (!assetPath.StartsWith(ArtRoot)) return;
+
+            var importer = (AudioImporter)assetImporter;
+            AudioImporterSampleSettings settings = importer.defaultSampleSettings;
+            settings.loadType = AudioClipLoadType.Streaming;
+            settings.compressionFormat = AudioCompressionFormat.Vorbis;
+            settings.quality = 0.7f;
+            settings.preloadAudioData = false;
+            importer.defaultSampleSettings = settings;
+
+            // Decoding an 18 MB track must not hold the first frame of a level.
+            importer.loadInBackground = true;
+
+            // A cabinet speaker plays the same mix to the room; a stereo ambience stays stereo.
+            importer.forceToMono = false;
         }
 
         private void OnPreprocessTexture()

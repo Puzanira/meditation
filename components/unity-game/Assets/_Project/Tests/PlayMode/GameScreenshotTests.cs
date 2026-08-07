@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using AiGameStudio.ArcadeControls;
 using Meditation.Game;
 using Meditation.Mechanics;
@@ -274,127 +275,292 @@ namespace Meditation.Tests
                 "луч дошёл до детали в полную силу", 30f);
 
             Shoot("Game28_L2_sweep");
+            AssertTheBandIsVisibleInThisFrame(screen, "Game28_L2_sweep");
             LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// The frame that was just written has to SHOW the band — measured on the very picture the
+        /// design gate opens, not on a rig beside it.
+        ///
+        /// This is the check whose absence cost the drop of 2026-08-07 a gate: frames 26 and 28 were
+        /// staged off the sweep's own numbers («Active», «Strength ≥ 0.9×0.45», «centre inside a
+        /// detail's rectangle»), all of which were true while the picture was judged «луча нет». The
+        /// numbers were never the claim — the pixels are. So the shot state is captured, the band is
+        /// switched off without moving anything else, and the detail the band is over has to have
+        /// dropped by <see cref="MinSweepLift"/> when it went out.
+        ///
+        /// The whole rectangle's p95 is the ruler here, unlike the rig's median-over-lit-pixels: this
+        /// is the number a human takes off the PNG in an image editor, and it is the number the design
+        /// skeptic reported. Making the frame gate answer in the skeptic's own units is the point.
+        /// </summary>
+        private static void AssertTheBandIsVisibleInThisFrame(LevelScreen screen, string frameName)
+        {
+            LevelDefinition level = screen.Level;
+            float centre = screen.Sweep.CentreX;
+            float halfBand = TuningConfig.SweepWidthPx * 0.5f;
+
+            Texture2D lit = StandTestHarness.Capture(Letterbox);
+            screen.View.ApplySweep(false, 0f, 0f, 0f, -1);
+            Texture2D dark = StandTestHarness.Capture(Letterbox);
+
+            float best = float.MinValue;
+            string bestName = "—";
+            int counted = 0;
+
+            try
+            {
+                for (int i = 0; i < level.DetailCount; i++)
+                {
+                    if (TuningConfig.SweepOnlyUnnoticed && i == screen.Runtime.NoticedIndex) continue;
+
+                    Rect box = LevelCatalog.RectOf(level.Details[i]);
+                    if (Mathf.Abs(centre - box.center.x) > halfBand + box.width * 0.5f) continue;
+
+                    counted++;
+                    float lift = P95Of(lit, box) - P95Of(dark, box);
+                    if (lift <= best) continue;
+                    best = lift;
+                    bestName = level.Details[i].Name;
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(lit);
+                Object.DestroyImmediate(dark);
+            }
+
+            Assert.Greater(counted, 0,
+                frameName + ": полоса не накрывает ни одной незамеченной детали — кадр не про луч.");
+
+            Assert.Greater(best, MinSweepLift,
+                frameName + ": луч на кадре не виден. Лучшая из деталей под полосой — «" + bestName +
+                "», +" + best.ToString("0.0") + " ед. p95 при пороге " + MinSweepLift +
+                " (сила " + TuningConfig.SweepStrength.ToString("0.00") + ").");
         }
 
         /// <summary>
         /// Is the band on a detail the sweep is actually allowed to light? The shipped toggle «луч
         /// только по незамеченным» skips the one already on its thread, and a frame staged over THAT
         /// one shows nothing lit at all.
+        ///
+        /// «On» means the band's own middle is within <see cref="BandCoreU"/> of the detail's INK, not
+        /// merely inside its rectangle. Two reasons, both learned off frames: the rectangle of a detail
+        /// can be mostly empty (the plane's is 484 px of sky, the vine's is 658 px of wall), so a centre
+        /// inside it is regularly a centre beside the object; and the falloff is (1 - d²)², which is
+        /// down to a third of the light at the band's own edge. Waiting for the core is what turns
+        /// «where did the pass happen to be when the shutter opened» into the same frame every run.
         /// </summary>
         private static bool BandIsOverAnUnnoticedDetail(LevelScreen screen)
         {
             float centre = screen.Sweep.CentreX;
+            float core = TuningConfig.SweepWidthPx * 0.5f * BandCoreU;
             for (int i = 0; i < screen.Level.DetailCount; i++)
             {
                 if (TuningConfig.SweepOnlyUnnoticed && i == screen.Runtime.NoticedIndex) continue;
-                Rect box = LevelCatalog.RectOf(screen.Level.Details[i]);
-                if (centre >= box.xMin && centre <= box.xMax) return true;
+                if (Mathf.Abs(centre - LevelCatalog.AnchorOf(screen.Level.Details[i]).x) <= core)
+                    return true;
             }
             return false;
         }
+
+        /// <summary>
+        /// How near the band's middle the detail's ink has to be for the frame to be «луч на детали»,
+        /// as a share of the band's half-width. Half of it: the falloff there is still 0.56 of full,
+        /// and demanding the exact middle would make the wait miss passes on a batch frame rate.
+        /// </summary>
+        private const float BandCoreU = 0.5f;
 
         // ---- луч: измеренная прибавка яркости, а не «материал получил число» ----------------------------
 
         /// <summary>
         /// The gate's own question, answered in pixels: does the SHIPPED strength put light on the art
-        /// that a human can see?
+        /// that a human can see — on EVERY detail of EVERY level, not on the best one of five?
         ///
         /// <c>TheLightSweep_ReachesEveryDetailsOwnMaterial</c> proves the number arrives at every
         /// detail's material, which is a different claim and was never the one in doubt — a band that
         /// reaches the material and lands one brightness unit on the sprite passes it and ships an
-        /// invisible feature. The design gate of 2026-08-07 read frames 26 and 28 as «луча нет» off a
-        /// per-detail p95 that had been taken on details the band was NOT over, and there was no
-        /// machine claim to contradict it with. This is that claim.
+        /// invisible feature.
+        ///
+        /// Three things this test learned the hard way, each of them a way it USED to be green while a
+        /// человек saw nothing:
+        ///
+        /// <list type="number">
+        /// <item>It took the LOUDEST detail of one level. Four dead details and one lit one passed —
+        ///       and «the band is over a detail» is not a thing the frame gets to choose. Now every
+        ///       detail of every level has to clear the bar on its own.</item>
+        /// <item>It measured the p95 of the RECTANGLE'S BRIGHTNESS, which is not the same question as
+        ///       «did the band light this object». What the band does to «очки на скамье» is turn a
+        ///       black rim silver, and the box's 95th percentile there is the translucent lens — pale
+        ///       already, and by rights gaining little: +13 by that ruler against a rim that rose by
+        ///       about +100. The lift is now the RISE itself, measured on the pixels that moved (see
+        ///       <see cref="SweepLift"/>), with a floor on how much of the box they cover.</item>
+        /// <item>It had no negative: a rig that reports a lift no matter what is a green light with no
+        ///       claim behind it. The same measurement is taken at strength 0 on every level and has
+        ///       to come back empty.</item>
+        /// </list>
         ///
         /// Measured off <see cref="StandTestHarness.Capture"/> — the very path that writes the gate's
-        /// frames — twice in ONE frame: band on, band off, nothing else moved between them. Level 2
-        /// because frame 28 is level 2, and the band is driven onto each detail in turn rather than
-        /// waited for, so the measurement is the same every run.
+        /// frames — twice in ONE frame: band on, band off, nothing else moved between them. The band is
+        /// driven onto each detail's own ink (<see cref="LevelCatalog.AnchorOf"/>) rather than waited
+        /// for, so the measurement is the same every run.
         /// </summary>
         [UnityTest]
-        public IEnumerator TheLightSweep_VisiblyBrightensTheDetailsItIsOver()
+        public IEnumerator TheLightSweep_VisiblyBrightensEveryDetailItIsOver()
         {
             TuningConfig.Notice = NoticeMode.FixedOrder;
 
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
-            yield return GameTestHarness.EnterLevel(fake, 1);
 
-            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
-            LevelDefinition level = screen.Level;
-
-            // The plate as it is with no band anywhere — the baseline every lift below is measured off.
-            screen.View.ApplySweep(false, 0f, 0f, 0f, -1);
-            Texture2D dark = StandTestHarness.Capture(Letterbox);
-
-            float loudest = float.MinValue;
-            string loudestName = "—";
-            float worstBleed = 0f;
-
-            try
+            for (int levelIndex = 0; levelIndex < LevelCatalog.Count; levelIndex++)
             {
-                for (int i = 0; i < level.DetailCount; i++)
+                yield return GameTestHarness.EnterLevel(fake, levelIndex);
+
+                var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+                LevelDefinition level = screen.Level;
+                string where = "уровень " + level.Number + " («" + level.Title + "»)";
+
+                // The plate as it is with no band anywhere — the baseline every lift is measured off.
+                screen.View.ApplySweep(false, 0f, 0f, 0f, -1);
+                Texture2D dark = StandTestHarness.Capture(Letterbox);
+
+                try
                 {
-                    Rect box = LevelCatalog.RectOf(level.Details[i]);
-
-                    // The band centred on this detail, at the strength the game ships.
-                    screen.View.ApplySweep(true, box.center.x, TuningConfig.SweepWidthPx,
-                        TuningConfig.SweepStrength, -1);
-                    Texture2D lit = StandTestHarness.Capture(Letterbox);
-
-                    try
+                    for (int i = 0; i < level.DetailCount; i++)
                     {
-                        float lift = P95Of(lit, box) - P95Of(dark, box);
-                        if (lift > loudest)
+                        ArtDetail detail = level.Details[i];
+                        Rect box = LevelCatalog.RectOf(detail);
+                        // Centred on the INK, not on the rectangle: the plane's box is 484 px of sky
+                        // and its middle is trail, so a band centred there is a band beside the object.
+                        float centre = LevelCatalog.AnchorOf(detail).x;
+
+                        screen.View.ApplySweep(true, centre, TuningConfig.SweepWidthPx,
+                            TuningConfig.SweepStrength, -1);
+                        Texture2D lit = StandTestHarness.Capture(Letterbox);
+
+                        // …and the same pass with the knob at zero: the rig has to be able to say «no».
+                        screen.View.ApplySweep(true, centre, TuningConfig.SweepWidthPx, 0f, -1);
+                        Texture2D unlit = StandTestHarness.Capture(Letterbox);
+
+                        try
                         {
-                            loudest = lift;
-                            loudestName = level.Details[i].Name;
-                        }
+                            float covered;
+                            float lift = SweepLift(lit, dark, box, out covered);
 
-                        // …and it must stop at the sprite's edge: a strip of BARE plate inside the
-                        // band's own column may not have moved at all, or the light is landing on the
-                        // picture instead of on the objects. Skipped where the strip would catch
-                        // another detail — that one is lit on purpose.
-                        Rect plate = new Rect(box.xMin, Mathf.Max(0f, box.yMin - box.height - 40f),
-                            box.width, box.height);
-                        if (!TouchesADetail(level, plate))
-                            worstBleed = Mathf.Max(worstBleed,
-                                Mathf.Abs(P95Of(lit, plate) - P95Of(dark, plate)));
-                    }
-                    finally
-                    {
-                        Object.DestroyImmediate(lit);
+                            Assert.Greater(covered, MinSweepCoverage,
+                                "Луч штатной силы (" + TuningConfig.SweepStrength.ToString("0.00") +
+                                ") почти ничего не задел на детали «" + detail.Name + "», " + where +
+                                ": сдвинулось " + (covered * 100f).ToString("0.0") +
+                                " % прямоугольника при пороге " + (MinSweepCoverage * 100f) + " %.");
+
+                            Assert.Greater(lift, MinSweepLift,
+                                "Луч штатной силы (" + TuningConfig.SweepStrength.ToString("0.00") +
+                                ") не даёт заметной прибавки на детали «" + detail.Name + "», " +
+                                where + ": +" + lift.ToString("0.0") + " ед. по подсвеченным пикселям " +
+                                "при пороге " + MinSweepLift + ".");
+
+                            float zeroCovered;
+                            SweepLift(unlit, dark, box, out zeroCovered);
+                            Assert.Less(zeroCovered, MinSweepCoverage * 0.1f,
+                                "Замер врёт: при силе 0 на детали «" + detail.Name + "», " + where +
+                                " всё равно сдвинулось " + (zeroCovered * 100f).ToString("0.00") +
+                                " % прямоугольника — значит и «прибавка» выше меряет не луч.");
+
+                            // …and it must stop at the sprite's edge: a strip of BARE plate inside the
+                            // band's own column may not have moved at all, or the light is landing on
+                            // the picture instead of on the objects. Skipped where the strip would
+                            // catch another detail — that one is lit on purpose.
+                            Rect plate = new Rect(box.xMin, Mathf.Max(0f, box.yMin - box.height - 40f),
+                                box.width, box.height);
+                            if (!TouchesADetail(level, plate))
+                            {
+                                float bleed = Mathf.Abs(P95Of(lit, plate) - P95Of(dark, plate));
+                                Assert.Less(bleed, MaxSweepBleed,
+                                    "Луч светит по плите, а не по спрайтам: пустой участок фона рядом " +
+                                    "с «" + detail.Name + "», " + where + ", изменился на " +
+                                    bleed.ToString("0.0") + " ед.");
+                            }
+                        }
+                        finally
+                        {
+                            Object.DestroyImmediate(lit);
+                            Object.DestroyImmediate(unlit);
+                        }
                     }
                 }
+                finally
+                {
+                    screen.View.ApplySweep(false, 0f, 0f, 0f, -1);
+                    Object.DestroyImmediate(dark);
+                }
             }
-            finally
-            {
-                Object.DestroyImmediate(dark);
-            }
-
-            Assert.Greater(loudest, MinSweepLift,
-                "Луч штатной силы (" + TuningConfig.SweepStrength.ToString("0.00") +
-                ") не даёт заметной прибавки ни на одной детали уровня 2: лучшая — «" + loudestName +
-                "», +" + loudest.ToString("0.0") + " ед. p95 при пороге " + MinSweepLift + ".");
-
-            Assert.Less(worstBleed, MaxSweepBleed,
-                "Луч светит по плите, а не по спрайтам: пустой участок фона изменился на " +
-                worstBleed.ToString("0.0") + " ед.");
 
             LogAssert.NoUnexpectedReceived();
         }
 
         /// <summary>
-        /// The lift the founder's own «заметно» was measured against: the drop's frames put +46 on the
-        /// office sticky note and +46 on the city's curtains, so a floor of 20 fails long before a
-        /// human would stop seeing it — and it fails immediately if the band ever stops reaching the
-        /// sprites at all, which is the failure this test exists for.
+        /// The lift the founder's own «заметно» was measured against: the shipped strength puts +37 on
+        /// the office sticky note and +41 on the city's curtains in the gate's own frames, and +45 in
+        /// the median across all 38 details of the run, so a floor of 20 fails long before a human
+        /// would stop seeing it — and it fails immediately if the band ever stops reaching the sprites
+        /// at all, which is the failure this test exists for.
         /// </summary>
         private const float MinSweepLift = 20f;
 
+        /// <summary>
+        /// How much of a detail's rectangle the band has to actually move. Without it a single stray
+        /// pixel would be a «lit object»: the lift is a median over the pixels that moved, and a
+        /// median over three pixels is a number about nothing. Two per cent is below the thinnest
+        /// detail in the game (the glasses' wire fills 4 % of their box).
+        /// </summary>
+        private const float MinSweepCoverage = 0.02f;
+
         /// <summary>…and how much the bare plate beside a detail is allowed to move: nothing real.</summary>
         private const float MaxSweepBleed = 3f;
+
+        /// <summary>
+        /// How bright a highlight the band put on the object inside <paramref name="design"/>: the
+        /// 95th percentile of the per-pixel RISE, in luminance units of 255, over the pixels the band
+        /// actually moved. <paramref name="covered"/> comes back as the share of the rectangle those
+        /// pixels are, so a three-pixel sparkle cannot be read as a lit object.
+        ///
+        /// Two choices in that sentence, both paid for on frames:
+        ///
+        /// The RISE, not a percentile of the lit picture's own brightness. A percentile of brightness
+        /// asks «is this rectangle bright», and what a highlight does to «очки на скамье» is turn a
+        /// BLACK rim silver — a change of about +100 that lives at the dark end of the box and moves
+        /// its p95 by 13, because the p95 there is the translucent lens, which is already pale and by
+        /// rights gains little. Judged that way the loudest highlight in the library reads as the
+        /// dimmest detail of the game.
+        ///
+        /// The pixels that MOVED, not the whole rectangle. Half the details are ink in a mostly empty
+        /// box — the vine fills a fifth of its 54×658, the plane a sixth of its 484×84 — and any
+        /// percentile taken over the box there is a percentile of plate that never moves.
+        /// </summary>
+        private static float SweepLift(Texture2D lit, Texture2D dark, Rect design, out float covered)
+        {
+            Color[] after = PixelsOf(lit, design);
+            Color[] before = PixelsOf(dark, design);
+            covered = 0f;
+            if (after.Length == 0 || after.Length != before.Length) return 0f;
+
+            var risen = new List<float>();
+            for (int i = 0; i < after.Length; i++)
+            {
+                float d = Luminance(after[i]) - Luminance(before[i]);
+                if (d > SweepPixelNoise) risen.Add(d);
+            }
+
+            covered = risen.Count / (float)after.Length;
+            if (risen.Count == 0) return 0f;
+
+            risen.Sort();
+            return risen[Mathf.Clamp(Mathf.FloorToInt(risen.Count * 0.95f), 0, risen.Count - 1)];
+        }
+
+        /// <summary>A pixel has to move by more than a rounding step to count as lit.</summary>
+        private const float SweepPixelNoise = 1f;
 
         private static bool TouchesADetail(LevelDefinition level, Rect strip)
         {
@@ -406,22 +572,29 @@ namespace Meditation.Tests
         /// <summary>95th percentile of luminance, 0…255, over a design-space rectangle of a frame.</summary>
         private static float P95Of(Texture2D frame, Rect design)
         {
+            Color[] pixels = PixelsOf(frame, design);
+            if (pixels.Length == 0) return 0f;
+
+            var luminance = new float[pixels.Length];
+            for (int i = 0; i < pixels.Length; i++) luminance[i] = Luminance(pixels[i]);
+
+            System.Array.Sort(luminance);
+            return luminance[Mathf.Clamp(Mathf.FloorToInt(luminance.Length * 0.95f), 0, luminance.Length - 1)];
+        }
+
+        /// <summary>The pixels of a DESIGN-space rectangle out of a captured frame, clipped to it.</summary>
+        private static Color[] PixelsOf(Texture2D frame, Rect design)
+        {
             int x = Mathf.Clamp(Mathf.RoundToInt(design.xMin), 0, frame.width);
             int y = Mathf.Clamp(Mathf.RoundToInt(design.yMin), 0, frame.height);
             var box = new RectInt(x, y,
                 Mathf.Clamp(Mathf.RoundToInt(design.width), 0, frame.width - x),
                 Mathf.Clamp(Mathf.RoundToInt(design.height), 0, frame.height - y));
-
-            Color[] pixels = StandTestHarness.PixelsOf(frame, box);
-            if (pixels.Length == 0) return 0f;
-
-            var luminance = new float[pixels.Length];
-            for (int i = 0; i < pixels.Length; i++)
-                luminance[i] = (pixels[i].r + pixels[i].g + pixels[i].b) * (255f / 3f);
-
-            System.Array.Sort(luminance);
-            return luminance[Mathf.Clamp(Mathf.FloorToInt(luminance.Length * 0.95f), 0, luminance.Length - 1)];
+            return StandTestHarness.PixelsOf(frame, box);
         }
+
+        /// <summary>Brightness of a pixel, 0…255 — the flat mean the design gate reads frames with.</summary>
+        private static float Luminance(Color pixel) => (pixel.r + pixel.g + pixel.b) * (255f / 3f);
 
         // ---- 18 срыв детали: красное кольцо и полёт обратно ---------------------------------------------
 
@@ -765,12 +938,17 @@ namespace Meditation.Tests
 
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
 
-            // Half-way across, where the band is at full strength and covers the middle of the frame.
+            // Caught ON an object, like frame 28 — «somewhere in the middle of the frame» was the whole
+            // staging until 2026-08-07, and the middle of a frame is where the band has nothing to
+            // light as often as not. The city's middle happens to hold the curtains and a cloud, which
+            // is why the shot looked staged at all; that was luck, and luck is not a gate.
             yield return GameTestHarness.Until(
-                () => screen.Sweep.Active && screen.Sweep.CentreX > 700f && screen.Sweep.CentreX < 1200f,
-                "луч в середине кадра", 30f);
+                () => screen.Sweep.Active && BandIsOverAnUnnoticedDetail(screen) &&
+                      screen.Sweep.Strength >= TuningConfig.SweepStrength * 0.9f,
+                "луч дошёл до детали в полную силу", 30f);
 
             Shoot("Game26_L5_sweep");
+            AssertTheBandIsVisibleInThisFrame(screen, "Game26_L5_sweep");
             LogAssert.NoUnexpectedReceived();
         }
 

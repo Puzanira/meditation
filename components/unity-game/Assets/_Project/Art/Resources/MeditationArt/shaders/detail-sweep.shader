@@ -125,10 +125,21 @@ Shader "Meditation/DetailSweep"
                 float band = (1.0 - d * d);
                 band = band * band;
 
-                // Multiplied by the sprite's own alpha, so the light stops at the object's edge and
-                // never touches the plate behind it — and by alpha again through the additive term, so
-                // a soft-edged sprite gets a soft-edged highlight.
-                color.rgb += _SweepStrength * band * color.a;
+                // The light is added flat and left for the BLEND to mask: `Blend SrcAlpha
+                // OneMinusSrcAlpha` already multiplies everything this returns by color.a, so the band
+                // stops at the object's edge and never touches the plate behind it — for free, and
+                // exactly once.
+                //
+                // It used to be multiplied by color.a here as well, «so a soft-edged sprite gets a
+                // soft-edged highlight», and that squared the mask: what reached the screen was
+                // strength × band × α². On solid art the second mask does nothing (α = 1), which is
+                // why it survived a drop — but half this game's details are thin or translucent: the
+                // librarian's glasses are antialiased wire with translucent lenses, the city's cloud
+                // and the moon's halo are see-through blobs. At α ≈ 0.36 they were getting ×0.13 of
+                // the light where the spec promises ×0.36, and «облако у столба» came off the frame at
+                // +26 units of 255 against +25…+115 on the solid details (it reads +32 now). SCREENS
+                // asks for «маска по их альфе» — one mask, not two.
+                color.rgb += _SweepStrength * band;
 
                 #ifdef UNITY_UI_CLIP_RECT
                 color.a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect);

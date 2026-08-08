@@ -33,6 +33,7 @@ namespace Meditation.Tests
             // MECHANICS §3 + §7.2, plus the §4 wave knobs the thoughts-only scenette owns
             "порог удара: амплитуда",
             "порог удара: резкость",
+            "порог удара: кулдаун",
             "прочность: слабые",
             "прочность: средние",
             "прочность: крепкие",
@@ -129,11 +130,13 @@ namespace Meditation.Tests
             "удержание взгляда",
             "порог удара: амплитуда",
             "порог удара: резкость",
+            "порог удара: кулдаун",
             "затухание счётчика ударов",
             "пауза затухания",
             "таргетинг ударов",
             "дрейф мыслей к центру",
             "мысли закрывают сосуд и деталь",
+            "белая подложка мыслей",
             "порог пика хаоса",
             "порог поражения (перекрытие)",
             "передышка после детали",
@@ -345,24 +348,32 @@ namespace Meditation.Tests
             {
                 var amplitude = rows.OfType<FloatParam>().FirstOrDefault(p => p.Label == "порог удара: амплитуда");
                 var sharpness = rows.OfType<FloatParam>().FirstOrDefault(p => p.Label == "порог удара: резкость");
+                var cooldown = rows.OfType<FloatParam>().FirstOrDefault(p => p.Label == "порог удара: кулдаун");
 
                 Assert.IsNotNull(amplitude, where + ": нет строки порога амплитуды взмаха.");
                 Assert.IsNotNull(sharpness, where + ": нет строки резкости взмаха.");
+                Assert.IsNotNull(cooldown, where + ": нет строки кулдауна ударов.");
 
-                Assert.AreEqual(0.05f, amplitude.Min, 1e-3f, where + ": амплитуда — доли хода датчика (0..1).");
+                Assert.AreEqual(0.02f, amplitude.Min, 1e-3f, where + ": амплитуда — доли хода датчика (0..1).");
                 Assert.AreEqual(0.6f, amplitude.Max, 1e-3f, where + ": амплитуда — доли хода датчика (0..1).");
                 Assert.AreEqual(0.1f, sharpness.Min, 1e-3f, where + ": резкость — единицы датчика в секунду.");
                 Assert.AreEqual(3f, sharpness.Max, 1e-3f, where + ": резкость — единицы датчика в секунду.");
+                Assert.AreEqual(0f, cooldown.Min, 1e-3f, where + ": кулдаун — миллисекунды между ударами.");
+                Assert.AreEqual(300f, cooldown.Max, 1e-3f, where + ": кулдаун — миллисекунды между ударами.");
             }
 
             TuningConfig.ResetToDefaults();
-            Assert.AreEqual(0.2f, TuningConfig.SwipeAmplitude, 1e-3f,
-                "Стартовая амплитуда взмаха — пятая часть хода датчика.");
+            Assert.AreEqual(0.08f, TuningConfig.SwipeAmplitude, 1e-3f,
+                "Стартовая амплитуда взмаха — двенадцатая часть хода датчика (перенастройка 2026-08-08).");
             Assert.AreEqual(0.6f, TuningConfig.SwipeSharpness, 1e-3f,
                 "Стартовая резкость — половина скорости клавиатурной симуляции (1.25 ед/с).");
-            Assert.That(TuningConfig.SwipeAmplitude, Is.InRange(0.05f, 0.6f),
+            Assert.AreEqual(45f, TuningConfig.SwipeCooldownMs, 1e-3f,
+                "Стартовый кулдаун — потолок в 22 удара в секунду на датчик.");
+            Assert.That(TuningConfig.SwipeAmplitude, Is.InRange(0.02f, 0.6f),
                 "Стартовое значение обязано лежать внутри своего же слайдера.");
             Assert.That(TuningConfig.SwipeSharpness, Is.InRange(0.1f, 3f),
+                "Стартовое значение обязано лежать внутри своего же слайдера.");
+            Assert.That(TuningConfig.SwipeCooldownMs, Is.InRange(0f, 300f),
                 "Стартовое значение обязано лежать внутри своего же слайдера.");
         }
 

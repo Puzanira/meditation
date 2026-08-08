@@ -127,6 +127,10 @@ namespace Meditation.Game
         private readonly System.Collections.Generic.List<Rect> _blockedForDragHint =
             new System.Collections.Generic.List<Rect>();
 
+        /// <summary>…and the same list for the отгон card, built once per beat.</summary>
+        private readonly System.Collections.Generic.List<Rect> _blockedForSwipeCard =
+            new System.Collections.Generic.List<Rect>();
+
         public LevelScreen(GameFlow flow, int levelIndex) : base(flow, "LevelScreen")
         {
             _levelIndex = levelIndex;
@@ -232,6 +236,8 @@ namespace Meditation.Game
             EnterStage(LevelStage.Intro);
 
             _view.HideHint();
+            _view.HideSecondHint();
+            _view.HideSwipeCard();
             _view.HideOutcomeScreen();
             _view.SetHudVisible(true);
             _view.SetDesaturated(false);
@@ -452,9 +458,68 @@ namespace Meditation.Game
 
             _tutorialThought = _runtime.Field.SpawnAt(ThoughtStrength.Weak, _level.ThoughtSprites[0], over);
 
-            // No «ТРЯСИ» in the drop: an arrow at the sensors and no words at all (walkthrough Э6).
+            // An arrow at the sensors — and, since 2026-08-08, the words to go with it.
             AimTheSwipeArrow(0f);
+            ShowSwipeCard();
         }
+
+        /// <summary>
+        /// Put «Маши над датчиком!» beside the thought that has to be beaten off — once, at the start
+        /// of the beat, and not again.
+        ///
+        /// Once, and then only again if the picture moves out from under it: the stroke swings and the
+        /// thought drifts, and a plate re-placed every frame against a search that breaks ties by
+        /// nearest-clear-spot walks around the screen. So it is placed at the start of the beat and
+        /// left alone until the stroke would actually cross it (see <see cref="AimTheHints"/>).
+        ///
+        /// The stroke is handed to the search as an obstacle for the same reason the details are — the
+        /// beat is one arrow and one sentence, and a sentence lying across its own arrow is neither. As
+        /// a chain of small squares along it, not as its bounding box: the stroke runs diagonally
+        /// across most of the frame, and its box is most of the frame. On level 1 the teaching thought
+        /// can sit on the gull in the top right corner, and with the box as an obstacle there was no
+        /// clear spot anywhere — the search fell back to «on top of the target», i.e. the card landed
+        /// on the gull it was supposed to avoid.
+        /// </summary>
+        private void ShowSwipeCard()
+        {
+            Vector2 thought = _tutorialThought != null
+                ? _tutorialThought.Position
+                : new Vector2(960f, 420f);
+
+            _blockedForSwipeCard.Clear();
+            for (int i = 0; i < _hintObstacles.Length; i++) _blockedForSwipeCard.Add(_hintObstacles[i]);
+            if (_tutorialThought != null)
+                _blockedForSwipeCard.Add(HintPlacement.Centred(thought, _tutorialThought.Size));
+            AddSwipeArrowCorridor(_blockedForSwipeCard);
+
+            Vector2 size = HintCard.SizeFor(GameTexts.SwipeHint);
+            Vector2 spot = HintPlacement.Beside(size, thought, _blockedForSwipeCard);
+            _view.ShowSwipeCard(GameTexts.SwipeHint, HintTone.Swipe, spot);
+        }
+
+        /// <summary>
+        /// The stroke of the отгон, as squares laid along it from the panel cue up to everything the
+        /// thought paints. Sampled closer together than the squares are wide, so the chain has no gaps
+        /// for a plate to slip through.
+        ///
+        /// The swing is not added to it: the swing only ever SHORTENS the stroke (it slides the tail
+        /// down its own axis), so the stroke at rest already contains every stroke the beat draws.
+        /// </summary>
+        private void AddSwipeArrowCorridor(System.Collections.Generic.List<Rect> into)
+        {
+            Vector2 tail = SwipeArrowAnchor();
+            var square = new Vector2(SwipeCorridorWidth, SwipeCorridorWidth);
+
+            for (int i = 0; i <= SwipeCorridorSamples; i++)
+                into.Add(HintPlacement.Centred(
+                    Vector2.Lerp(tail, SensorsCue, i / (float)SwipeCorridorSamples), square));
+        }
+
+        /// <summary>How wide the stroke's chain of squares is, design px — the arrow plus its bow.</summary>
+        private const float SwipeCorridorWidth = 90f;
+
+        /// <summary>…and how many of them, so the spacing stays under that width on a full-height stroke.</summary>
+        private const int SwipeCorridorSamples = 16;
 
         /// <summary>
         /// The отгон beat's arrow: a stroke that leaves the thought and lands on the sensor panel at the
@@ -549,6 +614,7 @@ namespace Meditation.Game
             _tutorialThought = null;
             _view.HideHint();
             _view.HideSecondHint();
+            _view.HideSwipeCard();
         }
 
         private void TickTutorial()
@@ -583,6 +649,15 @@ namespace Meditation.Game
                 // back, the tip staying on the sensor panel.
                 AimTheSwipeArrow(
                     (1f + Mathf.Sin(Age * SwipeWobbleHz * Mathf.PI * 2f)) * 0.5f * SwipeWobblePx);
+
+                // The thought DRIFTS towards the centre, and the stroke is anchored to it — so a card
+                // that was clear of the arrow when the beat opened can be crossed by it half a minute
+                // later. Re-placed only then: a plate that moves every frame is worse than one that
+                // moves twice.
+                if (_view.SwipeCard.IsShown &&
+                    HintPlacement.SegmentHits(_view.Hint.Arrow.From, _view.Hint.Arrow.To,
+                        _view.SwipeCard.CardRect))
+                    ShowSwipeCard();
                 return;
             }
 

@@ -28,17 +28,6 @@ namespace Meditation.Tests
     [Category("Visual")]
     public class GamePictureTests
     {
-        /// <summary>A pixel counts as ink when it differs from its plate by this much of 255.</summary>
-        private const float InkThreshold = 40f / 255f;
-
-        /// <summary>
-        /// Share of a slot the silhouette has to cover, and the contrast it has to reach — the design
-        /// gate's own criterion for «читается с метра» (ink ≥ 8 %, контраст ≥ 90 из 255).
-        /// </summary>
-        private const float MinInkShare = 0.08f;
-
-        private const float MinContrast = 90f / 255f;
-
         /// <summary>Backdrop for a shot of one layer alone — nothing in the drop is magenta.</summary>
         private static readonly Color Nothing = new Color(1f, 0f, 1f);
 
@@ -66,71 +55,17 @@ namespace Meditation.Tests
             TuningConfig.ActiveLevelIndex = 0;
         }
 
-        // ---- S9 + N2: the slots read at a metre, empty and full ----------------------------------------
-
-        [UnityTest]
-        public IEnumerator EveryHudSlot_ReadsAtAMetre_OnEveryLevel([Values(0, 1, 2, 3, 4)] int levelIndex)
-        {
-            yield return GameTestHarness.LoadGame();
-            FakeBackend fake = StandTestHarness.TakeOverInput();
-            yield return GameTestHarness.EnterLevel(fake, levelIndex);
-
-            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
-            DesignStage stage = StandTestHarness.Stage();
-            yield return GameTestHarness.SettleScreen(fake);
-
-            Texture2D frame = StandTestHarness.Capture(Color.black);
-            try
-            {
-                for (int i = 0; i < screen.Level.DetailCount; i++)
-                {
-                    RectTransform slot = StandTestHarness.Find(stage, "Slot" + (i + 1));
-                    AssertSlotReads(frame, stage, slot,
-                        screen.Level.Title + " · слот " + (i + 1) + " («" +
-                        screen.Level.Details[i].Name + "», пустой)");
-                }
-            }
-            finally
-            {
-                Object.DestroyImmediate(frame);
-            }
-
-            LogAssert.NoUnexpectedReceived();
-        }
-
-        /// <summary>
-        /// Ink and contrast inside one slot: how much of it differs from the plate, and by how much.
-        /// The plate is taken as the slot's own median colour — the silhouette is never the majority
-        /// of a slot, and reading the plate off the frame keeps this honest when the plate changes.
-        /// </summary>
-        private static void AssertSlotReads(Texture2D frame, DesignStage stage, RectTransform slot,
-            string what)
-        {
-            RectInt box = StandTestHarness.PixelRectOf(stage, slot);
-            box = new RectInt(box.x + 4, box.y + 4, Mathf.Max(1, box.width - 8), Mathf.Max(1, box.height - 8));
-
-            Color[] pixels = StandTestHarness.PixelsOf(frame, box);
-            Assert.Greater(pixels.Length, 100, what + ": слот не попал в кадр.");
-
-            Color plate = Median(pixels);
-
-            int ink = 0;
-            float loudest = 0f;
-            for (int i = 0; i < pixels.Length; i++)
-            {
-                float distance = MaxChannelDistance(pixels[i], plate);
-                if (distance > InkThreshold) ink++;
-                if (distance > loudest) loudest = distance;
-            }
-
-            float share = ink / (float)pixels.Length;
-            Assert.GreaterOrEqual(share, MinInkShare,
-                what + ": силуэт закрывает " + (share * 100f).ToString("0.0") +
-                " % плашки — с метра это пустая плашка (нужно " + (MinInkShare * 100f) + " %).");
-            Assert.GreaterOrEqual(loudest, MinContrast,
-                what + ": контраст силуэта к плашке " + (loudest * 255f).ToString("0") +
-                " из 255 — нужно " + (MinContrast * 255f).ToString("0") + ".");
-        }
+        // ---- S9 + N2: «слоты читаются с метра» -------------------------------------------------
+        //
+        // «EveryHudSlot_ReadsAtAMetre_OnEveryLevel» and its AssertSlotReads stood here until
+        // 2026-08-08. They were the guard on the flat-ink silhouettes stamped into the HUD's row of
+        // detail slots — 34 details over five levels, measured at ink ≥ 8 % of the slot and contrast
+        // ≥ 90 of 255. The founder took the row out of the game («убрать ряд совсем»), and a
+        // readability guard on a widget that is not drawn is a test that can only ever be green.
+        //
+        // What survives of that work is the ICON CROP it forced (LevelCatalog.ArtDetail.IconCrop): the
+        // haul inside the vessel asks the same question of the same sprites at the same size, and
+        // TheRewardBeat_KeepsTheWholeHaulInsideTheVessel below is where it is now asked.
 
         // ---- N2 + B2: the victory picture — filled slots, and a haul inside the vessel's SILHOUETTE ----
 
@@ -268,7 +203,7 @@ namespace Meditation.Tests
 
                 wiped = StandTestHarness.Capture(Color.black);
                 float wipedAway = MeanDifference(lost, wiped);
-                Assert.Greater(wipedAway, MinDefeatChange,
+                Assert.Greater(wipedAway, MinWipeChange,
                     "Пять оборотов не изменили картинку (" + wipedAway.ToString("0.000") +
                     ") — экран поражения не стирается, а только считается стёртым.");
             }
@@ -288,6 +223,20 @@ namespace Meditation.Tests
         /// still pass and a missing sprite (nothing drawn at all) would not.
         /// </summary>
         private const float MinDefeatChange = 0.08f;
+
+        /// <summary>
+        /// …and the same question for the WIPE, which is a smaller number and has to be.
+        ///
+        /// The retry dissolves one dark picture into another: the designer's loss screen is a wall of
+        /// black hatching, and what shows through it is a level buried in black hatching of its own.
+        /// Since 2026-08-08 that second half is darker still — the thoughts lost their light halo
+        /// («мысли чисто чёрные», founder) — so five turns of the handle now move the mean pixel by
+        /// 0.044 where they used to move it past 0.08. Nothing about the wipe changed; what changed is
+        /// what it uncovers. The floor is set at 0.03: an order of magnitude above a frame where the
+        /// handle did nothing (the thoughts' own drift over two frames, ~0.00x), and comfortably under
+        /// the measurement.
+        /// </summary>
+        private const float MinWipeChange = 0.03f;
 
         /// <summary>Mean absolute difference of two captured frames, 0..1, sampled every 8th pixel.</summary>
         private static float MeanDifference(Texture2D a, Texture2D b)
@@ -329,31 +278,36 @@ namespace Meditation.Tests
         /// </summary>
         private const float MinDefeatHighlight = 0.035f;
 
-        // ---- N3: the marker thoughts read against every plate -------------------------------------------
+        // ---- N3: the marker thoughts are black, and the halo is a switch ------------------------------
 
         /// <summary>
-        /// Risk the drop was handed over with: «чёрное по тёмному может сливаться» — the evening street,
-        /// the metro car and the dark office.
+        /// «Мысли чисто чёрные» (founder, 2026-08-08) — held on the pixels, in both directions.
         ///
-        /// Measured on the frames before the backing landed, the hatching sat at 1.6–3.5:1 against the
-        /// plates, median per level, with 40–97 % of its ink under 3:1.
+        /// This is the same gate as before, turned inside out. It used to prove the light halo under the
+        /// hatching was doing its job: the ink that lands on a piece of plate too dark to read black
+        /// against had to bring its own light with it, measured as the brightest pixel within a few px.
+        /// Every level passed at 0.871 with the halo and failed at 0.23–0.25 without it, so the number
+        /// was real — and then the founder looked at the game and decided the halo costs more than the
+        /// contrast buys. That does not make the measurement wrong, it makes it the TOGGLE's.
         ///
-        /// What is measured here is the ink that landed WHERE THE PROBLEM IS — on a piece of plate too
-        /// dark to read black against (local brightness under <see cref="DarkPlate"/>, i.e. under 2.4:1
-        /// to the drop's #0D0D0D). Everywhere else the question does not arise. Of that ink, the claim
-        /// is that it brings its own light: the brightest pixel within a few px on the FINISHED frame.
+        /// So the claim is now two claims:
         ///
-        /// Stated any looser the gate has no teeth, and this was checked rather than assumed — the
-        /// first form of it (local contrast ratio anywhere on the frame) went green with the backing
-        /// switched off, because a hatch line always has some light plate a few pixels away and because
-        /// even a zero-width backing leaks a grey fringe through the ink's antialiasing.
+        /// 1. **as shipped** — the thought layer paints a substantial amount of ink DARKER than the plate
+        ///    under it, and no meaningful amount of light. That is what «чёрные каракули» is, in pixels;
+        ///    it is also the thing that would silently break if a future sprite pass shipped the drop's
+        ///    scribbles on their own white canvases.
+        /// 2. **negative control** — switching <see cref="TuningConfig.ThoughtBacking"/> back on VISIBLY
+        ///    brightens the same frame around the same strokes. Without this half, «подложки нет» would
+        ///    be satisfied by a shader that quietly stopped loading, and the founder's own way of
+        ///    comparing the two would be broken with the suite green.
         ///
-        /// The thought layer is switched off and on to find the ink: the plates have blacks of their
-        /// own (the L4 railing, the L5 monitors), and without the difference the measurement would be
+        /// The thought layer is switched off and on to find the ink: the plates have blacks of their own
+        /// (the L4 railing, the L5 monitors), and without the difference the measurement would be
         /// judging the scenery.
         /// </summary>
         [UnityTest]
-        public IEnumerator EveryLevelsThoughts_ReadAgainstItsPlate([Values(0, 1, 2, 3, 4)] int levelIndex)
+        public IEnumerator EveryLevelsThoughts_AreBlackInk_AndTheHaloIsAToggle(
+            [Values(0, 1, 2, 3, 4)] int levelIndex)
         {
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
@@ -361,128 +315,121 @@ namespace Meditation.Tests
 
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
             LevelView view = screen.View;
+            string where = screen.Level.Title;
+
+            Assert.IsFalse(TuningConfig.ThoughtBacking,
+                "Подложка приезжает включённой — решение founder 2026-08-08 было обратным.");
 
             GameTestHarness.CrowdTheScreen(screen, 6);
             yield return GameTestHarness.SettleScreen(fake);
             Assert.Greater(screen.Runtime.Field.Thoughts.Count, 0, "На кадре нет мыслей.");
 
-            Texture2D withThoughts = StandTestHarness.Capture(Color.black);
+            // Every halo object really is off — the state behind the pixels, so a red pixel test below
+            // can be told apart from a level that simply drew no thoughts.
+            foreach (ArtThoughtView thought in view.ThoughtViews)
+                Assert.IsFalse(HaloOf(thought).activeInHierarchy,
+                    where + ": подложка мысли всё ещё рисуется при выключенном тогглере.");
+
+            Texture2D black = StandTestHarness.Capture(Color.black);
             view.ThoughtsLayer.gameObject.SetActive(false);
             yield return null;
             Canvas.ForceUpdateCanvases();
             Texture2D plateOnly = StandTestHarness.Capture(Color.black);
             view.ThoughtsLayer.gameObject.SetActive(true);
+            yield return null;
+
+            TuningConfig.ThoughtBacking = true;
+            yield return GameTestHarness.Frames(2);
+            Canvas.ForceUpdateCanvases();
+            Texture2D haloed = StandTestHarness.Capture(Color.black);
 
             try
             {
-                int w = ScanBox.width, h = ScanBox.height;
-                Color[] after = withThoughts.GetPixels(ScanBox.x, ScanBox.y, w, h);
-                Color[] before = plateOnly.GetPixels(ScanBox.x, ScanBox.y, w, h);
+                // 1. as shipped: dark ink, and hardly any light.
+                Counted ink = Compare(plateOnly, black);
+                Assert.Greater(ink.Darker, MinThoughtInkPixels,
+                    where + ": слой мыслей затемнил всего " + ink.Darker +
+                    " px — чёрных каракулей на кадре практически нет (порог " +
+                    MinThoughtInkPixels + ").");
+                Assert.Less(ink.Brighter, ink.Darker * MaxLightShareOfInk,
+                    where + ": слой мыслей высветлил " + ink.Brighter + " px против " + ink.Darker +
+                    " затемнённых — на мыслях снова белое.");
 
-                var light = new float[after.Length];
-                var plate = new float[before.Length];
-                for (int i = 0; i < after.Length; i++)
-                {
-                    light[i] = LevelOneData.RelativeLuminance(after[i]);
-                    plate[i] = LevelOneData.RelativeLuminance(before[i]);
-                }
-
-                float[] surround = LocalMax(light, w, h, SurroundRadius);
-                float[] plateAround = LocalMax(plate, w, h, SurroundRadius);
-
-                var carried = new List<float>(1 << 16);
-                for (int i = 0; i < after.Length; i++)
-                {
-                    // The stroke: a pixel the thought layer drew, and drew dark…
-                    if (light[i] > InkLuminance) continue;
-                    if (Mathf.Abs(after[i].r - before[i].r) < 0.02f &&
-                        Mathf.Abs(after[i].g - before[i].g) < 0.02f &&
-                        Mathf.Abs(after[i].b - before[i].b) < 0.02f) continue;
-
-                    // …on a piece of plate that had nothing to offer it.
-                    if (plateAround[i] >= DarkPlate) continue;
-
-                    carried.Add(surround[i]);
-                }
-
-                Assert.Greater(carried.Count, 2000,
-                    screen.Level.Title + ": штриховки на тёмных местах плиты почти нет — мерить нечего (" +
-                    carried.Count + " px).");
-
-                carried.Sort();
-                float median = carried[carried.Count / 2];
-                Assert.GreaterOrEqual(median, MinCarriedLight,
-                    screen.Level.Title + ": штриховка на тёмном месте плиты не несёт своего света — " +
-                    "медианная яркость рядом со штрихом " + median.ToString("0.000") +
-                    " при пороге " + MinCarriedLight.ToString("0.000") + ".");
+                // 2. negative control: the halo comes back and it is LIGHT.
+                Counted halo = Compare(black, haloed);
+                Assert.Greater(halo.Brighter, MinHaloPixels,
+                    where + ": тогглер подложки включён, а кадр не посветлел (" + halo.Brighter +
+                    " px при пороге " + MinHaloPixels + ") — подложка сломана, сравнить их нечем.");
+                // …and it is LIGHT, not merely different. Not a clean sweep, and it should not be
+                // asked to be: the halo is drawn under the ink and dilated past it, so on the plates'
+                // own bright patches (the metro's lit windows) an off-white halo replaces something
+                // brighter than itself. Twice as much light as shadow is the shape of «подложка», and
+                // the metro — the level that measures worst — comes in at 3.2×.
+                Assert.Greater(halo.Brighter, halo.Darker * 2f,
+                    where + ": подложка не светлее того, что была под ней.");
             }
             finally
             {
-                Object.DestroyImmediate(withThoughts);
+                TuningConfig.ThoughtBacking = TuningConfig.Defaults.ThoughtBacking;
+                Object.DestroyImmediate(black);
                 Object.DestroyImmediate(plateOnly);
+                Object.DestroyImmediate(haloed);
             }
 
             LogAssert.NoUnexpectedReceived();
         }
 
-        /// <summary>Below this relative luminance a thought's pixel is its ink rather than its backing.</summary>
-        private const float InkLuminance = 0.03f;
-
-        /// <summary>How far around a stroke counts as «рядом», px — a little wider than the halo.</summary>
-        private const int SurroundRadius = 4;
-
-        /// <summary>
-        /// Plate brightness under which black ink has no chance of its own: 2.4:1 against #0D0D0D,
-        /// below the 3:1 the walkthrough's note asks for. All five plates have such places; the metro
-        /// windows and the office wall are mostly made of them.
-        /// </summary>
-        private const float DarkPlate = 0.08f;
-
-        /// <summary>
-        /// The light a stroke on a dark plate has to have next to it, WCAG relative luminance.
-        ///
-        /// Set between two measured worlds, both of them run rather than guessed: with the halo taken
-        /// down to nothing the ink's brightest neighbour is only the grey fringe its own antialiasing
-        /// leaks — 0.232…0.247 across the five levels, and all five go red. With the shipped 3 px halo
-        /// it is the backing itself: 0.871 on every level. Three tenths clears the leak and leaves the
-        /// picture a factor of three.
-        /// </summary>
-        private const float MinCarriedLight = 0.30f;
-
-        /// <summary>
-        /// Brightest value within <paramref name="radius"/> of each pixel, separably (rows, then
-        /// columns). Two passes of 2r+1 instead of one of (2r+1)² — the naive form is 17× the work on a
-        /// 1200×800 window, and this gate already runs five times.
-        /// </summary>
-        private static float[] LocalMax(float[] source, int width, int height, int radius)
+        /// <summary>The halo image of a thought — a SIBLING built just before it, so it draws under it.</summary>
+        private static GameObject HaloOf(ArtThoughtView thought)
         {
-            var rows = new float[source.Length];
-            for (int y = 0; y < height; y++)
-            {
-                int line = y * width;
-                for (int x = 0; x < width; x++)
-                {
-                    float best = 0f;
-                    int from = Mathf.Max(0, x - radius), to = Mathf.Min(width - 1, x + radius);
-                    for (int i = from; i <= to; i++) best = Mathf.Max(best, source[line + i]);
-                    rows[line + x] = best;
-                }
-            }
-
-            var box = new float[source.Length];
-            for (int x = 0; x < width; x++)
-            {
-                for (int y = 0; y < height; y++)
-                {
-                    float best = 0f;
-                    int from = Mathf.Max(0, y - radius), to = Mathf.Min(height - 1, y + radius);
-                    for (int i = from; i <= to; i++) best = Mathf.Max(best, rows[i * width + x]);
-                    box[y * width + x] = best;
-                }
-            }
-
-            return box;
+            Transform parent = thought.Rect.parent;
+            int at = thought.Rect.GetSiblingIndex();
+            Assert.Greater(at, 0, "У мысли нет объекта подложки перед ней.");
+            return parent.GetChild(at - 1).gameObject;
         }
+
+        /// <summary>How many pixels of one frame got lighter / darker than the same pixel of another.</summary>
+        private struct Counted
+        {
+            public int Brighter;
+            public int Darker;
+        }
+
+        /// <summary>Compare two captures inside <see cref="ScanBox"/>, by relative luminance.</summary>
+        private static Counted Compare(Texture2D before, Texture2D after)
+        {
+            Color[] a = before.GetPixels(ScanBox.x, ScanBox.y, ScanBox.width, ScanBox.height);
+            Color[] b = after.GetPixels(ScanBox.x, ScanBox.y, ScanBox.width, ScanBox.height);
+
+            var counted = new Counted();
+            for (int i = 0; i < a.Length; i++)
+            {
+                float delta = LevelOneData.RelativeLuminance(b[i]) - LevelOneData.RelativeLuminance(a[i]);
+                if (delta > LuminanceStep) counted.Brighter++;
+                else if (delta < -LuminanceStep) counted.Darker++;
+            }
+            return counted;
+        }
+
+        /// <summary>How far a pixel has to move in luminance to count as changed at all.</summary>
+        private const float LuminanceStep = 0.02f;
+
+        /// <summary>Ink a screen of six thoughts owes the frame, px — a floor, not a measurement.</summary>
+        private const int MinThoughtInkPixels = 5000;
+
+        /// <summary>…and the light the halo owes it when it is switched back on.</summary>
+        private const int MinHaloPixels = 5000;
+
+        /// <summary>
+        /// How much light the thoughts may still carry with the halo off, as a share of their own ink.
+        ///
+        /// Not zero, and deliberately: the row of pips under a thought keeps its light discs — it is a
+        /// READOUT of how many hits are left, and a black dot on a night street is not one. The founder's
+        /// sentence was about the hatching's outline, which is the thing that made a scribble look like a
+        /// white blob; the pips are twelve px across. A fifth leaves them room and still fails the moment
+        /// the strokes themselves get anything white back.
+        /// </summary>
+        private const float MaxLightShareOfInk = 0.2f;
 
         // ---- staging helpers ---------------------------------------------------------------------------
 
@@ -692,24 +639,5 @@ namespace Meditation.Tests
         private static float MaxChannelDistance(Color a, Color b) =>
             Mathf.Max(Mathf.Abs(a.r - b.r), Mathf.Max(Mathf.Abs(a.g - b.g), Mathf.Abs(a.b - b.b)));
 
-        /// <summary>Per-channel median — the plate, whatever is drawn on top of it.</summary>
-        private static Color Median(Color[] pixels)
-        {
-            var r = new float[pixels.Length];
-            var g = new float[pixels.Length];
-            var b = new float[pixels.Length];
-            for (int i = 0; i < pixels.Length; i++)
-            {
-                r[i] = pixels[i].r;
-                g[i] = pixels[i].g;
-                b[i] = pixels[i].b;
-            }
-
-            System.Array.Sort(r);
-            System.Array.Sort(g);
-            System.Array.Sort(b);
-            int mid = pixels.Length / 2;
-            return new Color(r[mid], g[mid], b[mid]);
-        }
     }
 }

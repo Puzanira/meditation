@@ -86,15 +86,34 @@ namespace Meditation.Tests
         // ---- claims made on the PIXELS of the frame that was just written -------------------------------
 
         /// <summary>
-        /// How much of the frame the thoughts have to actually paint before it counts as «кадр волн».
+        /// How much ink a frame is STAGED to before it is shot — the model-side wait, in shares of the
+        /// frame (<c>GameTestHarness.PaintedShare</c>: visible rectangles weighted by each sprite's own
+        /// baked ink share).
         ///
         /// Three per cent, and the number comes from what a failure looked like: frames 06 and 09 of the
         /// 2026-08-08 gate carried 0.67 % of ink against 0.66 % on an EMPTY intro — three thoughts, all
         /// of them slivers hanging off the edge of the frame. One medium thought fully inside the frame
-        /// is already about 2.8 %, so this floor says «at least one whole thought, or two half ones»,
-        /// which is the least a picture of a wave can be.
+        /// is already about 2.8 %, so this says «at least one whole thought, or two half ones», which is
+        /// the least a picture of a wave can be.
         /// </summary>
-        private const float MinThoughtInk = 0.03f;
+        private const float StagedThoughtInk = 0.03f;
+
+        /// <summary>
+        /// …and how much of it has to be VISIBLE on the written frame, which is a smaller number and
+        /// has to be a separate one.
+        ///
+        /// The two are measured differently on purpose (that is the whole point of having both): the
+        /// staging wait is arithmetic on rectangles and baked ink shares, while this counts pixels that
+        /// actually MOVED when the thought layer was switched off. Since the halo came off on
+        /// 2026-08-08 those two answers pulled apart, and in the direction the founder accepted when she
+        /// asked for it: black hatching laid on the dark half of a night street moves the pixel by less
+        /// than the 6/255 this counts as «closed», so a frame staged to 3 % of ink measures 1.8–2.9 % of
+        /// picture depending on where the waves happened to land.
+        ///
+        /// 1.2 % is set under the worst of those measurements and still nearly twice the 0.67 % that the
+        /// gate's own frame-with-no-waves scored — which is the failure this floor exists to catch.
+        /// </summary>
+        private const float MinThoughtInk = 0.012f;
 
         /// <summary>A pixel has to move by more than this (0…255) to count as covered by something.</summary>
         private const float PaintNoise = 6f;
@@ -458,7 +477,7 @@ namespace Meditation.Tests
             // …и «обычный play» — это play с прицелом: обучение шло в FixedOrder, чтобы биты вообще
             // можно было прогнать, а кадр после обучения обязан быть кадром отгружаемой игры.
             yield return GameTestHarness.NoticeByLooking(fake, screen, FirstUncollected(screen));
-            yield return GameTestHarness.WaitForInkOnScreen(fake, screen, MinThoughtInk);
+            yield return GameTestHarness.WaitForInkOnScreen(fake, screen, StagedThoughtInk);
 
             Assert.IsFalse(screen.View.Hint.IsShown, "После отгона подсказки на кадре быть не должно.");
             Assert.IsFalse(screen.View.SecondHint.IsShown, "Вторая кнопка тоже обязана уйти.");
@@ -1075,7 +1094,7 @@ namespace Meditation.Tests
             // обзоре — дизайн-гейт 2026-08-08).
             TuningConfig.CollectSeconds = 8f;   // slow enough to be caught mid-thread
             yield return GameTestHarness.NoticeByLooking(fake, screen, FirstUncollected(screen));
-            yield return GameTestHarness.WaitForInkOnScreen(fake, screen, MinThoughtInk);
+            yield return GameTestHarness.WaitForInkOnScreen(fake, screen, StagedThoughtInk);
 
             // Only the crank here: shaking every frame would pop the waves as fast as they arrive, and
             // this frame is supposed to show what the player is up against.
@@ -1178,7 +1197,7 @@ namespace Meditation.Tests
             yield return GameTestHarness.NoticeByLooking(fake, screen, FirstUncollected(screen));
 
             // …and the level's own band, waited out by the ink it actually paints.
-            yield return GameTestHarness.WaitForInkOnScreen(fake, screen, MinThoughtInk);
+            yield return GameTestHarness.WaitForInkOnScreen(fake, screen, StagedThoughtInk);
 
             // Only the crank, for the same reason frame 06 uses it: shaking every frame pops the
             // waves as fast as they arrive. This frame is about what the player is up against.

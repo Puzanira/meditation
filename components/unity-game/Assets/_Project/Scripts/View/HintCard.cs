@@ -128,6 +128,25 @@ namespace Meditation.View
         }
 
         /// <summary>
+        /// The card WITHOUT an arrow of its own.
+        ///
+        /// The отгон beat needs exactly this. It already has a stroke — the one that starts clear of
+        /// everything the thought paints and lands on the sensor panel at the bottom edge, swinging
+        /// the way a hand is meant to (<c>LevelScreen.AimTheSwipeArrow</c>) — and that stroke is the
+        /// gesture, drawn. What the beat was missing is the WORDS (founder, 2026-08-08: an arrow at a
+        /// piece of furniture is not an instruction). A second arrow, from the card to the same place,
+        /// would be the same sentence said twice in the same breath.
+        /// </summary>
+        public void ShowCardOnly(string text, HintTone tone, Vector2 cardCentre)
+        {
+            Show(text, tone, cardCentre, cardCentre);
+            _arrow.Hide();
+        }
+
+        /// <summary>The rectangle this string's card would occupy at <paramref name="centre"/>.</summary>
+        public static Vector2 SizeFor(string text) => new Vector2(WidthFor(text), CardHeight);
+
+        /// <summary>
         /// Re-aim the arrow without moving the card.
         ///
         /// The teaching arrow points at a THING, and on beat 1 that thing moves: a detail that slips off

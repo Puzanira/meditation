@@ -115,22 +115,43 @@ namespace Meditation.Tuning
             public const float GazeNeonRingPx = 12f;
 
             /// <summary>
-            /// Отгон на датчиках высоты (founder, 2026-08-07). Both numbers are in the sensor's own
-            /// units — 0..1 of its travel — so neither of them is the joystick pair renamed: 0.5 of a
-            /// stick deflection and 0.5 of a sensor's range are not the same gesture, and the two old
-            /// values would have been a lie carried over by the name.
+            /// Отгон на датчиках высоты (founder, 2026-08-07), retuned for «хаотичные махания» on
+            /// 2026-08-08. All three numbers are in the sensor's own units — 0..1 of its travel and
+            /// seconds — so none of them is the joystick pair renamed: 0.5 of a stick deflection and
+            /// 0.5 of a sensor's range are not the same gesture.
             ///
-            /// **Амплитуда 0.2** — a fifth of the sensor's range inside ONE stroke. A hand passing over
-            /// the sensor sweeps far more than that; a hand resting above it, and the ripple of an
-            /// analog reading, sweep far less. On the keyboard emulation (1.25 units/s, package
-            /// mapping) it is 0.16 s of a held Q — a tap, not a hold.
+            /// **Амплитуда 0.08** — was 0.2, a fifth of the range, and that fifth is what the founder
+            /// was fighting: on the keyboard emulation (1.25 ед/с up, 2.0 ед/с of spring-back) it took
+            /// 160 ms of holding Q one way and 100 ms the other, so anything faster than a metronome
+            /// landed no hits at all. A twelfth of the range is 64 ms up and 40 ms down — the timing of
+            /// a hand being jerked about rather than swept — and it is still comfortably above the
+            /// ±0.05 ripple an analog line makes standing still.
             ///
-            /// **Резкость 0.6 ед/с** — half of that same emulated rise rate and under a third of the
-            /// spring-back (2.0 ед/с), so BOTH halves of a keyboard stroke clear it comfortably, while
-            /// a hand slowly lowering onto the panel — which is a rest, not a swipe — never does.
+            /// **Резкость 0.6 ед/с** — unchanged. Half of the emulated rise rate and under a third of
+            /// the spring-back, so BOTH halves of a keyboard stroke clear it comfortably, while a hand
+            /// slowly lowering onto the panel — which is a rest, not a swipe — never does.
+            ///
+            /// **Кулдаун 45 мс** — the floor between two hits of ONE sensor, i.e. a ceiling of 22
+            /// hits/s. It is not what keeps a held key quiet (one movement lands one hit, full stop —
+            /// see <see cref="Mechanics.SwipeDetector"/>); it is what keeps a jittering analog line,
+            /// where every frame can be its own turn-around, from reading as a drum roll. Chosen under
+            /// the fastest hand we could measure (~16 hits/s on mashed Q) so it never touches a player.
             /// </summary>
-            public const float SwipeAmplitude = 0.2f;
+            public const float SwipeAmplitude = 0.08f;
             public const float SwipeSharpness = 0.6f;
+            public const float SwipeCooldownMs = 45f;
+
+            /// <summary>
+            /// Белая подложка под штрихами мысли — OFF since 2026-08-08 (founder, live session:
+            /// «мысли должны быть чисто чёрными»).
+            ///
+            /// It shipped ON because black hatching measures 1.6–3.5:1 against the five plates and the
+            /// designer put her own sample strips on paper. The founder has now looked at the game with
+            /// the halo in it and decided the halo costs more than it buys — so it is a [toggle] and the
+            /// default is her answer, not ours. The risk is hers and she named it: on the dark zones of
+            /// a plate the scribbles are harder to see, and this switch is how she compares.
+            /// </summary>
+            public const bool ThoughtBacking = false;
 
             // Pip counts of the walkthrough's own frames: гора посуды 4, клубок ? 3. Strong came down
             // from 7 to the level-1 band's 6 in the playtest — see the note on the globals above.
@@ -357,10 +378,12 @@ namespace Meditation.Tuning
         public static float GazeNeonRingPx = Defaults.GazeNeonRingPx;
 
         // ---- §3 Отгон мыслей (датчики высоты) ------------------------------------------------
-        /// <summary>Sensor travel inside one stroke that counts as a hit, 0..1. [tune]</summary>
+        /// <summary>Sensor travel inside one movement that counts as a hit, 0..1. [tune]</summary>
         public static float SwipeAmplitude = Defaults.SwipeAmplitude;
         /// <summary>Sensor speed below which a movement is not a pass at all, units/s. [tune]</summary>
         public static float SwipeSharpness = Defaults.SwipeSharpness;
+        /// <summary>Shortest gap between two hits of ONE sensor, ms — the rate ceiling. [tune 0–300]</summary>
+        public static float SwipeCooldownMs = Defaults.SwipeCooldownMs;
         /// <summary>Hits needed to pop a weak thought. [tune 2–12]</summary>
         public static int DurabilityWeak = Defaults.DurabilityWeak;
         /// <summary>Hits needed to pop a medium thought. [tune 2–12]</summary>
@@ -405,6 +428,12 @@ namespace Meditation.Tuning
         /// time to dig out.
         /// </summary>
         public static float PeakOverlapPercent = Defaults.PeakOverlapPercent;
+
+        /// <summary>
+        /// Draw the light halo under a thought's hatching? [toggle] — OFF by default (founder,
+        /// 2026-08-08: «мысли чисто чёрные»). See <see cref="Defaults.ThoughtBacking"/>.
+        /// </summary>
+        public static bool ThoughtBacking = Defaults.ThoughtBacking;
 
         /// <summary>How fast a thought grows past its class, % of its spawn size per second. [tune per level]</summary>
         public static float ThoughtGrowthPercentPerSec = Defaults.ThoughtGrowthPercentPerSec;
@@ -557,6 +586,7 @@ namespace Meditation.Tuning
 
             SwipeAmplitude = Defaults.SwipeAmplitude;
             SwipeSharpness = Defaults.SwipeSharpness;
+            SwipeCooldownMs = Defaults.SwipeCooldownMs;
             DurabilityWeak = Defaults.DurabilityWeak;
             DurabilityMedium = Defaults.DurabilityMedium;
             DurabilityStrong = Defaults.DurabilityStrong;
@@ -576,6 +606,7 @@ namespace Meditation.Tuning
             LossOverlapPercent = Defaults.LossOverlapPercent;
             PeakOverlapPercent = Defaults.PeakOverlapPercent;
 
+            ThoughtBacking = Defaults.ThoughtBacking;
             ThoughtGrowthPercentPerSec = Defaults.ThoughtGrowthPercentPerSec;
             ThoughtGrowthCap = Defaults.ThoughtGrowthCap;
             BreatherEnabled = Defaults.BreatherEnabled;

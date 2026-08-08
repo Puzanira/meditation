@@ -414,9 +414,10 @@ namespace Meditation.Mechanics
         /// difference stopped being cosmetic.
         ///
         /// Layers multiply: a cell under k thoughts is open with probability Π(1 − ink), so it counts
-        /// as 1 − Π(1 − ink) hidden. That is the same arithmetic the HUD slots use to harden a soft
-        /// alpha by stacking copies (<c>SlotSilhouette</c>, 1 − (1 − a)^k) — hatching over hatching
-        /// really does close a gap, and a screen buried five deep still reads as full. A solid blob
+        /// as 1 − Π(1 − ink) hidden. (The same arithmetic used to harden the HUD slots' soft alpha by
+        /// stacking copies — 1 − (1 − a)^k — until the row of slots left the game in 2026-08-08.)
+        /// Hatching over hatching really does close a gap, and a screen buried five deep still reads
+        /// as full. A solid blob
         /// (ink 1, i.e. the greybox stand and the defeat wallpaper) closes its cell outright, so the
         /// number this returns is unchanged everywhere art is not involved.
         /// </summary>

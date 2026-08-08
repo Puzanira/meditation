@@ -276,21 +276,9 @@ namespace Meditation.Tests
             }
         }
 
-        [Test]
-        public void TheHudSlots_FitOnScreen_EvenForTheLongestLevel()
-        {
-            foreach (LevelDefinition level in LevelCatalog.Levels)
-            {
-                Rect slots = LevelCatalog.SlotsRectOf(level);
-
-                Assert.GreaterOrEqual(slots.xMin, 0f, level.Title + ": ряд слотов уходит за левый край.");
-                Assert.GreaterOrEqual(slots.yMin, 0f, level.Title + ": ряд слотов уходит за верхний край.");
-                Assert.LessOrEqual(slots.yMax, DesignStage.DesignHeight,
-                    level.Title + ": ряд слотов уходит за нижний край.");
-                Assert.LessOrEqual(slots.xMax, DesignStage.DesignWidth,
-                    level.Title + ": ряд слотов уходит за правый край.");
-            }
-        }
+        // «TheHudSlots_FitOnScreen_EvenForTheLongestLevel» stood here until 2026-08-08. The row of
+        // detail slots is out of the game (founder: «убрать ряд совсем»), so the longest level no
+        // longer has a 8×88 px row to fit anywhere.
 
         /// <summary>
         /// The progress bar under the vessel — «на всех уровнях» since 2026-08-07 (founder).
@@ -351,7 +339,6 @@ namespace Meditation.Tests
 
                 AssertClear(LevelCatalog.CrankRectOf(level), art, what, "индикатор динамо");
                 AssertClear(LevelCatalog.VesselBarRectOf(level), art, what, "полоса наполнения сосуда");
-                AssertClear(LevelCatalog.SlotsRectOf(level), art, what, "ряд слотов");
             }
         }
 
@@ -364,7 +351,6 @@ namespace Meditation.Tests
                 string what = level.Title + " · сосуд";
 
                 AssertClear(LevelCatalog.CrankRectOf(level), vessel, what, "индикатор динамо");
-                AssertClear(LevelCatalog.SlotsRectOf(level), vessel, what, "ряд слотов");
             }
         }
 
@@ -574,9 +560,6 @@ namespace Meditation.Tests
                     level.Title + ": индикатор динамо ушёл из левого нижнего угла по X.");
                 Assert.Greater(crank.center.y, DesignStage.DesignHeight * 0.75f,
                     level.Title + ": индикатор динамо ушёл из левого нижнего угла по Y.");
-
-                Assert.LessOrEqual(LevelCatalog.SlotsRectOf(level).yMax, LevelCatalog.SceneHeight * 0.5f,
-                    level.Title + ": ряд слотов сполз из верхней полосы кадра.");
             }
         }
 
@@ -595,12 +578,8 @@ namespace Meditation.Tests
                 "Набережная: индикатору нечего было уступать — он должен стоять на базе SCREENS.");
             Assert.AreEqual(LevelOneData.CrankIndicatorCentre, LevelCatalog.At(4).CrankIndicatorCentre,
                 "Город: индикатору нечего было уступать — он должен стоять на базе SCREENS.");
-            Assert.AreEqual(LevelOneData.SlotsOrigin, LevelCatalog.At(0).SlotsOrigin,
-                "Набережная: ряду слотов нечего было уступать — он должен стоять на базе SCREENS.");
-            Assert.AreEqual(LevelOneData.SlotsOrigin, LevelCatalog.At(1).SlotsOrigin,
-                "Офис: ряду слотов нечего было уступать — он должен стоять на базе SCREENS.");
-            Assert.AreEqual(LevelOneData.SlotsOrigin, LevelCatalog.At(3).SlotsOrigin,
-                "Библиотека: ряду слотов нечего было уступать — он должен стоять на базе SCREENS.");
+            // The three «ряд слотов стоит на базе SCREENS» claims left with the row itself on
+            // 2026-08-08, together with the two shifts they were guarding (метро y 146, город y 124).
 
             // …and the ones that did move stayed as close to the base as the art allowed.
             foreach (LevelDefinition level in LevelCatalog.Levels)
@@ -608,8 +587,6 @@ namespace Meditation.Tests
                 Assert.LessOrEqual(
                     Vector2.Distance(level.CrankIndicatorCentre, LevelOneData.CrankIndicatorCentre), 300f,
                     level.Title + ": индикатор уехал от базы SCREENS дальше, чем нужно.");
-                Assert.LessOrEqual(Vector2.Distance(level.SlotsOrigin, LevelOneData.SlotsOrigin), 150f,
-                    level.Title + ": ряд слотов уехал от базы SCREENS дальше, чем нужно.");
             }
         }
 

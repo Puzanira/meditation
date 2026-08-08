@@ -40,10 +40,8 @@ namespace Meditation.Mechanics
         /// </summary>
         public const float CrankHaloRadius = 86f;
 
-        /// <summary>HUD detail slots: from (60, 40), 5 × 72 px, step 88 (base; per-level in a level).</summary>
-        public static readonly Vector2 SlotsOrigin = new Vector2(60f, 40f);
-        public const float SlotSize = 72f;
-        public const float SlotStep = 88f;
+        // The HUD's row of detail slots stood here — from (60, 40), 5 × 72 px, step 88 — until
+        // 2026-08-08 (founder: «убрать ряд совсем»). StageView was its only reader; see StageView.cs.
 
         /// <summary>Scene zone 0,0 1920×810; foreground strip 0,810 1920×270.</summary>
         public const float SceneHeight = 810f;

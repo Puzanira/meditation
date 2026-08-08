@@ -57,15 +57,10 @@ namespace Meditation.Mechanics
         /// </summary>
         public Vector2 AlphaCentroid;
 
-        /// <summary>
-        /// Explicit silhouette dilation radius for this detail's HUD slot, slot px; 0 = let
-        /// <see cref="View.SlotSilhouette.RadiusFor"/> decide from the shape. The auto rule keys off
-        /// how thin the shape FITS, so a square fragment of line art defeats it: the vine's leaf
-        /// window fills its box yet is mostly air, and read 6.4 % ink at a metre where the readability
-        /// guard demands 8 (GamePictureTests, 2026-08-01). Like <see cref="IconCrop"/>, this is a
-        /// per-detail design decision, not a rule on sprite geometry.
-        /// </summary>
-        public float SilhouetteRadius;
+        // «SilhouetteRadius» stood here until 2026-08-08: a per-detail dilation for the HUD slot's
+        // flat-ink silhouette, needed because a square fragment of line art (the vine's leaf window)
+        // read as 6.4 % ink at a metre against a guard that wanted 8. The row of slots is gone with the
+        // founder's «убрать ряд совсем», and with it both the silhouette and the number that tuned it.
     }
 
     /// <summary>A level as the art drop authored it (SCREENS.md «Сцены уровней», превью = канон).</summary>
@@ -109,9 +104,6 @@ namespace Meditation.Mechanics
 
         /// <summary>HUD crank indicator, centre in design px. Base (140, 950); per level, see above.</summary>
         public Vector2 CrankIndicatorCentre;
-
-        /// <summary>HUD detail-slot row, top-left of the first slot. Base (60, 40); per level.</summary>
-        public Vector2 SlotsOrigin;
 
         /// <summary>Thought silhouettes of this level, Resources keys.</summary>
         public string[] ThoughtSprites;
@@ -194,20 +186,18 @@ namespace Meditation.Mechanics
                     // centroid at all: the ink's own middle is 0.2497 of the rectangle, i.e. design
                     // (760, 135) — on the fuselage — while the rectangle's centre (881) is trail.
                     Detail("самолёт в небе", "L1/objects/airplane", 881f, 134f, 484f, 84f,
-                        new Rect(0f, 0f, 0.4040f, 1f), 0f, 0.2497f, 0.5103f),
+                        new Rect(0f, 0f, 0.4040f, 1f), 0.2497f, 0.5103f),
                     Detail("чайка", "L1/objects/seagull-large", 1535f, 172f, 133f, 28f, 0.5002f, 0.5023f),
                     Detail("кораблик", "L1/objects/ship", 1592f, 695f, 139f, 64f, 0.4439f, 0.6381f),
                     Detail("акулий плавник", "L1/objects/shark-fin", 169f, 725f, 196f, 63f, 0.4728f, 0.6655f),
                     Detail("ракушка на асфальте", "L1/objects/seashell", 1285f, 1021f, 189f, 60f,
                         0.6433f, 0.6399f)
                 },
-                // Nothing on this plate wants the HUD's corners: the shark fin is 100 px above the
-                // indicator's halo and the slot row's 424 px end well left of the plane. Both widgets
-                // stay on the SCREENS base — «HUD переехал» must not quietly become «HUD переезжает
-                // на каждом уровне». (The sun that used to stand in the third corner left with the
-                // timer, 2026-08-07.)
+                // Nothing on this plate wants the HUD's corner: the shark fin is 100 px above the
+                // indicator's halo, so the widget stays on the SCREENS base — «HUD переехал» must not
+                // quietly become «HUD переезжает на каждом уровне». (The sun that used to stand in the
+                // third corner left with the timer, 2026-08-07; the slot row left on 2026-08-08.)
                 CrankIndicatorCentre = new Vector2(140f, 950f),
-                SlotsOrigin = new Vector2(60f, 40f),
                 ThoughtSprites = new[]
                 {
                     // Order matters: the tutorial's отгон beat spawns [0] — «первая мысль (кот)»
@@ -253,7 +243,6 @@ namespace Meditation.Mechanics
                 // indicator slides right along the floor. 375 is the first position that clears them
                 // (279 + halo 86 + 10 px of air) and it stops well short of the mug at x 948.
                 CrankIndicatorCentre = new Vector2(375f, 950f),
-                SlotsOrigin = new Vector2(60f, 40f),
                 ThoughtSprites = new[]
                 {
                     "L2/thoughts/banknote", "L2/thoughts/cake", "L2/thoughts/glasses",
@@ -299,9 +288,8 @@ namespace Meditation.Mechanics
                 // Back on the SCREENS base: the shift to (420, 950) existed only to clear the puddle
                 // (260 px of floor at (172, 942)), and the puddle left with the drop.
                 CrankIndicatorCentre = new Vector2(140f, 950f),
-                // The «Пляжи Сызрани» poster (604…884 × 19…135) reaches under the last slot of the row,
-                // so the row drops below it — the wall there is bare down to the goose at y 345.
-                SlotsOrigin = new Vector2(60f, 146f),
+                // This level used to drop its slot row to y 146 to clear the «Пляжи Сызрани» poster
+                // (604…884 × 19…135). The row is gone (founder, 2026-08-08) and the shift with it.
                 ThoughtSprites = new[]
                 {
                     "L3/thoughts/phone-call", "L3/thoughts/soccer-ball", "L3/thoughts/exclamations",
@@ -347,7 +335,6 @@ namespace Meditation.Mechanics
                 // dial needs 172. Sliding right along the same floor line keeps the indicator in its
                 // corner and lands it in the empty stretch between the mouse and the backpack (x 465).
                 CrankIndicatorCentre = new Vector2(310f, 950f),
-                SlotsOrigin = new Vector2(60f, 40f),
                 ThoughtSprites = new[]
                 {
                     "L4/thoughts/alarm-clock", "L4/thoughts/burger", "L4/thoughts/baby-head",
@@ -400,13 +387,12 @@ namespace Meditation.Mechanics
                     // so the auto radius (2) left 6.4 % ink; 4 hardens it past the 8 % readability
                     // bar without turning the bend into a blob.
                     Detail("лоза на стене", "L5/objects/vine", 1591f, 608f, 54f, 658f,
-                        new Rect(0f, 0.1709f, 1f, 0.0692f), 4f, 0.4632f, 0.4757f)
+                        new Rect(0f, 0.1709f, 1f, 0.0692f), 0.4632f, 0.4757f)
                 },
                 CrankIndicatorCentre = new Vector2(140f, 950f),
-                // The sparrow (156…218 × 52…114) sat UNDER the slot row — a collectable detail the
-                // player could not see, let alone aim at. The sky below it is empty down to the
-                // curtains at y 340, so the row drops just past the sparrow.
-                SlotsOrigin = new Vector2(60f, 124f),
+                // The sparrow (156…218 × 52…114) sat UNDER the slot row and this level dropped the row
+                // to y 124 to uncover it. The row is gone (founder, 2026-08-08) and the sky above the
+                // curtains is simply the sparrow's own.
                 ThoughtSprites = new[]
                 {
                     "L5/thoughts/teddy-bear", "L5/thoughts/empty-bed", "L5/thoughts/cake",
@@ -529,20 +515,9 @@ namespace Meditation.Mechanics
             Centred(level.CrankIndicatorCentre,
                 new Vector2(LevelOneData.CrankHaloRadius * 2f, LevelOneData.CrankHaloRadius * 2f));
 
-        /// <summary>The whole slot row of this level: N slots of 72 px with step 88 from the origin.</summary>
-        public static Rect SlotsRectOf(LevelDefinition level) =>
-            new Rect(level.SlotsOrigin.x, level.SlotsOrigin.y,
-                (level.DetailCount - 1) * LevelOneData.SlotStep + LevelOneData.SlotSize,
-                LevelOneData.SlotSize);
-
-        /// <summary>Slot number <paramref name="index"/> of this level (0-based), design px.</summary>
-        public static Rect SlotRectOf(LevelDefinition level, int index) =>
-            new Rect(level.SlotsOrigin.x + index * LevelOneData.SlotStep, level.SlotsOrigin.y,
-                LevelOneData.SlotSize, LevelOneData.SlotSize);
-
         /// <summary>
         /// Everything a teaching plate is not allowed to cover: every detail, the vessel with its
-        /// progress bar, and each HUD widget (the crank indicator, the slot row).
+        /// progress bar, and the one HUD widget that is left — the crank indicator.
         ///
         /// Приёмка п.3 of the drop names the HUD; the design gate of 2026-08-07 extended it to the
         /// tutorial's own plates, and it is the same list either way — the point is that the level stays
@@ -552,16 +527,20 @@ namespace Meditation.Mechanics
         /// The sun and its caption left this list with the timer (founder, 2026-08-07). The bar under
         /// the vessel took their place — it is the widget that replaced them as the level's live
         /// readout, and a hint standing on it hides the only thing on screen that counts.
+        ///
+        /// The row of detail slots left it on 2026-08-08, with the row itself (founder: «убрать ряд
+        /// совсем»). That is the one deletion here that CHANGES where hints stand: the row ran along
+        /// the top of the frame and <see cref="View.HintPlacement"/> breaks ties upwards, so «рядом,
+        /// повыше» used to mean «повыше, но не туда» on every level. Now it just means повыше.
         /// </summary>
         public static Rect[] HintObstaclesOf(LevelDefinition level)
         {
-            var rects = new Rect[level.DetailCount + 4];
+            var rects = new Rect[level.DetailCount + 3];
             int at = 0;
             for (int i = 0; i < level.DetailCount; i++) rects[at++] = RectOf(level.Details[i]);
             rects[at++] = VesselRectOf(level);
             rects[at++] = VesselBarRectOf(level);
-            rects[at++] = CrankRectOf(level);
-            rects[at] = SlotsRectOf(level);
+            rects[at] = CrankRectOf(level);
             return rects;
         }
 
@@ -639,11 +618,10 @@ namespace Meditation.Mechanics
 
         /// <summary>…and the same detail whose ICON is a fragment (<see cref="ArtDetail.IconCrop"/>).</summary>
         private static ArtDetail Detail(string name, string sprite, float cx, float cy, float w, float h,
-            Rect iconCrop, float silhouetteRadius = 0f, float cxAlpha = 0.5f, float cyAlpha = 0.5f)
+            Rect iconCrop, float cxAlpha = 0.5f, float cyAlpha = 0.5f)
         {
             ArtDetail detail = Detail(name, sprite, cx, cy, w, h, cxAlpha, cyAlpha);
             detail.IconCrop = iconCrop;
-            detail.SilhouetteRadius = silhouetteRadius;
             return detail;
         }
     }

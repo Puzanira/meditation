@@ -143,6 +143,31 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        /// <summary>
+        /// The registry is a registry in BOTH directions since 2026-08-08 — <see cref="GameTexts.Live"/>
+        /// is what the game may say, <see cref="GameTexts.Withdrawn"/> is what it may not — and the two
+        /// lists must not overlap.
+        ///
+        /// That is not a tautology waiting to happen. The lines the founder asked for say almost exactly
+        /// what two withdrawn ones said («Крути ручку, чтобы начать», «Тряси джойстик!»), because they
+        /// are answers to the same two questions; the difference is that those were the greybox's own
+        /// captions and the drop baked their meaning into pictures. A live line that drifts back into
+        /// being a withdrawn one is the mistake this catches, and it is a plausible one.
+        /// </summary>
+        [Test]
+        public void TheLiveLines_AreNotTheWithdrawnOnesComingBack()
+        {
+            Assert.IsNotEmpty(GameTexts.Live, "Реестр живых строк пуст, а игра что-то рисует.");
+
+            foreach (string live in GameTexts.Live)
+            {
+                Assert.IsFalse(string.IsNullOrWhiteSpace(live), "В реестре живых строк пустая строка.");
+                foreach (string withdrawn in GameTexts.Withdrawn)
+                    Assert.AreNotEqual(withdrawn, live,
+                        "Строка «" + live + "» одновременно живая и выведенная из игры.");
+            }
+        }
+
         private static void AssertNothingWithdrawnOnScreen(string where)
         {
             DesignStage stage = StandTestHarness.Stage();
@@ -184,6 +209,51 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        /// <summary>
+        /// …and the title SAYS so. The founder sat down in front of the finished render and could not
+        /// start the game (2026-08-08): a drawn НАЧАТЬ over a bar that has not moved yet reads as a
+        /// button, and there is nothing on the cabinet to press it with.
+        ///
+        /// The claim is not «есть какой-то текст» but that the text matches the CODE — the run starts on
+        /// <see cref="TitleScreen.StartDegrees"/> of the dynamo, so the line names the handle and the
+        /// count. If somebody ever moves the start onto a button, this test is where the caption stops
+        /// being true out loud instead of quietly.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheTitle_SaysHowToStart_AndSaysWhatTheCodeDoes()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            GameFlow flow = GameTestHarness.Flow();
+            yield return GameTestHarness.SettleScreen(fake);
+
+            var title = (TitleScreen)flow.Screen;
+
+            Assert.AreEqual(GameTexts.TitleStart, title.StartLabel.text,
+                "Подпись титула пишется мимо реестра GameTexts.");
+            Assert.AreEqual(GameTexts.TitleStartOnDesk, title.DeskLabel.text,
+                "ПК-скобка пишется мимо реестра GameTexts.");
+
+            StandTestHarness.AssertVisible(title.StartLabel.rectTransform, "Подпись «как начать»");
+            StandTestHarness.AssertVisible(title.DeskLabel.rectTransform, "ПК-скобка титула");
+
+            Assert.Greater(title.StartLabel.fontSize, title.DeskLabel.fontSize,
+                "Скобка для ПК набрана не мельче основной строки — на автомате она вводит в заблуждение.");
+
+            // It names the dynamo, because the dynamo is what the code actually waits for.
+            Assert.AreEqual(720f, TitleScreen.StartDegrees, 1e-3f,
+                "Старт больше не два оборота — подпись титула стала неправдой.");
+            StringAssert.Contains("ручку", title.StartLabel.text,
+                "Подпись не называет ручку, а старт — это она.");
+
+            // …and it is not one of the lines the drop withdrew.
+            foreach (string withdrawn in GameTexts.Withdrawn)
+                Assert.AreNotEqual(withdrawn, title.StartLabel.text,
+                    "Подпись титула — это выведенная дропом строка «" + withdrawn + "».");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
         // ---- every level really loads with its art (done contract §3) --------------------------------
 
         [UnityTest]
@@ -218,10 +288,13 @@ namespace Meditation.Tests
                 Assert.Greater(drawn.height, 1f, name + ": деталь нарисована нулевой высоты.");
             }
 
-            // One HUD slot per detail of THIS level (SCREENS «HUD: слоты деталей»).
-            Assert.AreEqual(level.DetailCount, screen.View.Slots.Count, "Слотов не по числу деталей.");
-            StandTestHarness.AssertVisible(StandTestHarness.Find(stage, "Slot1"), "Первый слот");
+            // The HUD's row of detail slots left the game on 2026-08-08 (founder: «убрать ряд
+            // совсем»), so «сколько собрано» is the bar under the vessel and the haul inside it — and
+            // the row must not quietly come back with the next art pass.
+            Assert.IsNull(StandTestHarness.FindOrNull(stage, "Slot1"),
+                "Ряд слотов вернулся в игру — его вывели решением founder 2026-08-08.");
             StandTestHarness.AssertVisible(StandTestHarness.Find(stage, "Vessel"), "Сосуд");
+            StandTestHarness.AssertVisible(screen.View.VesselFillTrack.rectTransform, "Полоса наполнения");
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -689,8 +762,6 @@ namespace Meditation.Tests
 
             Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.VesselRectOf(level)),
                 "Плашка «" + what + "» накрыла сосуд.");
-            Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.SlotsRectOf(level)),
-                "Плашка «" + what + "» накрыла ряд слотов.");
             Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.CrankRectOf(level)),
                 "Плашка «" + what + "» накрыла индикатор динамо.");
             Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.VesselBarRectOf(level)),
@@ -814,6 +885,62 @@ namespace Meditation.Tests
             Color ink = HintCard.ToneColour(HintTone.Swipe);
             Assert.Greater(ink.b, ink.r + 0.2f, "Цвет отгона не бирюзовый — это снова кирпич грейбокса.");
             Assert.Greater(ink.g, ink.r + 0.2f, "Цвет отгона не бирюзово-зелёный.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// …and the words that go with that arrow: «Маши над датчиком!» on a teaching card, beside the
+        /// thought, off the art and off its own stroke.
+        ///
+        /// The beat had no words at all until 2026-08-08 — the drop ships no «ТРЯСИ» — and the founder,
+        /// playing it, did not know what the arrow was asking her to do. An arrow that ends on a piece
+        /// of furniture names a PLACE; the sentence names the movement, and the movement is the whole
+        /// mechanic. The card is checked exactly the way the drawn buttons are (it covers no detail, no
+        /// vessel, no HUD widget), plus one thing they never had to prove: it does not lie on the stroke
+        /// it belongs to.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheSwipeBeat_SaysWhatToDo_BesideItsOwnArrow()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            LevelDefinition level = screen.Level;
+
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            yield return GameTestHarness.Idle(fake, 4);
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "Бит отгона не начался.");
+
+            HintCard card = screen.View.SwipeCard;
+            Assert.IsTrue(card.IsShown, "На бите отгона нет подписи — игрок снова видит одну стрелку.");
+            Assert.AreEqual(GameTexts.SwipeHint, card.Label.text,
+                "Подпись бита отгона пишется мимо реестра GameTexts.");
+            StandTestHarness.AssertVisible(card.Rect, "Карточка «" + GameTexts.SwipeHint + "»");
+
+            Rect plate = StandTestHarness.Stage().DesignRectOf(card.Rect);
+            foreach (ArtDetail detail in level.Details)
+                Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.RectOf(detail)),
+                    "Подпись отгона накрыла деталь «" + detail.Name + "».");
+            Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.VesselRectOf(level)),
+                "Подпись отгона накрыла сосуд.");
+            Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.VesselBarRectOf(level)),
+                "Подпись отгона накрыла полосу наполнения сосуда.");
+            Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.CrankRectOf(level)),
+                "Подпись отгона накрыла индикатор динамо.");
+
+            HintArrow arrow = screen.View.Hint.Arrow;
+            Assert.IsFalse(HintPlacement.SegmentHits(arrow.From, arrow.To, plate),
+                "Подпись отгона легла на собственную стрелку.");
+
+            // …and it goes away with the beat, like every other hint of the tutorial.
+            yield return GameTestHarness.SwipeUntil(fake,
+                () => screen.Runtime.Field.Thoughts.Count == 0, "мысль отбита");
+            yield return GameTestHarness.Frames(3);
+            Assert.AreEqual(TutorialBeat.Done, screen.Beat, "Обучение не закончилось после отбитой мысли.");
+            Assert.IsFalse(card.IsShown, "Подпись отгона осталась на экране после обучения.");
 
             LogAssert.NoUnexpectedReceived();
         }

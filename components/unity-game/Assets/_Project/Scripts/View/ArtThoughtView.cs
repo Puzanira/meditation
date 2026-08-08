@@ -14,13 +14,21 @@ namespace Meditation.View
     /// The sprite is drawn at its own colour: the whole set is one ink by design, so tinting per
     /// thought would be inventing a distinction the designer removed on purpose.
     ///
-    /// What the ink DOES need is something to sit on. Measured on the rendered frames, the hatching
-    /// lands at 1.6–3.5:1 against the five plates (median; 40–97 % of it below 3:1, worst on the L4
-    /// embankment at 1.60) — «чёрное на тёмно-синем не разглядеть», which is why the designer put her
-    /// own sample strips in the walkthrough on a light backing. So every thought is drawn twice: the
-    /// hatching, and under it the same sprite as a light halo (<see cref="BackingColour"/>, dilated by
-    /// <see cref="BackingHaloPx"/> through <c>Meditation/ThoughtBacking</c>). A halo rather than a card
-    /// because SCREENS keeps thoughts «без обведённой рамки» and the screen under them «дырявым».
+    /// What the ink was given to sit on was a halo: the same sprite under the hatching, in a light
+    /// off-white (<see cref="BackingColour"/>) dilated by <see cref="BackingHaloPx"/> through
+    /// <c>Meditation/ThoughtBacking</c>. It was measured into the game — the hatching lands at 1.6–3.5:1
+    /// against the five plates (median; 40–97 % of it below 3:1, worst on the L4 embankment at 1.60),
+    /// «чёрное на тёмно-синем не разглядеть», and the designer put her own sample strips in the
+    /// walkthrough on a light backing.
+    ///
+    /// **Since 2026-08-08 it is OFF by default** (founder, live session: «мысли должны быть чисто
+    /// чёрными» — the halo read as a white blob around every scribble, which is not what a marker
+    /// drawing looks like). The measurement above did not become wrong, it became somebody else's
+    /// call: it is now the [toggle] <see cref="Tuning.TuningConfig.ThoughtBacking"/>, and the founder
+    /// switches it on to check the dark zones of a plate against the risk she named herself.
+    ///
+    /// The toggle is read every frame in <see cref="Bind"/> rather than at construction, because the
+    /// panel is meant to answer «а так?» while a level is running.
     /// </summary>
     public sealed class ArtThoughtView
     {
@@ -170,7 +178,7 @@ namespace Meditation.View
             Ui.Place(_backing.rectTransform, 0f, 0f, 280f, 220f);
             _backingMaterial = NewBackingMaterial();
             _backing.material = _backingMaterial;
-            _backing.gameObject.SetActive(_backingMaterial != null);
+            _backing.gameObject.SetActive(BackingWanted);
 
             _root = Ui.NewImage(parent, "Thought");
             _root.color = Color.white;
@@ -197,10 +205,17 @@ namespace Meditation.View
             if (_backingMaterial != null) Object.Destroy(_backingMaterial);
         }
 
+        /// <summary>
+        /// Is the halo drawn at all right now — the founder's [toggle], plus the two conditions that
+        /// were always there (a shader to draw it with, and a sprite to dilate).
+        /// </summary>
+        private bool BackingWanted =>
+            Tuning.TuningConfig.ThoughtBacking && _backingMaterial != null;
+
         public void SetActive(bool active)
         {
             _root.gameObject.SetActive(active);
-            _backing.gameObject.SetActive(active && _backingMaterial != null && _root.sprite != null);
+            _backing.gameObject.SetActive(active && BackingWanted && _root.sprite != null);
         }
 
         /// <summary>
@@ -254,8 +269,8 @@ namespace Meditation.View
             _root.rectTransform.sizeDelta = box;
             _backing.rectTransform.sizeDelta = box;
             _backing.sprite = _root.sprite;
-            _backing.gameObject.SetActive(_backingMaterial != null && _root.sprite != null);
-            if (_backingMaterial != null && _root.sprite != null)
+            _backing.gameObject.SetActive(BackingWanted && _root.sprite != null);
+            if (BackingWanted && _root.sprite != null)
             {
                 // The halo is asked for in DESIGN px and handed over in UV, because only this side
                 // knows how far down the sprite is being drawn (see NewBackingMaterial).

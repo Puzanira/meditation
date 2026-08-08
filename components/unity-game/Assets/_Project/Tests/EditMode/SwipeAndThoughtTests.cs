@@ -137,6 +137,129 @@ namespace Meditation.Tests
             Assert.AreEqual(2, both.TotalHits, "Взмах над обоими датчиками — два удара, а не один.");
         }
 
+        // ---- «хаотичные махания быстро отгоняют, а лежащая рука — нет» (founder, 2026-08-08) --------
+
+        /// <summary>
+        /// How long each simulated hand is measured for, seconds — long enough that a rate is a rate.
+        /// </summary>
+        private const float MeasuredSeconds = 3f;
+
+        /// <summary>
+        /// The keyboard emulation, exactly as the arcade-controls package produces it: Q ramps the
+        /// reading up at 1.25 units/s, letting go springs it back down at 2.0 (the project's own
+        /// <c>default-keyboard-mapping.json</c>). The package's class is used rather than reproduced —
+        /// a test that re-implements the signal it is judging can go green against a signal the game
+        /// never sees.
+        /// </summary>
+        private static float HitsPerSecond(bool[] keyDownPerFrame)
+        {
+            var sensor = new AiGameStudio.ArcadeControls.HeightSimulator(1.25f, 1.25f, 0f, 2f);
+            var detector = new SwipeDetector();
+
+            for (int i = 0; i < keyDownPerFrame.Length; i++)
+            {
+                sensor.Update(keyDownPerFrame[i], false, Dt);
+                detector.Tick(sensor.Value, 0f, Dt);
+            }
+
+            return detector.TotalHits / (keyDownPerFrame.Length * Dt);
+        }
+
+        /// <summary>
+        /// A hand being jerked about over one sensor: Q mashed in bursts of 3…8 frames, deterministic
+        /// so the number in the checkpoint log is the number the suite measures.
+        /// </summary>
+        private static bool[] ChaoticMashing(int frames)
+        {
+            var pressed = new bool[frames];
+            var random = new System.Random(20260808);
+
+            int at = 0;
+            bool down = true;
+            while (at < frames)
+            {
+                int hold = random.Next(3, 9);
+                for (int i = 0; i < hold && at < frames; i++, at++) pressed[at] = down;
+                down = !down;
+            }
+
+            return pressed;
+        }
+
+        /// <summary>
+        /// The whole of the founder's sentence, in one measurement: «хаотичные махания должны быстро
+        /// отгонять мысли» AND «неподвижная рука ударов не даёт».
+        ///
+        /// Both halves have to be here together, because either one alone is trivially satisfiable —
+        /// a detector that fires on every frame passes the first, and one that never fires passes the
+        /// second. What the retune of 2026-08-08 had to do is separate them, and the gap it opened is
+        /// what this asserts: an order of magnitude between a hand that is moving and a key that is
+        /// merely held.
+        ///
+        /// The floor of 6 hits/s is a floor, not the measurement (which is ~12–13): the point of the
+        /// number is that a weak thought — three hits at the level-1 band — dies in well under half a
+        /// second of waving, so the screen really does clear as fast as she asked.
+        /// </summary>
+        [Test]
+        public void ChaoticWaving_LandsHitsFast_WhileAHeldKeyLandsAlmostNone()
+        {
+            int frames = Mathf.RoundToInt(MeasuredSeconds / Dt);
+
+            float chaotic = HitsPerSecond(ChaoticMashing(frames));
+
+            var held = new bool[frames];
+            for (int i = 0; i < frames; i++) held[i] = true;
+            float holding = HitsPerSecond(held);
+
+            // Written out, not only asserted: these two numbers are what MECHANICS §3 quotes as the
+            // start values' effect, and a number quoted in a doc has to come from a run.
+            TestContext.WriteLine("отгон, замер на клавиатурной симуляции: хаотичное дёрганье " +
+                                  chaotic.ToString("0.00") + " удара/с, зажатая клавиша " +
+                                  holding.ToString("0.00") + " удара/с (" +
+                                  (holding * MeasuredSeconds).ToString("0.0") + " за " +
+                                  MeasuredSeconds + " с).");
+
+            Assert.Greater(chaotic, 6f,
+                "Хаотичное дёрганье одной клавиши даёт " + chaotic.ToString("0.0") +
+                " удара/с — этого мало, чтобы «быстро отгонять» (founder, 2026-08-08).");
+
+            Assert.LessOrEqual(holding * MeasuredSeconds, 1f,
+                "Зажатая клавиша набила " + (holding * MeasuredSeconds).ToString("0.0") +
+                " ударов за " + MeasuredSeconds + " с — пассивная рука обязана давать ноль. " +
+                "ИНВАРИАНТ, снимать его нельзя.");
+
+            Assert.Greater(chaotic, holding * 8f,
+                "Разрыв между машущей рукой и зажатой клавишей схлопнулся: " +
+                chaotic.ToString("0.0") + " против " + holding.ToString("0.0") + " удара/с.");
+        }
+
+        /// <summary>
+        /// …and the rate ceiling is really the panel's row. Turning the cooldown up to a fifth of a
+        /// second has to cap the same mashing at five hits a second — otherwise the row is a slider
+        /// wired to nothing, which is how the joystick's old thresholds survived the move to the
+        /// sensors.
+        /// </summary>
+        [Test]
+        public void TheCooldown_IsTheRateCeiling_AndItIsThePanelsRow()
+        {
+            int frames = Mathf.RoundToInt(MeasuredSeconds / Dt);
+            bool[] mashing = ChaoticMashing(frames);
+
+            float shipped = HitsPerSecond(mashing);
+
+            TuningConfig.SwipeCooldownMs = 200f;
+            float capped = HitsPerSecond(mashing);
+
+            TestContext.WriteLine("кулдаун: 45 мс → " + shipped.ToString("0.00") +
+                                  " удара/с, 200 мс → " + capped.ToString("0.00") + " удара/с.");
+
+            Assert.LessOrEqual(capped, 5.2f,
+                "Кулдаун 200 мс обязан ограничить темп пятью ударами в секунду, а вышло " +
+                capped.ToString("0.0") + ".");
+            Assert.Less(capped, shipped,
+                "Кулдаун не влияет на детект — строка панели никуда не подключена.");
+        }
+
         /// <summary>
         /// The thresholds are the panel's, in the sensor's own units — a check that the two [tune]
         /// rows really are the ones the detector reads (they replaced the joystick pair, so they could

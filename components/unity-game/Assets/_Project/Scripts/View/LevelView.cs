@@ -7,8 +7,9 @@ namespace Meditation.View
 {
     /// <summary>
     /// Screen S3 for a real level: the art drop's background plate, its details on the positions the
-    /// designer authored, its vessel with its progress bar, its thoughts, and the HUD (N slots and the
-    /// crank indicator — the sun-dial went out with the timer, founder 2026-08-07).
+    /// designer authored, its vessel with its progress bar, its thoughts, and what is left of the HUD —
+    /// the crank indicator (the sun-dial went out with the timer, founder 2026-08-07; the row of detail
+    /// slots went out on 2026-08-08, same founder, see <see cref="BuildHud"/>).
     ///
     /// It is the art twin of <see cref="StageView"/>, not a replacement: the stand keeps its greybox
     /// so the mechanics can still be judged without a picture in the way. Both implement
@@ -23,10 +24,6 @@ namespace Meditation.View
     {
         /// <summary>Mock 18 keeps the location behind the victory tableau at half strength.</summary>
         public const float VictoryBackgroundAlpha = 0.5f;
-
-        /// <summary>HUD slot side and step (SCREENS «HUD: слоты деталей»); the origin is per level.</summary>
-        public const float SlotSize = LevelOneData.SlotSize;
-        public const float SlotStep = LevelOneData.SlotStep;
 
         private readonly Transform _parent;
         private readonly LevelDefinition _level;
@@ -44,8 +41,6 @@ namespace Meditation.View
         private readonly List<Image> _detailImages = new List<Image>();
         private readonly List<Image> _detailRings = new List<Image>();
         private readonly List<Image> _detailOutlines = new List<Image>();
-        private readonly List<Image> _slots = new List<Image>();
-        private readonly List<Image> _slotFills = new List<Image>();
         private readonly List<Image> _vesselContents = new List<Image>();
         private readonly List<Vector2> _vesselContentSizes = new List<Vector2>();
         private readonly List<Material> _sweepMaterials = new List<Material>();
@@ -154,7 +149,6 @@ namespace Meditation.View
         /// </summary>
         public Image OutcomeTextPlate => _outcomePlate;
 
-        public IReadOnlyList<Image> Slots => _slots;
         public IReadOnlyList<Image> DetailImages => _detailImages;
         public IReadOnlyList<ArtThoughtView> ThoughtViews => _thoughtPool;
 
@@ -421,56 +415,22 @@ namespace Meditation.View
         /// <summary>The warm orange the metro's indicator was painted in, now the bar's colour on all five.</summary>
         private static readonly Color MetroFill = new Color(0.89f, 0.45f, 0.28f, 0.92f);
 
-        /// <summary>Padding between a slot's border and the picture inside it, design px.</summary>
-        public const float SlotPadding = 7f;
-
         /// <summary>
-        /// A slot is two layers, and it is two layers in BOTH states.
+        /// The HUD's only widgets: the crank indicator with its halo, and (built next door) the bar
+        /// under the vessel.
         ///
-        /// Underneath, the detail's silhouette in flat ink (<see cref="SlotSilhouette"/>) — that is what
-        /// makes a pale cloud or a hairline vine into something readable from a metre. On top, the
-        /// detail's own picture, shown only once it has been collected, so the row still says «нашёл»
-        /// in colour. The silhouette is dilated a little past the picture, so a collected slot keeps a
-        /// dark outline instead of being a cream moon on a white plate.
+        /// **The row of detail slots is gone** — founder, 2026-08-08, live session, choosing «убрать
+        /// ряд совсем» out of three offered variants. It stood along the top of every plate, N white
+        /// tiles of 72 px with the details' silhouettes stamped into them, and it was the third thing
+        /// on screen answering «сколько осталось» after the bar under the vessel and the haul inside
+        /// the vessel itself. What went with it: <c>SlotSilhouette</c> (its only user), the per-level
+        /// <c>SlotsOrigin</c> shifts that moved the row off the art on levels 3 and 5, and the row's
+        /// place in <see cref="LevelCatalog.HintObstaclesOf"/> — a teaching plate may now stand where
+        /// the tiles used to be, which is the top of the frame, which is where the mock always wanted
+        /// its cards.
         /// </summary>
-        private static Image BuildSlotPicture(Image slot, string name, Sprite sprite, float inner,
-            float silhouetteRadius = 0f)
-        {
-            SlotSilhouette.Build(slot.transform, name + "Sil", sprite, SlotPadding, inner,
-                silhouetteRadius);
-
-            Image picture = Ui.NewImage(slot.transform, name);
-            picture.sprite = sprite;
-            picture.preserveAspect = true;
-            picture.color = SlotPictureHidden;
-            picture.raycastTarget = false;
-
-            RectTransform rt = picture.rectTransform;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = new Vector2(SlotPadding, SlotPadding);
-            rt.offsetMax = new Vector2(-SlotPadding, -SlotPadding);
-            return picture;
-        }
-
-        /// <summary>An uncollected slot shows the silhouette only — the picture waits behind alpha 0.</summary>
-        private static readonly Color SlotPictureHidden = new Color(1f, 1f, 1f, 0f);
-
         private void BuildHud()
         {
-            for (int i = 0; i < _level.DetailCount; i++)
-            {
-                Rect box = LevelCatalog.SlotRectOf(_level, i);
-                Image slot = Ui.Rounded(HudLayer, "Slot" + (i + 1),
-                    box.center.x, box.center.y, box.width, box.height,
-                    new Color(1f, 1f, 1f, 0.82f), new Color(0.35f, 0.35f, 0.35f, 0.9f), 3f, 10);
-                _slots.Add(slot);
-
-                _slotFills.Add(BuildSlotPicture(slot, "SlotArt" + (i + 1),
-                    ArtLibrary.IconOf(_level.Details[i]), box.width - SlotPadding * 2f,
-                    _level.Details[i].SilhouetteRadius));
-            }
-
             // Positions come from the level, not from LevelOneData: the stand keeps the SCREENS base,
             // a real level moves the widget off whatever the art drop painted there (founder 2026-07-31).
             //
@@ -505,7 +465,24 @@ namespace Meditation.View
         {
             Hint = new ButtonHint(MessageLayer);
             SecondHint = new ButtonHint(MessageLayer, "SecondHint");
+            SwipeCard = new HintCard(MessageLayer);
         }
+
+        /// <summary>
+        /// The written half of the отгон beat: «Маши над датчиком!» on a teaching card, beside the
+        /// thought, with no arrow of its own (the beat's stroke is the arrow).
+        ///
+        /// A card and not a drawn button because there IS no drawn button for this beat — «ТРЯСИ» is
+        /// still with the designer and would be the wrong verb anyway now that the отгон is on the
+        /// height sensors. The card is the mock's own plate, which is what the four drawn buttons were
+        /// made from, so the beat looks like the other three until the fourth PNG arrives.
+        /// </summary>
+        public HintCard SwipeCard { get; private set; }
+
+        public void ShowSwipeCard(string text, HintTone tone, Vector2 centre) =>
+            SwipeCard.ShowCardOnly(text, tone, centre);
+
+        public void HideSwipeCard() => SwipeCard.Hide();
 
         /// <summary>
         /// The finished outcome screens of the drop (S4 «level-complete», S5 «game-over»), full frame,
@@ -887,11 +864,11 @@ namespace Meditation.View
             _detailRings[index].gameObject.SetActive(false);
             _vesselBounce = 0.3f;
 
-            if (index < _slotFills.Count) _slotFills[index].color = Color.white;
-
-            // The haul shows the same icon the slot does: a cell is a small square, and a detail that
-            // needs a fragment to be readable in a 66 px slot needs it here too — the vine arrived in
-            // the briefcase as a thread otherwise.
+            // The haul shows the detail by its ICON, not by its whole sprite: a cell of the haul is a
+            // small square, and a detail that needs a fragment of itself to be readable at that size
+            // needs it here too — the vine arrived in the briefcase as a thread otherwise. (The icon
+            // crops were measured for the HUD slots; the slots are gone since 2026-08-08 and the haul
+            // is what still asks the same question of the same sprites.)
             Image copy = Ui.NewImage(_vessel.transform, "InVessel_" + spec.Name);
             copy.sprite = ArtLibrary.IconOf(spec);
             copy.preserveAspect = true;
@@ -940,9 +917,6 @@ namespace Meditation.View
             _vesselContents.Clear();
             _vesselContentSizes.Clear();
             UpdateVesselFill();
-
-            for (int i = 0; i < _slotFills.Count; i++)
-                _slotFills[i].color = SlotPictureHidden;
 
             for (int i = 0; i < _detailImages.Count; i++)
             {

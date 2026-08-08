@@ -35,7 +35,7 @@ namespace Meditation.Tuning
         {
             return new List<TuningParam>
             {
-                SwipeAmplitude(), SwipeSharpness(),
+                SwipeAmplitude(), SwipeSharpness(), SwipeCooldown(),
                 FloatParam.Make("прочность: слабые", 2f, 12f,
                     () => TuningConfig.DurabilityWeak, v => TuningConfig.DurabilityWeak = (int)v, "уд.", "0", true),
                 FloatParam.Make("прочность: средние", 2f, 12f,
@@ -61,13 +61,23 @@ namespace Meditation.Tuning
         // the founder tunes the same feeling. What changed under them is the unit — доли хода датчика
         // instead of отклонение стика — so the ranges are the sensor's, not the joystick's.
 
-        /// <summary>Travel inside one stroke, in fractions of the sensor's 0..1 range.</summary>
-        private static FloatParam SwipeAmplitude() => FloatParam.Make("порог удара: амплитуда", 0.05f, 0.6f,
+        /// <summary>
+        /// Travel inside one movement, in fractions of the sensor's 0..1 range.
+        ///
+        /// The floor came down from 0.05 to 0.02 with the retune of 2026-08-08: the shipped value is
+        /// now 0.08, and a slider whose bottom end is 0.05 gives the founder almost no room BELOW the
+        /// default — which is the direction «ещё чаще» lives in.
+        /// </summary>
+        private static FloatParam SwipeAmplitude() => FloatParam.Make("порог удара: амплитуда", 0.02f, 0.6f,
             () => TuningConfig.SwipeAmplitude, v => TuningConfig.SwipeAmplitude = v, "хода", "0.00");
 
         /// <summary>How fast the sensor has to be moving for that travel to count at all.</summary>
         private static FloatParam SwipeSharpness() => FloatParam.Make("порог удара: резкость", 0.1f, 3f,
             () => TuningConfig.SwipeSharpness, v => TuningConfig.SwipeSharpness = v, "ед/с", "0.00");
+
+        /// <summary>The rate ceiling: the shortest gap between two hits of one sensor.</summary>
+        private static FloatParam SwipeCooldown() => FloatParam.Make("порог удара: кулдаун", 0f, 300f,
+            () => TuningConfig.SwipeCooldownMs, v => TuningConfig.SwipeCooldownMs = v, "мс", "0");
 
         private static FloatParam ThoughtGrowth() => FloatParam.Make("рост мыслей", 0f, 10f,
             () => TuningConfig.ThoughtGrowthPercentPerSec,
@@ -216,7 +226,7 @@ namespace Meditation.Tuning
                 ChoiceParam.Make("выбор детали", new[] { "A: порядок", "B: взгляд", "C: авто" },
                     () => (int)TuningConfig.Notice, v => TuningConfig.Notice = (NoticeMode)v),
                 GazeSpeed(), GazeDwell(),
-                SwipeAmplitude(), SwipeSharpness(),
+                SwipeAmplitude(), SwipeSharpness(), SwipeCooldown(),
                 BoolParam.Make("затухание счётчика ударов",
                     () => TuningConfig.HitDecayEnabled, v => TuningConfig.HitDecayEnabled = v),
                 FloatParam.Make("пауза затухания", 400f, 1500f,
@@ -226,6 +236,11 @@ namespace Meditation.Tuning
                 BoolParam.Make("дрейф мыслей к центру",
                     () => TuningConfig.ThoughtDrift, v => TuningConfig.ThoughtDrift = v),
                 ThoughtsCoverVessel(),
+
+                // Founder, 2026-08-08: «мысли чисто чёрные». OFF by default; the row is here so she
+                // can put the halo back on the dark plates and compare, which is the risk she named.
+                BoolParam.Make("белая подложка мыслей",
+                    () => TuningConfig.ThoughtBacking, v => TuningConfig.ThoughtBacking = v),
                 FloatParam.Make("порог пика хаоса", 40f, 100f,
                     () => TuningConfig.PeakOverlapPercent, v => TuningConfig.PeakOverlapPercent = v, "%", "0"),
                 FloatParam.Make("порог поражения (перекрытие)", 85f, 100f,

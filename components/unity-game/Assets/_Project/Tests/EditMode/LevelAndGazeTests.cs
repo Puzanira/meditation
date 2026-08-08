@@ -264,6 +264,15 @@ namespace Meditation.Tests
             // The halo has to be a halo: wide enough to see at a metre, narrow enough that it does not
             // fill in the gaps the hatching is made of (SCREENS: экран под мыслями остаётся «дырявым»).
             Assert.That(ArtThoughtView.BackingHaloPx, Is.InRange(2f, 6f));
+
+            // …and none of that is on by default any more. The numbers above describe what the toggle
+            // TURNS ON — they stay measured, because the founder switches it on to compare (2026-08-08),
+            // and a halo she cannot read is not a comparison.
+            Assert.IsFalse(TuningConfig.Defaults.ThoughtBacking,
+                "Белая подложка мыслей обязана приезжать ВЫКЛЮЧЕННОЙ — решение founder 2026-08-08.");
+            TuningConfig.ResetToDefaults();
+            Assert.IsFalse(TuningConfig.ThoughtBacking,
+                "Сброс панели возвращает подложку — это не тот дефолт, который выбрала founder.");
         }
 
         [Test]

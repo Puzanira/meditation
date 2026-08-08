@@ -26,7 +26,6 @@ namespace Meditation.Stand
         private readonly Vector2 _vesselCentre;
 
         private float _displayProgress;
-        private float _gazeFreeze;
 
         /// <summary>The preview stand's composition: level 1 greybox out of <see cref="LevelOneData"/>.</summary>
         public CollectionRuntime(ICollectionView view)
@@ -124,10 +123,10 @@ namespace Meditation.Stand
         public bool CollectionSuspended { get; set; }
 
         /// <summary>
-        /// Is the gaze circle in play at all? The level-1 tutorial says no until its third beat: the
-        /// first two ask for the crank and the joystick's SHAKE, and the walkthrough introduces the
-        /// gaze only with «Оглядись — наклони стик» (frames 4–9). A circle drifting through beats 1–2
-        /// both spoils the frame and teaches the wrong hand.
+        /// Is the gaze circle in play at all? A flag rather than a constant because the tutorial used
+        /// to open with the crank and introduce the gaze only later; since the drop of 2026-08-07 beat
+        /// 1 IS «НАВОДИ», so the level switches it on from the first beat — but a screen that has to
+        /// take the aim away still has one call to make instead of a special case in the loop.
         /// </summary>
         public bool GazeInPlay { get; set; } = true;
 
@@ -147,18 +146,17 @@ namespace Meditation.Stand
             _view.SetPeak(false);
         }
 
+        /// <param name="stick">The joystick, which since 2026-08-07 is the AIM and nothing else.</param>
+        /// <param name="hits">Hits of the отгон this frame — swipes over the height sensors.</param>
         public void Tick(float deltaTime, Vector2 stick, int hits, float crankSpeed, bool spawningAllowed)
         {
             Field.Tick(deltaTime, stick, hits, spawningAllowed);
 
-            if (hits > 0) _gazeFreeze = 0.15f;
-            else _gazeFreeze = Mathf.Max(0f, _gazeFreeze - deltaTime);
-
             if (CollectionSuspended)
             {
                 // Nothing is noticed and nothing turns: the only hand that does anything is the one
-                // shaking. The gaze stays where it is (frozen, like during any shake) rather than
-                // disappearing — a circle that blinks out and back reads as a glitch, not as a rule.
+                // over the sensors. The gaze stays where it is rather than disappearing — a circle that
+                // blinks out and back reads as a glitch, not as a rule.
                 Notice(-1);
                 _view.SetGaze(Gaze.Position, 0f,
                     GazeInPlay && TuningConfig.Notice == NoticeMode.GazeJoystick);
@@ -210,7 +208,8 @@ namespace Meditation.Stand
                     break;
 
                 default:
-                    // Variant B: the gaze circle picks the detail; a shake freezes it in place.
+                    // Variant B: the gaze circle picks the detail. Nothing interrupts it any more —
+                    // the отгон is on the sensors, so the stick has one job and does it every frame.
                     if (!GazeInPlay)
                     {
                         // Not yet taught: the circle is neither drawn nor selecting.
@@ -221,7 +220,7 @@ namespace Meditation.Stand
                     for (int i = 0; i < _selectable.Count; i++)
                         _selectable[i] = _selectable[i] && i != NoticedIndex;
 
-                    Gaze.Tick(stick, deltaTime, _homes, _selectable, _gazeFreeze > 0f);
+                    Gaze.Tick(stick, deltaTime, _homes, _selectable);
                     if (Gaze.NoticedThisTick) Notice(Gaze.NoticedIndex);
                     _view.SetGaze(Gaze.Position, Gaze.DwellProgress01, true);
                     break;

@@ -18,6 +18,11 @@
        width:19px; height:19px; line-height:19px; text-align:center; font-size:12px;
        margin:0 3px 0 8px; font-weight:600; }
   .k:first-child { margin-left:0; }
+  /* Бейдж «это место макета пережило своё решение» — правки 2026-08-07/08 не стирают старое
+     молча: зачёркнутый текст остаётся, рядом встаёт бейдж с датой решения. */
+  .sup { display:inline-block; background:#8a6d1a; color:#fff; border-radius:4px;
+         padding:1px 7px; font-size:11.5px; font-weight:600; white-space:nowrap;
+         vertical-align:middle; margin:0 2px; }
   svg { width:100%; height:auto; display:block; background:#f4f2ec; border-radius:6px; }
   .note { font-size:13px; color:#8a6d1a; background:#fdf6dd; border-radius:6px; padding:8px 12px; }
   table { border-collapse:collapse; width:100%; font-size:13.5px; background:#fff; }
@@ -29,6 +34,11 @@
 <body>
 <h1>«Медитация в спешке» — вся игра по шагам</h1>
 <div class="sub">Читать сверху вниз — это весь игровой поток по порядку. Верх кадра = экран 1920×1080, серая панель внизу = что делают руки. Кнопка «в меню» из любого кадра — мгновенный выход в лаунчер.</div>
+
+<p class="note"><b>Синхронизация с решениями 2026-08-07/08.</b> Макет писался до трёх решений founder, и они меняют то, что нарисовано на кадрах ниже. Кадры и подписи приведены в соответствие; старые формулировки помечены <s>зачёркиванием</s> и бейджем «убрано решением 2026-08-07», а не стёрты молча.
+<br>① <b>Таймера нет.</b> Солнце-циферблат (1800,100) r=60 ушло из HUD всех уровней вместе с самим таймером. Победа = все детали собраны, поражение = экран заполнен мыслями. «Таймер стоит / запускается / тает» ниже — про механику, которой больше нет. Символ солнца оставлен пустым; кадры 15 и 16 рисовали клин таймера мимо символа, своим <code>path</code>, и он убран отдельно (возврат дизайн-скептика 2026-08-08).
+<br>② <b>Отгон — на датчиках движения, не на джойстике.</b> Джойстик только целится, отгон — взмахи руки над датчиками высоты пульта (A/B). Поэтому «Тряси джойстик!» и «джойстик: ТРЯСЁМ / отбиваемся / разгребаем» на кадрах 7, 8, 13, <b>15 и 16</b> стали «Маши над датчиком!» и «датчики: …» (15 и 16 добавлены 2026-08-08 — их подписи остались на джойстике после первого прохода). Кнопки «ТРЯСИ» в дропе по-прежнему нет — бит показывает стрелку на пульт без текста. <b>Пиктограмма пульта на панели рук пока прежняя</b> (джойстик с рисками движения): её перерисует дизайнер, как и правую карточку титула, — здесь синхронизированы подписи, а не greybox-иконки.
+<br>③ <b>Круг-«взгляд» крупнее:</b> r=130 вместо r=90 (заказ founder «крупнее и заметнее»), и это один радиус и для рисунка, и для попадания.</p>
 
 <svg width="0" height="0" style="position:absolute">
 <defs>
@@ -48,7 +58,11 @@
   <g id="det-rest3"><use href="#det-cup"/><use href="#det-bird"/><use href="#det-shadow"/></g>
   <g id="dand"><rect x="-25" y="-25" width="50" height="50" rx="8" fill="#e8d44d" stroke="#8f7d0a" stroke-width="3"/></g>
   <g id="cloudm"><rect x="-30" y="-30" width="60" height="60" rx="8" fill="#bcd3e8" stroke="#4a7096" stroke-width="3"/></g>
-  <g id="sun"><circle cx="1800" cy="100" r="60" fill="#f0b24a" stroke="#a8761d" stroke-width="4"/></g>
+  <!-- Таймер-«солнце» (1800,100) r=60 УБРАН решением founder 2026-08-07 («давай уберём, он плохо
+       работает»). Символ оставлен пустым, а не удалён: он был во всех кадрах ниже, и пустая
+       заготовка на прежнем месте — это видимая отметка «здесь было солнце», а не молчаливая
+       правка макета. Победа теперь только по всем деталям, поражение — только по заполнению. -->
+  <g id="sun"></g>
   <g id="slots0">
     <rect x="60" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
     <rect x="148" y="40" width="72" height="72" rx="10" fill="#fff" stroke="#999" stroke-width="3"/>
@@ -127,8 +141,8 @@
   <rect x="1171" y="545" width="18" height="80" rx="8" fill="#b0413e"/>
   <circle cx="1180" cy="535" r="26" fill="#b0413e"/>
   <path d="M 1131 545 L 1111 530 M 1229 545 L 1249 530 M 1131 585 L 1107 585 M 1229 585 L 1253 585" stroke="#b0413e" stroke-width="6"/>
-  <text x="1180" y="690" font-size="36" text-anchor="middle" font-weight="bold" fill="#333">ТРЯСИ</text>
-  <text x="1180" y="736" font-size="28" text-anchor="middle" fill="#666">отгоняй мысли</text>
+  <text x="1180" y="690" font-size="36" text-anchor="middle" font-weight="bold" fill="#333">МАШИ</text>
+  <text x="1180" y="736" font-size="28" text-anchor="middle" fill="#666">над датчиком — отгоняй мысли</text>
   <text x="960" y="920" font-size="40" text-anchor="middle" fill="#666">Крути ручку, чтобы начать</text>
   <use href="#panelbg"/>
   <use href="#dyn-on" transform="translate(560,1170)"/>
@@ -137,7 +151,7 @@
   <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
 </svg>
 <figcaption><div class="t">1 · Титул</div>
-<div class="d">Игра запущена из лаунчера (удержание джойстика). Фоном дрейфуют мысли. Старт — два оборота динамо: игра начинается с медленного кручения.</div></figcaption>
+<div class="d">Игра запущена из лаунчера (удержание джойстика). Фоном дрейфуют мысли. Старт — два оборота динамо: игра начинается с медленного кручения. <i>Правая карточка была <s>«ТРЯСИ · отгоняй мысли»</s> с пиктограммой джойстика — <b>убрано решением 2026-08-07</b>: отгон переехал на датчики движения, джойстик только целится. Пиктограмму перерисует дизайнер, текст синхронизирован.</i></div></figcaption>
 </figure>
 
 <!-- 2 карточка уровня -->
@@ -169,7 +183,7 @@
 <svg viewBox="0 0 1920 1300">
   <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det-rest3"/><use href="#det-cloud"/>
   <use href="#dand" x="180" y="760"/>
-  <use href="#sun"/><use href="#slots0"/>
+  <use href="#slots0"/>
   <use href="#panelbg"/>
   <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
@@ -180,7 +194,7 @@
 <div class="d">Мыслей нет, все 5 деталей разом пульсируют — игрок «оглядывает» локацию. Дальше пульс тише, детали надо замечать самому.</div></figcaption>
 </figure>
 
-<h2>Обучение — только на уровне 1, таймер стоит</h2>
+<h2>Обучение — только на уровне 1 <s>, таймер стоит</s> <span class="sup">убрано решением 2026-08-07</span></h2>
 
 <!-- 4 крути -->
 <figure>
@@ -192,7 +206,7 @@
   <text x="500" y="610" font-size="44" text-anchor="middle" fill="#1a6e46">Крути ручку!</text>
   <path d="M 380 660 Q 300 700 230 740" stroke="#2b7a5c" stroke-width="6" fill="none"/>
   <path d="M 230 740 l 26 -16 m -26 16 l 28 8" stroke="#2b7a5c" stroke-width="6" fill="none"/>
-  <use href="#sun" opacity="0.35"/><use href="#slots0"/>
+  <use href="#slots0"/>
   <use href="#panelbg"/>
   <circle cx="560" cy="1170" r="86" fill="#cfe8db"/>
   <use href="#dyn" transform="translate(560,1170)"/>
@@ -201,7 +215,7 @@
   <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: покой</text>
 </svg>
 <figcaption><div class="t">4 · Обучение, бит 1: «Крути ручку!»</div>
-<div class="d">Первая деталь (одуванчик) уже «замечена» за игрока — нить к сосуду протянута. Мысли не спавнятся, таймер стоит (солнце бледное). Игра ждёт первого кручения.</div></figcaption>
+<div class="d">Первая деталь (одуванчик) уже «замечена» за игрока — нить к сосуду протянута. Мысли не спавнятся. Игра ждёт первого кручения. <s>Таймер стоит (солнце бледное).</s> <i><b>Убрано решением 2026-08-07:</b> таймера и солнца в HUD больше нет.</i></div></figcaption>
 </figure>
 
 <!-- 5 крутим едет -->
@@ -211,7 +225,7 @@
   <line x1="180" y1="760" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
   <use href="#dand" x="414" y="811"/>
   <circle cx="414" cy="811" r="55" fill="none" stroke="#2b7a5c" stroke-width="9" stroke-dasharray="120 226"/>
-  <use href="#sun" opacity="0.35"/><use href="#slots0"/>
+  <use href="#slots0"/>
   <use href="#panelbg"/>
   <use href="#dyn-on" transform="translate(560,1170)"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим, не отпуская</text>
@@ -229,7 +243,7 @@
   <rect x="830" y="847" width="260" height="166" rx="16" fill="#7fc9a5" stroke="#2b7a5c" stroke-width="6"/>
   <use href="#dand" x="930" y="915"/>
   <path d="M 900 800 l -14 -24 M 960 790 l 0 -28 M 1020 800 l 14 -24" stroke="#2b7a5c" stroke-width="7"/>
-  <use href="#sun" opacity="0.35"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn-on" transform="translate(560,1170)"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: докрутили</text>
@@ -240,7 +254,7 @@
 <div class="d">Портфель подпрыгивает (scale 1.0→1.1→1.0, 0.3 с), деталь видна внутри, первый слот в HUD заполнился. Нить исчезла.</div></figcaption>
 </figure>
 
-<!-- 7 тряси -->
+<!-- 7 бит отгона -->
 <figure>
 <svg viewBox="0 0 1920 1300">
   <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det-rest3"/><use href="#det-cloud"/>
@@ -248,18 +262,18 @@
   <circle cx="588" cy="600" r="8" fill="#7a4433"/><circle cx="616" cy="600" r="8" fill="#7a4433"/>
   <circle cx="644" cy="600" r="8" fill="#7a4433"/><circle cx="672" cy="600" r="8" fill="#7a4433"/>
   <rect x="1030" y="380" width="480" height="110" rx="18" fill="#fff" stroke="#b0413e" stroke-width="4"/>
-  <text x="1270" y="450" font-size="44" text-anchor="middle" fill="#8f2f2c">Тряси джойстик!</text>
+  <text x="1270" y="450" font-size="44" text-anchor="middle" fill="#8f2f2c">Маши над датчиком!</text>
   <path d="M 1030 470 Q 920 500 830 500" stroke="#b0413e" stroke-width="6" fill="none"/>
   <path d="M 830 500 l 28 -12 m -28 12 l 28 12" stroke="#b0413e" stroke-width="6" fill="none"/>
-  <use href="#sun" opacity="0.35"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: можно отдохнуть</text>
   <circle cx="1360" cy="1170" r="86" fill="#f2d9d7"/>
   <use href="#joy" transform="translate(1360,1170)"/>
-  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">джойстик: игра ждёт тряски</text>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">датчики: игра ждёт взмаха</text>
 </svg>
-<figcaption><div class="t">7 · Обучение, бит 2: «Тряси джойстик!»</div>
+<figcaption><div class="t">7 · Обучение, бит отгона: «Маши над датчиком!» <s>«Тряси джойстик!»</s> <span class="sup">убрано решением 2026-08-07</span></div>
 <div class="d">Появилась первая мысль (в арте — плюшевый мишка; на greybox-кадре подписан старый плейсхолдер, прочность 4 пипса). Пока не отбита — дальше ничего не спавнится.</div></figcaption>
 </figure>
 
@@ -269,17 +283,17 @@
   <use href="#bldgs"/><use href="#ground"/><use href="#vessel"/><use href="#det-rest3"/><use href="#det-cloud"/>
   <g transform="translate(640,470) scale(0.45)" opacity="0.5"><use href="#blob-dish"/></g>
   <path d="M 548 388 l -34 -34 M 732 388 l 34 -34 M 548 553 l -34 34 M 732 553 l 34 34" stroke="#c08b77" stroke-width="7"/>
-  <use href="#sun" opacity="0.35"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
   <circle cx="1360" cy="1170" r="86" fill="#f2d9d7"/>
   <use href="#joy" transform="translate(1360,1170) rotate(14)"/>
   <path d="M 1250 1130 l -26 -14 m 262 14 l 26 -14 M 1250 1200 l -26 14 m 262 -14 l 26 14" stroke="#b0413e" stroke-width="8"/>
-  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">джойстик: ТРЯСЁМ</text>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">датчики: МАШЕМ</text>
 </svg>
 <figcaption><div class="t">8 · Мысль лопается</div>
-<div class="d">Каждый резкий рывок стика в любую сторону = удар, гаснет пипс, мысль вздрагивает. Пипсы кончились — мысль схлопывается. После этого таймер запускается, начинается настоящая игра.</div></figcaption>
+<div class="d">Каждый проход руки над датчиком высоты = удар, гаснет пипс, мысль вздрагивает. Пипсы кончились — мысль схлопывается, начинается настоящая игра. <s>Каждый резкий рывок стика в любую сторону = удар</s> · <s>после этого таймер запускается</s> <i><b>убрано решением 2026-08-07</b> (отгон на датчиках; таймера нет).</i></div></figcaption>
 </figure>
 
 <h2>Основная игра — цикл сбора</h2>
@@ -294,7 +308,7 @@
   <text x="1200" y="320" font-size="44" text-anchor="middle" fill="#39587a">Оглядись — наклони стик</text>
   <path d="M 880 340 Q 820 380 780 400" stroke="#4a7096" stroke-width="6" fill="none"/>
   <path d="M 780 400 l 28 -12 m -28 12 l 26 14" stroke="#4a7096" stroke-width="6" fill="none"/>
-  <use href="#sun"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
@@ -303,7 +317,7 @@
   <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#39587a">джойстик: плавный наклон</text>
 </svg>
 <figcaption><div class="t">9 · Обучение, бит 3 → игра: ведём взгляд</div>
-<div class="d">Последняя подсказка «Оглядись — наклони стик» показывается один раз. Плавный наклон двигает круг-«взгляд» (r=90, до 900 px/с); резкие рывки — тряска: игра различает по скорости жеста. Таймер теперь идёт (солнце яркое, сектор тает).</div></figcaption>
+<div class="d">Последняя подсказка «Оглядись — наклони стик» показывается один раз. Наклон двигает круг-«взгляд» (<b>r=130</b>, до 900 px/с) — и это всё, что делает джойстик. <s>r=90</s> <span class="sup">крупнее по заказу founder 2026-08-07</span> · <s>резкие рывки — тряска: игра различает по скорости жеста</s> · <s>Таймер теперь идёт (солнце яркое, сектор тает)</s> <i><b>убрано решением 2026-08-07:</b> отгон ушёл на датчики, поэтому различать жесты по скорости больше нечего и прицел ни от чего не замирает; таймера нет.</i></div></figcaption>
 </figure>
 
 <!-- 10 держим -->
@@ -313,7 +327,7 @@
   <use href="#cloudm" x="560" y="330"/>
   <use href="#gaze" x="560" y="330"/>
   <path d="M 560 230 A 100 100 0 1 1 470 380" stroke="#2b7a5c" stroke-width="12" fill="none"/>
-  <use href="#sun"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: стоит</text>
@@ -337,7 +351,7 @@
     <line x1="516" y1="286" x2="493" y2="263"/>
   </g>
   <line x1="560" y1="330" x2="960" y2="930" stroke="#2b7a5c" stroke-width="5" stroke-dasharray="14 12"/>
-  <use href="#sun"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn" transform="translate(560,1170)" opacity="0.45"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#888">динамо: пора крутить</text>
@@ -357,7 +371,7 @@
   <circle cx="680" cy="510" r="55" fill="none" stroke="#2b7a5c" stroke-width="9" stroke-dasharray="120 226"/>
   <use href="#blob-q" x="1350" y="380"/>
   <circle cx="1298" cy="510" r="8" fill="#4a3d80"/><circle cx="1326" cy="510" r="8" fill="#4a3d80"/><circle cx="1354" cy="510" r="8" fill="#4a3d80"/>
-  <use href="#sun"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn-on" transform="translate(560,1170)"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим</text>
@@ -378,17 +392,17 @@
   <use href="#blob-q" x="1338" y="392"/>
   <path d="M 1166 258 l -40 -26 M 1166 428 l -40 26 M 1510 258 l 40 -26 M 1510 428 l 40 26" stroke="#b0413e" stroke-width="8"/>
   <circle cx="1286" cy="522" r="8" fill="#4a3d80"/><circle cx="1314" cy="522" r="8" fill="#4a3d80"/><circle cx="1342" cy="522" r="8" fill="none" stroke="#4a3d80" stroke-width="3"/>
-  <use href="#sun"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn-on" transform="translate(560,1170)"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: НЕ останавливаем</text>
   <circle cx="1360" cy="1170" r="86" fill="#f2d9d7"/>
   <use href="#joy" transform="translate(1360,1170) rotate(14)"/>
   <path d="M 1250 1130 l -26 -14 m 262 14 l 26 -14 M 1250 1200 l -26 14 m 262 -14 l 26 14" stroke="#b0413e" stroke-width="8"/>
-  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">джойстик: ТРЯСЁМ</text>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">датчики: МАШЕМ</text>
 </svg>
-<figcaption><div class="t">13 · Главный момент: трясём, продолжая крутить</div>
-<div class="d">Правая рука бьёт по мысли (пипс погас), левая продолжает вести деталь. В этом вся игра: тело делит внимание на «медленное» и «резкое» одновременно.</div></figcaption>
+<figcaption><div class="t">13 · Главный момент: машем над датчиком, продолжая крутить <s>трясём</s> <span class="sup">убрано решением 2026-08-07</span></div>
+<div class="d">Правая рука бьёт по мысли взмахом над датчиком высоты (пипс погас), левая продолжает вести деталь. В этом вся игра: тело делит внимание на «медленное» и «резкое» одновременно.</div></figcaption>
 </figure>
 
 <!-- 14 срыв -->
@@ -401,7 +415,7 @@
   <path d="M 770 660 Q 660 480 590 370" stroke="#c0392b" stroke-width="7" stroke-dasharray="16 12" fill="none"/>
   <path d="M 590 370 l 26 -6 m -26 6 l 22 18" stroke="#c0392b" stroke-width="7" fill="none"/>
   <use href="#blob-q" x="1338" y="392"/>
-  <use href="#sun"/><use href="#slots1"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <circle cx="560" cy="1170" r="86" fill="#f2d9d7"/>
   <use href="#dyn" transform="translate(560,1170)"/>
@@ -424,17 +438,16 @@
   <use href="#blob-q" x="1338" y="392"/>
   <use href="#blob-dish" x="330" y="240"/>
   <use href="#blob-jkh" x="1470" y="820"/>
-  <use href="#sun"/><use href="#slots1"/>
-  <path d="M 1800 100 L 1800 40 A 60 60 0 1 1 1745 125 Z" fill="#a8761d" opacity="0.5"/>
+  <use href="#slots1"/>
   <use href="#panelbg"/>
   <use href="#dyn-on" transform="translate(560,1170)"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: крутим снова</text>
   <circle cx="1360" cy="1170" r="86" fill="#f2d9d7"/>
   <use href="#joy" transform="translate(1360,1170) rotate(-14)"/>
-  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">джойстик: отбиваемся</text>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">датчики: отбиваемся</text>
 </svg>
 <figcaption><div class="t">15 · Волны накатывают</div>
-<div class="d">Тащим деталь заново, а мыслей уже три, и таймер тает. Чем дольше медлишь — тем больше их скапливается. Прочность и частота растут с уровнями.</div></figcaption>
+<div class="d">Тащим деталь заново, а мыслей уже три. Чем дольше медлишь — тем больше их скапливается, и <b>каждая ещё и разрастается со временем жизни</b> (решение founder 2026-08-07). Прочность и частота растут с уровнями. <s>и таймер тает</s> · <s>клин солнца-таймера в правом верхнем углу</s> · <s>джойстик: отбиваемся</s> <span class="sup">убрано решением 2026-08-07</span> <i>(таймера нет; отгон — взмахи над датчиками, джойстик только целится).</i></div></figcaption>
 </figure>
 
 <!-- 16 пик -->
@@ -450,18 +463,17 @@
   <g transform="translate(1000,640)"><rect x="-140" y="-110" width="280" height="220" rx="60" fill="#f2c7b8" stroke="#c08b77" stroke-width="4"/><text y="10" font-size="30" text-anchor="middle" fill="#7a4433">мишка</text></g>
   <g transform="translate(1490,660)"><rect x="-210" y="-160" width="420" height="320" rx="80" fill="#cfc3ee" stroke="#8f7fc4" stroke-width="4"/><text y="10" font-size="34" text-anchor="middle" fill="#4a3d80">фото бывшего</text></g>
   <rect x="0" y="0" width="1920" height="1080" fill="#3a3050" opacity="0.12"/>
-  <use href="#sun"/><use href="#slots2"/>
-  <path d="M 1800 100 L 1800 40 A 60 60 0 1 1 1740 90 Z" fill="#a8761d" opacity="0.5"/>
+  <use href="#slots2"/>
   <use href="#panelbg"/>
   <use href="#dyn-on" transform="translate(560,1170)"/>
   <text x="560" y="1275" font-size="34" text-anchor="middle" fill="#1a6e46">динамо: держимся</text>
   <circle cx="1360" cy="1170" r="86" fill="#f2d9d7"/>
   <use href="#joy" transform="translate(1360,1170) rotate(14)"/>
   <path d="M 1250 1130 l -26 -14 m 262 14 l 26 -14 M 1250 1200 l -26 14 m 262 -14 l 26 14" stroke="#b0413e" stroke-width="8"/>
-  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">джойстик: разгребаем</text>
+  <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#8f2f2c">датчики: разгребаем</text>
 </svg>
 <figcaption><div class="t">16 · Пик хаоса</div>
-<div class="d">Сцена почти не видна, сосуд полузакрыт [toggle], края экрана темнеют. Перекрытие ≥ порога [tune] — проигрыш. Успел разгрести — сеттинг проступает обратно.</div></figcaption>
+<div class="d">Сцена почти не видна, сосуд полузакрыт [toggle], края экрана темнеют. Перекрытие ≥ порога [tune] — проигрыш. Успел разгрести — сеттинг проступает обратно. <s>клин солнца-таймера в правом верхнем углу</s> · <s>джойстик: разгребаем</s> <span class="sup">убрано решением 2026-08-07</span> <i>(таймера нет; разгребает не джойстик, а взмахи над датчиками. Пиктограмма на панели — та же, что на кадрах 8 и 13: её перерисует дизайнер, подпись синхронизирована.)</i></div></figcaption>
 </figure>
 
 <h2>Исходы уровня — схема (итоговые экраны ниже, Э3–Э4)</h2>
@@ -517,46 +529,75 @@
   <text x="1360" y="1275" font-size="34" text-anchor="middle" fill="#888">джойстик: — (экран сам, 3 с)</text>
 </svg>
 <figcaption><div class="t">18 · Победа уровня</div>
-<div class="d">Все 5 деталей собраны до конца таймера: мысли растворяются (0.5 с), секунда чистой «тишины», сосуд ×2 в центре со всей добычей. Дальше карточка следующего уровня (как шаг 2).</div></figcaption>
+<div class="d">Все 5 деталей собраны: мысли растворяются (0.5 с), секунда чистой «тишины», сосуд ×2 в центре со всей добычей. Дальше карточка следующего уровня (как шаг 2). <s>до конца таймера</s> <span class="sup">убрано решением 2026-08-07: победа = все детали, срока нет</span></div></figcaption>
 </figure>
 
 <h2>Старый greybox уровней — только про механику</h2>
-<div class="note">Кадры 19–22 — старый greybox: нумерация уровней на них <b>устарела</b> (порядок изменён 2026-08-07), смотреть их стоит только как схему поведения. Итоговый вид сцен — в секции «Арт всех уровней» ниже.</div>
+<div class="note"><b>Кадры 19–22 — старый greybox.</b> Порядок уровней изменён дропом 4 (2026-08-07), поэтому заголовки <b>перенумерованы 2026-08-08</b> под новый порядок (1 набережная → 2 офис → 3 метро → 4 библиотека → 5 город), а сами кадры переставлены в этот же порядок; старые номера уровней оставлены зачёркнутыми, а не стёрты. <b>Рисунки и легенды к канону не приводились:</b> расстановка, состав деталей и сосуд «(960,930)» на всех четырёх — greybox-заглушки до арт-дропа. Канон уровня — SCREENS.md, «Сцены уровней 1–5», и секция «Арт всех уровней» ниже (А1–А5). Отдельно поправлена только легенда набережной: она числила деталями запечённый декор.
+<br><b>Уровня 5 «Город» в этом блоке нет</b> — и не было: в старом порядке город был уровнем 1, и его greybox — это базовая сцена кадров 3–16 выше (одуванчик, птица, отражение облака — его же детали, SCREENS.md «Уровень 5 — Город»). Итоговый вид города — <b>А5</b>.</div>
 
-<!-- 19 L2 -->
+<!-- 19 · L1 набережная (был L4) -->
 <figure>
 <svg viewBox="0 0 1920 1080">
-  <rect x="0" y="0" width="1920" height="810" fill="#efe9dd"/>
-  <rect x="0" y="810" width="1920" height="270" fill="#ddd6c6"/>
-  <polygon points="960,0 760,520 1160,520" fill="#f7edc9" opacity="0.6"/>
-  <rect x="220" y="180" width="400" height="630" fill="#cfc9ba"/>
-  <rect x="1300" y="180" width="400" height="630" fill="#cfc9ba"/>
-  <rect x="870" y="640" width="180" height="90" fill="#bfb8a6"/>
-  <rect x="900" y="990" width="120" height="90" fill="#b8ad94"/>
-  <rect x="860" y="855" width="200" height="150" rx="14" fill="#e8b45a" stroke="#a8761d" stroke-width="4"/>
-  <circle cx="960" cy="350" r="26" fill="#f2df9a" stroke="#b3922e" stroke-width="3"/>
-  <circle cx="1030" cy="330" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1030" y="342" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">1</text>
-  <rect x="800" y="600" width="40" height="60" rx="6" fill="#8d6cae"/>
-  <circle cx="750" cy="570" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="750" y="582" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">2</text>
-  <rect x="915" y="595" width="70" height="50" rx="6" fill="#fff" stroke="#999" stroke-width="3"/>
-  <circle cx="905" cy="545" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="905" y="557" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">3</text>
-  <circle cx="1040" cy="600" r="22" fill="#b8d8a0" stroke="#6b9448" stroke-width="3"/>
-  <circle cx="1105" cy="575" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1105" y="587" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">4</text>
-  <circle cx="1275" cy="640" r="16" fill="none" stroke="#444" stroke-width="5"/>
-  <circle cx="1310" cy="640" r="16" fill="none" stroke="#444" stroke-width="5"/>
-  <circle cx="1380" cy="600" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1380" y="612" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">5</text>
+  <rect x="0" y="0" width="1920" height="360" fill="#eef0ee"/>
+  <rect x="0" y="360" width="1920" height="330" fill="#d3e4f2"/>
+  <rect x="0" y="690" width="1920" height="40" fill="#5a5a5a"/>
+  <rect x="0" y="730" width="1920" height="350" fill="#d8d3c6"/>
+  <path d="M 340 470 A 45 45 0 0 1 420 470" stroke="#9fb8cc" stroke-width="6" fill="none"/>
+  <rect x="880" y="860" width="180" height="140" rx="14" fill="#8fb7dd" stroke="#39587a" stroke-width="4"/>
+  <ellipse cx="1000" cy="190" rx="34" ry="16" fill="#a8a29a"/>
+  <circle cx="1080" cy="170" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1080" y="182" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">1</text>
+  <polygon points="1400,485 1450,455 1450,485" fill="#e8c34d"/>
+  <circle cx="1510" cy="465" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1510" y="477" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">2</text>
+  <circle cx="580" cy="680" r="18" fill="#d9c7a8" stroke="#9a8560" stroke-width="3"/>
+  <circle cx="650" cy="660" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="650" y="672" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">3</text>
+  <rect x="1278" y="692" width="44" height="36" rx="8" fill="#8d8d99" stroke="#4c4c58" stroke-width="3"/>
+  <circle cx="1380" cy="710" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1380" y="722" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">4</text>
+  <circle cx="285" cy="765" r="9" fill="#9a9285"/><circle cx="315" cy="778" r="9" fill="#9a9285"/>
+  <circle cx="380" cy="772" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="380" y="784" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">5</text>
 </svg>
-<figcaption><div class="t">19 · Уровень 2 — Библиотека</div>
-<div class="d">Сосуд — тканевая сумка на стуле (960,930). Мысли уровня: босс, весы, 99+ уведомлений, будильник…</div>
-<div class="lg"><span class="k">1</span>луч света с пылинками (960,350)<span class="k">2</span>закладка-перо (820,630)<span class="k">3</span>раскрытая книга (950,620)<span class="k">4</span>засушенный цветок (1040,600)<span class="k">5</span>очки (1290,640)</div></figcaption>
+<figcaption><div class="t">19 · Уровень 1 — Набережная (Питер) <s>Уровень 4</s> <span class="sup">перенумеровано дропом 4, 2026-08-07</span></div>
+<div class="d">Сосуд — ведёрко на асфальте, канон <b>(549, 846), 240×389</b> <s>(960,930)</s> <span class="sup">поправлено 2026-08-08 по SCREENS.md</span>. Мысли уровня в дропе — кот · гитара · вино · бабочка · зонт (<s>шаверма, силуэт Шнурова, «где ты?» от мамы</s> — прежние плейсхолдеры).</div>
+<div class="lg"><b>Канон, 5 деталей</b> (SCREENS.md, «Уровень 1 — Набережная»):<span class="k">1</span>самолёт в небе (881,134)<span class="k">2</span>чайка (1535,172)<span class="k">3</span>кораблик (1592,695)<span class="k">4</span>акулий плавник в воде (169,725)<span class="k">5</span>ракушка на асфальте (1285,1021)</div>
+<div class="note">Метки 1–5 на рисунке выше — старые, greybox-овские, и две из них деталями <b>не являются</b>: <s>морской конёк на решётке (1300,710)</s> и <s>мокрые следы (300,770)</s> <span class="sup">убрано 2026-08-08</span> — мокрые следы прямо названы запечённым декором фона (SCREENS.md, L1), морского конька в дропе нет ни в деталях, ни в декоре. Самолёта, наоборот, на greybox-рисунке нет вовсе. Как сцена выглядит на самом деле — А1 ниже.</div></figcaption>
 </figure>
 
-<!-- 20 L3 -->
+<!-- 20 · L2 офис (был L5) -->
+<figure>
+<svg viewBox="0 0 1920 1080">
+  <rect x="0" y="0" width="1920" height="810" fill="#eceee6"/>
+  <rect x="0" y="810" width="1920" height="270" fill="#d9d2bf"/>
+  <rect x="440" y="280" width="620" height="420" rx="16" fill="#b9b2a2"/>
+  <rect x="470" y="310" width="560" height="330" fill="#77848e"/>
+  <rect x="1280" y="170" width="510" height="440" fill="#e3efdb" stroke="#b9c9ad" stroke-width="6"/>
+  <rect x="880" y="860" width="160" height="140" rx="14" fill="#e8b45a" stroke="#a8761d" stroke-width="4"/>
+  <rect x="878" y="398" width="44" height="44" fill="#f2df5a"/>
+  <circle cx="965" cy="380" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="965" y="392" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">1</text>
+  <ellipse cx="1530" cy="390" rx="45" ry="60" fill="#94bb72"/>
+  <circle cx="1615" cy="350" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1615" y="362" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">2</text>
+  <path d="M 110 750 q 20 -25 40 0 q -20 25 -40 0" stroke="#7a7a7a" stroke-width="6" fill="none"/>
+  <circle cx="200" cy="730" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="200" y="742" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">3</text>
+  <circle cx="480" cy="850" r="26" fill="#e69ab8"/>
+  <circle cx="550" cy="825" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="550" y="837" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">4</text>
+  <ellipse cx="1350" cy="980" rx="34" ry="16" fill="#a8a29a"/><ellipse cx="1415" cy="985" rx="34" ry="16" fill="#a8a29a"/>
+  <circle cx="1490" cy="955" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1490" y="967" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">5</text>
+</svg>
+<figcaption><div class="t">20 · Уровень 2 — Офис <s>Уровень 5</s> <span class="sup">перенумеровано дропом 4, 2026-08-07</span></div>
+<div class="d">Сосуд — кружка на столе (960,930). Детали частично на столе (передний план) — мысли закрывают и его. Мысли: торт, пляж, сплетни, «поздравляем коллегу, не тебя»…</div>
+<div class="lg"><span class="k">1</span>стикер на мониторе (900,420)<span class="k">2</span>растение на подоконнике (1530,390)<span class="k">3</span>скрепка (130,760)<span class="k">4</span>игрушка-антистресс (480,850)<span class="k">5</span>тапки из-под стола (1380,980)</div></figcaption>
+</figure>
+
+<!-- 21 · L3 метро -->
 <figure>
 <svg viewBox="0 0 1920 1080">
   <rect x="0" y="0" width="1920" height="810" fill="#e4e0d6"/>
@@ -586,69 +627,42 @@
   <circle cx="1600" cy="255" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
   <text x="1600" y="267" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">5</text>
 </svg>
-<figcaption><div class="t">20 · Уровень 3 — Метро</div>
+<figcaption><div class="t">21 · Уровень 3 — Метро <span class="sup">номер уровня дропом 4 не менялся</span></div>
 <div class="d">Сосуд — карман пальто пассажира, стоящего в центре переднего плана (960,930). Мысли: разбитый телефон, кольцо в коробочке, увядший букет…</div>
 <div class="lg"><span class="k">1</span>отражение в окне (390,330)<span class="k">2</span>наклейка на поручне (465,430)<span class="k">3</span>газета (620,690)<span class="k">4</span>перчатка (1420,590)<span class="k">5</span>капля на потолке (1660,230)</div></figcaption>
 </figure>
 
-<!-- 21 L4 -->
+<!-- 22 · L4 библиотека (был L2) -->
 <figure>
 <svg viewBox="0 0 1920 1080">
-  <rect x="0" y="0" width="1920" height="360" fill="#eef0ee"/>
-  <rect x="0" y="360" width="1920" height="330" fill="#d3e4f2"/>
-  <rect x="0" y="690" width="1920" height="40" fill="#5a5a5a"/>
-  <rect x="0" y="730" width="1920" height="350" fill="#d8d3c6"/>
-  <path d="M 340 470 A 45 45 0 0 1 420 470" stroke="#9fb8cc" stroke-width="6" fill="none"/>
-  <rect x="880" y="860" width="180" height="140" rx="14" fill="#8fb7dd" stroke="#39587a" stroke-width="4"/>
-  <ellipse cx="1000" cy="190" rx="34" ry="16" fill="#a8a29a"/>
-  <circle cx="1080" cy="170" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1080" y="182" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">1</text>
-  <polygon points="1400,485 1450,455 1450,485" fill="#e8c34d"/>
-  <circle cx="1510" cy="465" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1510" y="477" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">2</text>
-  <circle cx="580" cy="680" r="18" fill="#d9c7a8" stroke="#9a8560" stroke-width="3"/>
-  <circle cx="650" cy="660" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="650" y="672" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">3</text>
-  <rect x="1278" y="692" width="44" height="36" rx="8" fill="#8d8d99" stroke="#4c4c58" stroke-width="3"/>
-  <circle cx="1380" cy="710" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1380" y="722" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">4</text>
-  <circle cx="285" cy="765" r="9" fill="#9a9285"/><circle cx="315" cy="778" r="9" fill="#9a9285"/>
-  <circle cx="380" cy="772" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="380" y="784" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">5</text>
+  <rect x="0" y="0" width="1920" height="810" fill="#efe9dd"/>
+  <rect x="0" y="810" width="1920" height="270" fill="#ddd6c6"/>
+  <polygon points="960,0 760,520 1160,520" fill="#f7edc9" opacity="0.6"/>
+  <rect x="220" y="180" width="400" height="630" fill="#cfc9ba"/>
+  <rect x="1300" y="180" width="400" height="630" fill="#cfc9ba"/>
+  <rect x="870" y="640" width="180" height="90" fill="#bfb8a6"/>
+  <rect x="900" y="990" width="120" height="90" fill="#b8ad94"/>
+  <rect x="860" y="855" width="200" height="150" rx="14" fill="#e8b45a" stroke="#a8761d" stroke-width="4"/>
+  <circle cx="960" cy="350" r="26" fill="#f2df9a" stroke="#b3922e" stroke-width="3"/>
+  <circle cx="1030" cy="330" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1030" y="342" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">1</text>
+  <rect x="800" y="600" width="40" height="60" rx="6" fill="#8d6cae"/>
+  <circle cx="750" cy="570" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="750" y="582" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">2</text>
+  <rect x="915" y="595" width="70" height="50" rx="6" fill="#fff" stroke="#999" stroke-width="3"/>
+  <circle cx="905" cy="545" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="905" y="557" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">3</text>
+  <circle cx="1040" cy="600" r="22" fill="#b8d8a0" stroke="#6b9448" stroke-width="3"/>
+  <circle cx="1105" cy="575" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1105" y="587" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">4</text>
+  <circle cx="1275" cy="640" r="16" fill="none" stroke="#444" stroke-width="5"/>
+  <circle cx="1310" cy="640" r="16" fill="none" stroke="#444" stroke-width="5"/>
+  <circle cx="1380" cy="600" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
+  <text x="1380" y="612" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">5</text>
 </svg>
-<figcaption><div class="t">21 · Уровень 4 — Набережная (Питер)</div>
-<div class="d">Сосуд — ведёрко (960,930). Мысли: шаверма, вино, силуэт Шнурова, «где ты?» от мамы…</div>
-<div class="lg"><span class="k">1</span>чайка (1000,190)<span class="k">2</span>кораблик (1420,470)<span class="k">3</span>ракушка (580,680)<span class="k">4</span>морской конёк на решётке (1300,710)<span class="k">5</span>мокрые следы (300,770)</div></figcaption>
-</figure>
-
-<!-- 22 L5 -->
-<figure>
-<svg viewBox="0 0 1920 1080">
-  <rect x="0" y="0" width="1920" height="810" fill="#eceee6"/>
-  <rect x="0" y="810" width="1920" height="270" fill="#d9d2bf"/>
-  <rect x="440" y="280" width="620" height="420" rx="16" fill="#b9b2a2"/>
-  <rect x="470" y="310" width="560" height="330" fill="#77848e"/>
-  <rect x="1280" y="170" width="510" height="440" fill="#e3efdb" stroke="#b9c9ad" stroke-width="6"/>
-  <rect x="880" y="860" width="160" height="140" rx="14" fill="#e8b45a" stroke="#a8761d" stroke-width="4"/>
-  <rect x="878" y="398" width="44" height="44" fill="#f2df5a"/>
-  <circle cx="965" cy="380" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="965" y="392" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">1</text>
-  <ellipse cx="1530" cy="390" rx="45" ry="60" fill="#94bb72"/>
-  <circle cx="1615" cy="350" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1615" y="362" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">2</text>
-  <path d="M 110 750 q 20 -25 40 0 q -20 25 -40 0" stroke="#7a7a7a" stroke-width="6" fill="none"/>
-  <circle cx="200" cy="730" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="200" y="742" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">3</text>
-  <circle cx="480" cy="850" r="26" fill="#e69ab8"/>
-  <circle cx="550" cy="825" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="550" y="837" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">4</text>
-  <ellipse cx="1350" cy="980" rx="34" ry="16" fill="#a8a29a"/><ellipse cx="1415" cy="985" rx="34" ry="16" fill="#a8a29a"/>
-  <circle cx="1490" cy="955" r="28" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
-  <text x="1490" y="967" font-size="34" text-anchor="middle" fill="#1a7a5e" font-weight="bold">5</text>
-</svg>
-<figcaption><div class="t">22 · Уровень 5 — Офис</div>
-<div class="d">Сосуд — кружка на столе (960,930). Детали частично на столе (передний план) — мысли закрывают и его. Мысли: торт, пляж, сплетни, «поздравляем коллегу, не тебя»…</div>
-<div class="lg"><span class="k">1</span>стикер на мониторе (900,420)<span class="k">2</span>растение на подоконнике (1530,390)<span class="k">3</span>скрепка (130,760)<span class="k">4</span>игрушка-антистресс (480,850)<span class="k">5</span>тапки из-под стола (1380,980)</div></figcaption>
+<figcaption><div class="t">22 · Уровень 4 — Библиотека <s>Уровень 2</s> <span class="sup">перенумеровано дропом 4, 2026-08-07</span></div>
+<div class="d">Сосуд — тканевая сумка на стуле (960,930). Мысли уровня: босс, весы, 99+ уведомлений, будильник…</div>
+<div class="lg"><span class="k">1</span>луч света с пылинками (960,350)<span class="k">2</span>закладка-перо (820,630)<span class="k">3</span>раскрытая книга (950,620)<span class="k">4</span>засушенный цветок (1040,600)<span class="k">5</span>очки (1290,640)</div></figcaption>
 </figure>
 
 <h2>Арт всех уровней — канон (дроп 2026-08-07)</h2>
@@ -771,7 +785,7 @@
   <img src="арт/кнопки/button-tashi.png" style="max-width:38%" alt="ТАЩИ">
 </div>
 <figcaption><div class="t">Э6 · Кнопки-подсказки</div>
-<div class="d">НАЧАТЬ — на титуле. НАВОДИ · КРУТИ РУЧКУ · ТАЩИ — три бита обучения на первом уровне. <b>Не хватает четвёртой — «ТРЯСИ»</b>: бит «отгони мысль» остался без кнопки, до неё показываем стрелку на джойстик без текста.</div></figcaption>
+<div class="d">НАЧАТЬ — на титуле. НАВОДИ · КРУТИ РУЧКУ · ТАЩИ — три бита обучения на первом уровне. <b>Не хватает четвёртой</b>: бит «отгони мысль» остался без кнопки, до неё показываем стрелку <b>на пульт с датчиками</b> без текста. Слово на кнопке теперь про взмах над датчиком, а не про тряску джойстика (<s>«ТРЯСИ»</s>, <s>стрелку на джойстик</s> <span class="sup">убрано решением 2026-08-07</span>).</div></figcaption>
 </figure>
 
 <figure>
@@ -829,7 +843,7 @@
   <use href="#slots0"/>
   <circle cx="540" cy="76" r="30" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
   <text x="540" y="89" font-size="36" text-anchor="middle" fill="#1a7a5e" font-weight="bold">2</text>
-  <use href="#sun"/>
+
   <circle cx="1706" cy="100" r="30" fill="#fff" stroke="#1a7a5e" stroke-width="5"/>
   <text x="1706" y="113" font-size="36" text-anchor="middle" fill="#1a7a5e" font-weight="bold">3</text>
   <circle cx="140" cy="950" r="70" fill="#fff" stroke="#666" stroke-width="4"/>
@@ -839,7 +853,7 @@
 </svg>
 <figcaption><div class="t">24 · Зоны и координаты (единые для всех уровней)</div>
 <div class="d">Z-порядок: сцена → детали → нить → мысли → сосуд → HUD. Точные правила и числа — <code>SCREENS.md</code> и <code>MECHANICS.md</code>.</div>
-<div class="lg"><span class="k">1</span>сосуд 240×150, центр (960,930)<span class="k">2</span>HUD-слоты 5×72, от (60,40), шаг 88<span class="k">3</span>таймер-«солнце» (1800,100), r=60<span class="k">4</span>индикатор динамо (140,950), r=70<span class="k">5</span>зона сцены 0,0 · 1920×810<span class="k">6</span>передний план 0,810 · 1920×270</div></figcaption>
+<div class="lg"><span class="k">1</span>сосуд 240×150, центр (960,930)<span class="k">2</span>HUD-слоты 5×72, от (60,40), шаг 88<span class="k">3</span><s>таймер-«солнце» (1800,100), r=60</s> — убрано решением 2026-08-07, место в углу свободно<span class="k">4</span>индикатор динамо (140,950), r=70<span class="k">5</span>зона сцены 0,0 · 1920×810<span class="k">6</span>передний план 0,810 · 1920×270</div></figcaption>
 </figure>
 
 <p class="note">Мысли размером S 180×140 / M 280×220 / L 420×320, дрейф к центру [tune]; прочность = пипсы под мыслью. Все параметры с пометками [tune]/[toggle] крутятся в превью-сценках (MECHANICS.md §7).</p>
@@ -855,7 +869,7 @@
 <tr><td class="s">Карточка уровня 3</td><td><b>Уровень 3 · Метро</b> / …в карман пассажира…</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
 <tr><td class="s">Карточка уровня 4</td><td><b>Уровень 4 · Библиотека</b> / …в рюкзак…</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
 <tr><td class="s">Карточка уровня 5</td><td><b>Уровень 5 · Город</b> / …в дипломат…</td><td class="s">запечён в арт</td><td>2.5 с перед уровнем</td></tr>
-<tr><td class="s">Обучение, биты</td><td>картинки-кнопки: <b>НАВОДИ</b> → <b>КРУТИ РУЧКУ</b> → <b>ТАЩИ</b>; для «отгони мысль» кнопки нет — запрос дизайнеру</td><td class="s">арт/кнопки/</td><td>уровень 1, таймер стоит</td></tr>
+<tr><td class="s">Обучение, биты</td><td>картинки-кнопки: <b>НАВОДИ</b> → <b>КРУТИ РУЧКУ</b> → <b>ТАЩИ</b>; для «отгони мысль» кнопки нет — запрос дизайнеру</td><td class="s">арт/кнопки/</td><td>уровень 1; <s>таймер стоит</s> <span class="sup">убрано решением 2026-08-07</span></td></tr>
 <tr><td class="s">Победа уровня</td><td>Отлично! Ты был здесь и сейчас и заметил всё. Двигаемся дальше!</td><td class="s">запечён в арт</td><td>после беата «сосуд с деталями»</td></tr>
 <tr><td class="s">Поражение</td><td>Мысли захватили тебя, ты не заметил жизнь вокруг. Попробуй ещё раз!</td><td class="s">запечён в арт</td><td>до расчистки экрана кручением (или авто-ретрая)</td></tr>
 <tr><td class="s">Финал</td><td>Ура! Ты смог замечать эту жизнь в деталях, несмотря ни на что!</td><td class="s">запечён в арт</td><td>после уровня 5, до выхода в лаунчер</td></tr>

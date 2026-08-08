@@ -177,8 +177,11 @@ namespace Meditation.View
             _root.preserveAspect = true;
             Ui.Place(_root.rectTransform, 0f, 0f, 280f, 220f);
 
-            _pips = new PipRow(_root.transform, -14f, BackingColour);
+            _pips = new PipRow(_root.transform, PipRowOffsetY, BackingColour);
         }
+
+        /// <summary>How far below the blob's own bottom edge the row of pips hangs, design px.</summary>
+        public const float PipRowOffsetY = -14f;
 
         public RectTransform Rect => _root.rectTransform;
 
@@ -343,6 +346,23 @@ namespace Meditation.View
 
         /// <summary>Below this much of the blob in frame the pips are noise, not a readout.</summary>
         public const float MinVisibleShareForPips = 0.35f;
+
+        /// <summary>
+        /// The lowest design-space Y this thought PAINTS — the blob's bottom edge or, lower down, the
+        /// bottom of the disc under the last row of pips.
+        ///
+        /// A thought is not its rectangle: the pips hang BELOW the blob, on their own light discs, and
+        /// the отгон arrow measured its clearance from the rectangle alone — so on frame 05 the arrow
+        /// grew straight out of the cat's pips with no air at all (design gate, 2026-08-08). The row is
+        /// counted in whether or not it happens to be shown at this instant, so the arrow does not jump
+        /// when a drifting blob crosses <see cref="MinVisibleShareForPips"/>.
+        /// </summary>
+        public static float DrawnBottomY(Vector2 centre, Vector2 size)
+        {
+            float blob = centre.y + size.y * 0.5f;
+            float row = Mathf.Clamp(blob - PipRowOffsetY, PipMargin, ThoughtField.ScreenHeight - PipMargin);
+            return Mathf.Max(blob, row + PipRow.DrawnRadius);
+        }
 
         private const float PipMargin = 26f;
         private const float PipSideMargin = 180f;

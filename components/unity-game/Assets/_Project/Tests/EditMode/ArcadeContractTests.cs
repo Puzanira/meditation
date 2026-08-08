@@ -55,6 +55,37 @@ namespace Meditation.Tests
                 "Raw input in gameplay code (use ArcadeInput): " + string.Join(", ", offenders));
         }
 
+        /// <summary>
+        /// Done contract §5 of the sensors increment: the отгон is read from the cabinet's height
+        /// sensors THROUGH the package facade, and from nowhere else.
+        ///
+        /// The scanner above cannot see this: reading a keyboard directly would be caught, but so
+        /// would nothing at all — a detector fed a made-up number, or one still fed the joystick,
+        /// passes it perfectly. So the two places that pump the loop (the game's flow and the stand's
+        /// scenette skeleton) are named here, and each has to be reading both sensors off ArcadeInput.
+        /// </summary>
+        [Test]
+        public void TheOtgon_IsReadFromTheHeightSensors_ThroughArcadeInput()
+        {
+            string root = Path.Combine(Application.dataPath, "_Project", "Scripts");
+            string[] pumps =
+            {
+                Path.Combine(root, "Game", "GameFlow.cs"),
+                Path.Combine(root, "Stand", "PreviewSceneController.cs")
+            };
+
+            foreach (string file in pumps)
+            {
+                Assert.IsTrue(File.Exists(file), file + " — где-то тут игра качает ввод, файла нет.");
+                string text = CodeOf(file);
+
+                StringAssert.Contains("ArcadeInput.HeightA.Value", text,
+                    Path.GetFileName(file) + ": отгон обязан читать датчик A через ArcadeInput.");
+                StringAssert.Contains("ArcadeInput.HeightB.Value", text,
+                    Path.GetFileName(file) + ": отгон обязан читать датчик B через ArcadeInput.");
+            }
+        }
+
         [Test]
         public void GameplayCode_DoesNotQuitTheApplication()
         {

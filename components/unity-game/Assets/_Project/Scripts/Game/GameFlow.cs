@@ -36,7 +36,7 @@ namespace Meditation.Game
         public const float FadeSeconds = 0.3f;
 
         private readonly CrankSpeedMeter _crankMeter = new CrankSpeedMeter();
-        private readonly ShakeDetector _shake = new ShakeDetector();
+        private readonly SwipeDetector _swipe = new SwipeDetector();
 
         private GameScreen _screen;
         private Image _fade;
@@ -115,9 +115,11 @@ namespace Meditation.Game
         {
             float deltaTime = Time.deltaTime;
 
+            // Three controllers, one line each (founder, 2026-08-07): the crank drags, the joystick
+            // ONLY aims, and the two height sensors are the отгон.
             float crankSpeed = _crankMeter.Tick(ArcadeInput.Crank.DeltaDegrees, deltaTime);
             Vector2 stick = ArcadeInput.Joystick.Vector;
-            _shake.Tick(stick, deltaTime);
+            _swipe.Tick(ArcadeInput.HeightA.Value, ArcadeInput.HeightB.Value, deltaTime);
 
             var hands = new Hands(
                 crankSpeed,
@@ -125,7 +127,7 @@ namespace Meditation.Game
                 ArcadeInput.Crank.DeltaDegrees,
                 ArcadeInput.Crank.TotalDegrees,
                 stick,
-                _shake.HitsThisTick);
+                _swipe.HitsThisTick);
 
             TickFade(deltaTime);
             _screen?.Advance(deltaTime, hands);
@@ -196,6 +198,11 @@ namespace Meditation.Game
             switch (phase)
             {
                 case GamePhase.Title:
+                    // The title IS the end of a run: whatever the last player learned goes with them.
+                    // Cleared here rather than in StartRun because every way back to the title is a
+                    // new run — the finale, «в меню», and the launcher's fallback all pass through
+                    // this line, and only one of them goes on to call StartRun.
+                    TutorialAlreadyGiven = false;
                     _screen = new TitleScreen(this);
                     break;
                 case GamePhase.LevelCard:
@@ -216,6 +223,21 @@ namespace Meditation.Game
         }
 
         // ---- what the screens ask for ---------------------------------------------------------------
+
+        /// <summary>
+        /// Has level 1 already opened in THIS run? Then it does not teach again — «обучение не
+        /// повторяется после поражения» (founder, 2026-08-07).
+        ///
+        /// It lives on the flow because a level screen cannot remember anything: every attempt builds
+        /// a new one, which is exactly what made the tutorial replay. And it is per RUN rather than
+        /// per session, because the cabinet hands the same process to one stranger after another —
+        /// a flag that survived <see cref="StartRun"/> would show the second player a game that
+        /// silently assumes they watched the first one's tutorial.
+        /// </summary>
+        public bool TutorialAlreadyGiven { get; private set; }
+
+        /// <summary>Level 1 has opened: from here on this run goes straight into play.</summary>
+        public void NoteTutorialGiven() => TutorialAlreadyGiven = true;
 
         /// <summary>Two turns of the dynamo on the title: the run begins at level 1.</summary>
         public void StartRun() => Go(GamePhase.LevelCard, 0);

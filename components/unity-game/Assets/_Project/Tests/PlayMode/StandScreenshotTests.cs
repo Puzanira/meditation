@@ -121,7 +121,7 @@ namespace Meditation.Tests
         public IEnumerator Scenette2_DamagedPipsAndTheStrongBlob()
         {
             TuningConfig.HitDecayEnabled = false;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             TuningConfig.WaveIntervalSeconds = 20f;
 
             yield return StandTestHarness.LoadScene(PreviewScenes.ShakeAway);
@@ -141,10 +141,7 @@ namespace Meditation.Tests
             float deadline = Time.time + 5f;
             while (Time.time < deadline && !damaged)
             {
-                fake.Next = new BackendSnapshot
-                {
-                    Joystick = new Vector2(Time.frameCount % 2 == 0 ? 1f : -1f, 0f)
-                };
+                fake.Next = new BackendSnapshot { HeightA = Time.frameCount % 2 == 0 ? 1f : 0f };
                 yield return null;
 
                 for (int i = 0; i < scene.Field.Thoughts.Count; i++)
@@ -187,7 +184,7 @@ namespace Meditation.Tests
                 fake.Next = new BackendSnapshot
                 {
                     CrankDeltaDegrees = CrankPerFrame,
-                    Joystick = new Vector2(Time.frameCount % 2 == 0 ? 1f : -1f, 0f)
+                    HeightA = Time.frameCount % 2 == 0 ? 1f : 0f
                 };
                 yield return null;
             }
@@ -233,36 +230,39 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
-        // ---- 8–10 · scenette 4: timer running down, victory, defeat ---------------------------
+        // ---- 8–10 · scenette 4: a level under way, victory, defeat ----------------------------
 
         [UnityTest]
-        public IEnumerator Scenette4_TimerVictoryAndDefeat()
+        public IEnumerator Scenette4_UnderWayVictoryAndDefeat()
         {
             TuningConfig.Notice = NoticeMode.FixedOrder;
             TuningConfig.GraceMs = 800f;
             TuningConfig.WaveIntervalSeconds = 2f;
             TuningConfig.BreatherEnabled = false;
 
-            // Short level + slow collecting: the dial has to visibly drain BEFORE anything is won,
-            // otherwise a victory restarts the timer and the shot never catches it moving.
-            TuningConfig.LevelSeconds = 12f;
+            // Slow collecting, so the first frame catches the loop MID-HAUL: a detail on its thread
+            // with thoughts already on screen. The frame used to be «таймер на убыли», and there is no
+            // timer to be on the wane any more (founder, 2026-08-07) — what it shows now is the state
+            // the level actually spends its time in.
             TuningConfig.CollectSeconds = 8f;
 
             yield return StandTestHarness.LoadScene(PreviewScenes.FullLevel);
             FakeBackend fake = StandTestHarness.TakeOverInput();
             var scene = Object.FindAnyObjectByType<Scene4FullLevel>();
 
-            // 8 · the sun dial has visibly wound down while a detail is being dragged in.
+            // 8 · a detail on its thread with a wave already on screen.
             float deadline = Time.time + 20f;
-            while (Time.time < deadline && scene.Rules.TimeLeft01 > 0.7f)
+            while (Time.time < deadline &&
+                   (scene.Runtime.Field.Thoughts.Count < 2 || scene.Runtime.DisplayProgress < 0.2f))
             {
                 fake.Next = new BackendSnapshot { CrankDeltaDegrees = CrankPerFrame };
                 yield return null;
             }
 
-            Assert.Less(scene.Rules.TimeLeft01, 0.8f, "The timer did not run down.");
+            Assert.GreaterOrEqual(scene.Runtime.Field.Thoughts.Count, 2, "Волны так и не пошли.");
+            Assert.Greater(scene.Runtime.DisplayProgress, 0.15f, "Деталь так и не поехала.");
             Assert.AreEqual(LevelOutcome.Playing, scene.Rules.Outcome, "The level ended too early.");
-            Shoot("Frame08_Scene4_timer_running");
+            Shoot("Frame08_Scene4_under_way");
 
             // 9 · frame 18: all five details in the vessel, every HUD slot filled.
             TuningConfig.CollectSeconds = TestOnlyFastCollectSeconds;

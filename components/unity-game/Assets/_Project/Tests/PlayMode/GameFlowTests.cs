@@ -264,10 +264,149 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        /// <summary>
+        /// …and since 2026-08-07 that bar is on EVERY level (founder), not only on the metro's baked
+        /// bag. Same widget, same numbers — so this is the level-3 case above run across all five,
+        /// asked of the picture rather than of the catalogue.
+        ///
+        /// The library is the level that made the clamp necessary: its backpack's own lower edge is
+        /// nine pixels past the frame, so «под сосудом» taken literally would draw the bar off screen
+        /// on exactly the level with the most details to keep track of.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheVesselBar_IsDrawnAndFills_OnEveryLevel([Values(0, 1, 2, 3, 4)] int levelIndex)
+        {
+            TuningConfig.Notice = NoticeMode.FixedOrder;
+            TuningConfig.CollectSeconds = TestOnlyFastCollectSeconds;
+
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, levelIndex);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            DesignStage stage = StandTestHarness.Stage();
+            string where = "уровень " + screen.Level.Number + " («" + screen.Level.Title + "»)";
+
+            Assert.IsNotNull(screen.View.VesselFillLevel, where + ": нет полосы наполнения.");
+            StandTestHarness.AssertVisible(StandTestHarness.Find(stage, "VesselFillTrack"),
+                where + " · полоса наполнения");
+
+            Rect bar = stage.DesignRectOf(StandTestHarness.Find(stage, "VesselFillTrack"));
+            Assert.AreEqual(screen.Level.VesselCentre.x, bar.center.x, 20f,
+                where + ": полоса не под сосудом по X.");
+            Assert.LessOrEqual(bar.yMax, DesignStage.DesignHeight,
+                where + ": полоса ушла за нижний край кадра.");
+            Assert.Greater(bar.yMin, screen.Level.VesselCentre.y,
+                where + ": полоса обязана быть ПОД серединой сосуда.");
+
+            float empty = screen.View.VesselFillLevel.rectTransform.rect.width;
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            Assert.Greater(screen.View.VesselFillLevel.rectTransform.rect.width, empty,
+                where + ": полоса не подросла после первой детали.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// The aim's radius is a [tune] now, and it is one number: the circle the player SEES and the
+        /// circle the rules HIT-TEST against.
+        ///
+        /// Two numbers is the failure this forbids. It would have been the natural shape — a constant
+        /// in <see cref="GazeSelector"/> and a slider in the view — and it would have made «крупнее»
+        /// a lie the founder could not see: a bigger drawing over an unchanged hit test aims worse
+        /// than the small one did, because what it circles is no longer what it selects.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheAimsRadius_MovesTheDrawnCircleAndTheHitTestTogether()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 1);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            DesignStage stage = StandTestHarness.Stage();
+            yield return GameTestHarness.Until(() => screen.Stage == LevelStage.Play, "уровень пошёл");
+
+            Assert.AreEqual(TuningConfig.GazeRadiusPx, GazeSelector.Radius, 1e-3f,
+                "Правила меряют не тот радиус, что стоит на панели.");
+            Assert.Greater(TuningConfig.GazeRadiusPx, GazeSelector.ScreensRadius,
+                "Круг взгляда обязан быть КРУПНЕЕ прежних 90 px (решение founder 2026-08-07).");
+
+            screen.View.SetGaze(new Vector2(960f, 400f), 0f, true);
+            yield return GameTestHarness.Frames(2);
+            float small = stage.DesignRectOf(screen.View.Gaze.rectTransform).width;
+
+            TuningConfig.GazeRadiusPx = 200f;
+            screen.View.SetGaze(new Vector2(960f, 400f), 0f, true);
+            yield return GameTestHarness.Frames(2);
+            float big = stage.DesignRectOf(screen.View.Gaze.rectTransform).width;
+
+            Assert.Greater(big, small + 40f, "Слайдер радиуса не двигает нарисованный круг.");
+            Assert.AreEqual(200f, GazeSelector.Radius, 1e-3f, "…и не двигает попадание.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // ---- три контроллера: динамо тянет, стик целится, датчики отгоняют ---------------------------
+
+        /// <summary>
+        /// Done contract §4 of the sensors increment: the joystick lands no hits in ANY mode of
+        /// choosing a detail — and the отгон answers the sensors in all three.
+        ///
+        /// Both halves in one test on purpose. «Стик больше не бьёт» proved alone would also pass if
+        /// the отгон were broken outright, and that is exactly the failure a rewrite of the detector
+        /// invites; so the same screen, the same thoughts and the same patience are given first to the
+        /// stick and then to a hand over the sensor, and the two answers have to differ.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheJoystick_LandsNoHits_InAnyNoticeMode_ButTheSensorsDo(
+            [Values(NoticeMode.FixedOrder, NoticeMode.GazeJoystick, NoticeMode.AutoNearest)] NoticeMode mode)
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+
+            // Level 2: no tutorial beats in the way, so the claim is about the loop itself. The knobs
+            // are set AFTER the level opens — entering one copies its own band over the live values.
+            yield return GameTestHarness.EnterLevel(fake, 1);
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
+            TuningConfig.HitDecayEnabled = false;
+            TuningConfig.Notice = mode;
+            yield return GameTestHarness.Until(() => screen.Runtime.Field.Thoughts.Count > 0,
+                "первая волна пришла");
+
+            Thought target = screen.Runtime.Field.Thoughts[0];
+            int pipsBefore = target.HitsRemaining;
+            int liveBefore = screen.Runtime.Field.Thoughts.Count;
+
+            // Two seconds of the stick being slammed from stop to stop — the old отгон, verbatim.
+            float end = Time.realtimeSinceStartup + 2f;
+            bool right = true;
+            while (Time.realtimeSinceStartup < end)
+            {
+                fake.Next = new BackendSnapshot { Joystick = new Vector2(right ? 1f : -1f, 0f) };
+                right = !right;
+                yield return null;
+            }
+
+            Assert.AreEqual(pipsBefore, target.HitsRemaining,
+                mode + ": джойстик выбил пипсы — тряска обязана уйти со стика полностью.");
+            Assert.GreaterOrEqual(screen.Runtime.Field.Thoughts.Count, liveBefore,
+                mode + ": мыслей стало меньше, пока играл только стик.");
+
+            // …and the sensor, on the very same thought, does what the stick no longer can.
+            yield return GameTestHarness.SwipeUntil(fake,
+                () => target.HitsRemaining < pipsBefore,
+                mode + ": взмах над датчиком обязан отбивать мысль");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
         // ---- the level-1 tutorial (done contract §4) -------------------------------------------------
 
         [UnityTest]
-        public IEnumerator Tutorial_TeachesAim_ThenCrank_ThenShake_HoldingTheWavesAndTheClock()
+        public IEnumerator Tutorial_TeachesAim_ThenCrank_ThenSwipe_HoldingTheWaves()
         {
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
@@ -280,12 +419,9 @@ namespace Meditation.Tests
             Assert.AreEqual(TutorialBeat.Aim, screen.Beat, "Обучение обязано начинаться с «НАВОДИ».");
             Assert.AreEqual(-1, screen.Runtime.NoticedIndex,
                 "Первый бит просит НАВЕСТИСЬ — замечать деталь за игрока нельзя.");
-            Assert.IsFalse(screen.TimerRunning, "Таймер в обучении обязан стоять [toggle].");
             AssertHintIs(screen, ArtScreens.ButtonAim, "НАВОДИ");
 
-            float clockAtStart = screen.Rules.TimeLeft;
             yield return GameTestHarness.Idle(fake, 30);
-            Assert.AreEqual(clockAtStart, screen.Rules.TimeLeft, 1e-3f, "Таймер шёл во время обучения.");
             Assert.AreEqual(0, screen.Runtime.Field.Thoughts.Count,
                 "До отбитой мысли волны спавниться не должны.");
 
@@ -297,34 +433,32 @@ namespace Meditation.Tests
             Assert.IsTrue(screen.View.SecondHint.IsShown, "Рядом с едущей деталью нет кнопки «ТАЩИ».");
             Assert.AreEqual(ArtLibrary.Get(ArtScreens.ButtonDrag), screen.View.SecondHint.Button.sprite,
                 "Вторая кнопка бита — не «ТАЩИ».");
-            Assert.IsFalse(screen.TimerRunning, "Таймер обязан стоять и на втором бите.");
 
             // Beat 3: the first detail lands, one thought appears ON the next one, and the beat has no
-            // button at all — the drop ships no «ТРЯСИ», so it is an arrow at the joystick.
+            // button at all — the drop ships no «ТРЯСИ», so it is an arrow at the sensors.
             yield return GameTestHarness.CollectOneDetail(fake, screen);
-            Assert.AreEqual(TutorialBeat.Shake, screen.Beat, "После первой детали должен идти бит отгона.");
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "После первой детали должен идти бит отгона.");
             Assert.AreEqual(1, screen.Runtime.Field.Thoughts.Count, "Должна быть ровно одна мысль.");
             Assert.IsFalse(screen.View.Hint.Button.gameObject.activeSelf,
                 "Кнопки «ТРЯСИ» в дропе нет — на этом бите текста быть не должно.");
             Assert.IsTrue(screen.View.Hint.IsShown, "Бит отгона обязан показывать хотя бы стрелку.");
-            Assert.IsFalse(screen.TimerRunning, "Таймер обязан стоять и на бите отгона.");
 
-            int covered = screen.ShakeBeatDetailIndex;
+            int covered = screen.SwipeBeatDetailIndex;
             Assert.GreaterOrEqual(covered, 0, "Мысль обучения села не на деталь.");
             Assert.IsTrue(screen.Runtime.Field.IsCovered(screen.Level.Details[covered].Home),
                 "Мысль обучения не накрывает деталь, сбор которой должна блокировать.");
 
-            // Beaten off — the clock starts and the tutorial is over (SCREENS §Обучение п.4).
-            yield return GameTestHarness.ShakeUntil(fake,
+            // Beaten off — the waves start and the tutorial is over (SCREENS §Обучение п.4; the clock
+            // that used to start here went out with the timer, 2026-08-07).
+            yield return GameTestHarness.SwipeUntil(fake,
                 () => screen.Runtime.Field.Thoughts.Count == 0, "мысль отбита");
             yield return GameTestHarness.Frames(3);
 
             Assert.AreEqual(TutorialBeat.Done, screen.Beat);
             Assert.IsFalse(screen.View.Hint.IsShown, "Обучение кончилось — подсказок быть не должно.");
-            Assert.IsTrue(screen.TimerRunning, "После отбитой мысли таймер обязан пойти.");
 
-            yield return GameTestHarness.Idle(fake, 30);
-            Assert.Less(screen.Rules.TimeLeft, clockAtStart, "Таймер так и не пошёл.");
+            yield return GameTestHarness.Until(() => screen.Runtime.Field.Thoughts.Count > 0,
+                "волны пошли после обучения");
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -338,7 +472,7 @@ namespace Meditation.Tests
         /// The instant half is the one that can be got wrong quietly. If the burst were animated by
         /// keeping the thought in <see cref="ThoughtField"/> for a fifth of a second, then for that
         /// fifth of a second a dead thought would still cover the detail under it, still soak up the
-        /// next shake, and still be counted into «мыслей на экране» that the chaos layer's volume is
+        /// next hit, and still be counted into «мыслей на экране» that the chaos layer's volume is
         /// mixed from — a fifth of a second of the player fighting a picture. So the field is asked
         /// here, in the same frame as the hit and before anything is drawn.
         /// </summary>
@@ -348,7 +482,7 @@ namespace Meditation.Tests
             // The counter must not decay under the test while the thought is walked to its last pip,
             // and the hits have to land on the one thought that is there.
             TuningConfig.HitDecayEnabled = false;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
 
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
@@ -360,7 +494,7 @@ namespace Meditation.Tests
             yield return GameTestHarness.Idle(fake, 4);
 
             ThoughtField field = screen.Runtime.Field;
-            Assert.AreEqual(TutorialBeat.Shake, screen.Beat, "Бит отгона не начался.");
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "Бит отгона не начался.");
             Assert.AreEqual(1, field.Thoughts.Count, "Для этой проверки нужна ровно одна мысль.");
 
             Thought thought = field.Thoughts[0];
@@ -386,9 +520,9 @@ namespace Meditation.Tests
             Assert.AreEqual(0, screen.Audio.ThoughtCount,
                 "Громкость слоя хаоса считается по живым мыслям — лопнувшая в счёт не идёт.");
 
-            // …and the next shake has nothing to hit: the burst is a picture, not a target.
+            // …and the next hit has nothing to land on: the burst is a picture, not a target.
             field.ApplyHits(1, Vector2.zero);
-            Assert.AreEqual(0, field.Thoughts.Count, "Тряска обязана проходить сквозь разрыв.");
+            Assert.AreEqual(0, field.Thoughts.Count, "Отгон обязан проходить сквозь разрыв.");
 
             // The picture, meanwhile, is still on the screen and going out.
             yield return null;
@@ -457,7 +591,7 @@ namespace Meditation.Tests
             var field = new ThoughtField(4242)
             {
                 Labels = level.ThoughtSprites,
-                ArtSizer = t => ArtLibrary.FitThought(t.Label, t.Strength)
+                ArtFitter = ArtLibrary.FitThought
             };
 
             try
@@ -559,8 +693,8 @@ namespace Meditation.Tests
                 "Плашка «" + what + "» накрыла ряд слотов.");
             Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.CrankRectOf(level)),
                 "Плашка «" + what + "» накрыла индикатор динамо.");
-            Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.SunRectOf(level)),
-                "Плашка «" + what + "» накрыла таймер-солнце.");
+            Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.VesselBarRectOf(level)),
+                "Плашка «" + what + "» накрыла полосу наполнения сосуда.");
         }
 
         /// <summary>
@@ -621,14 +755,20 @@ namespace Meditation.Tests
         private const float MaxDragHintReach = 420f;
 
         /// <summary>
-        /// The shake beat's arrow: turquoise, starting OUTSIDE the thought, and short.
+        /// The отгон beat's arrow: turquoise, clear of everything the thought PAINTS, running down the
+        /// frame and ending on the sensor panel — at the SAME point every time it is drawn.
         ///
-        /// All three were the greybox era showing through — a brick-red 1047 px line from the middle of
-        /// the drawn thought to the bottom edge of the frame, crossing the art out on its way to a piece
-        /// of empty asphalt (design gate, 2026-08-07).
+        /// Every clause of that is a finding. The stroke was a brick-red 1047 px line from the middle of
+        /// the drawn thought, crossing the art out (gate, 2026-08-07). The 240 px stroke that replaced it
+        /// answered the crossing-out and bought two new problems (gate, 2026-08-08): it measured its
+        /// clearance off the blob's RECTANGLE while the pips hang below that rectangle, so on level 1 it
+        /// grew straight out of them with no air at all; and it took both its length and its X off the
+        /// thought, so the beat's only hint ended in empty sky at a different place every run. The tip is
+        /// now fixed on the panel the gesture names, and it is the TAIL that the thought and the swing
+        /// move.
         /// </summary>
         [UnityTest]
-        public IEnumerator TheShakeArrow_StartsOffTheThought_IsShort_AndIsTheDropsTurquoise()
+        public IEnumerator TheSwipeArrow_ClearsTheWholeThought_AndAlwaysLandsOnTheSensorPanel()
         {
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
@@ -639,7 +779,7 @@ namespace Meditation.Tests
             yield return GameTestHarness.CollectOneDetail(fake, screen);
             yield return GameTestHarness.Idle(fake, 4);
 
-            Assert.AreEqual(TutorialBeat.Shake, screen.Beat, "Бит отгона не начался.");
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "Бит отгона не начался.");
             Assert.AreEqual(1, screen.Runtime.Field.Thoughts.Count);
             Thought thought = screen.Runtime.Field.Thoughts[0];
 
@@ -647,22 +787,42 @@ namespace Meditation.Tests
             Assert.IsTrue(arrow.IsShown, "Стрелка отгона не нарисована.");
             StandTestHarness.AssertVisible(arrow.FirstSegment, "Стрелка отгона");
 
-            float length = Vector2.Distance(arrow.From, arrow.To);
-            Assert.Less(length, MaxShakeArrowLength,
-                "Стрелка отгона всё ещё режет кадр насквозь: " + length.ToString("0") + " px.");
-            Assert.GreaterOrEqual(arrow.From.y, thought.Rect.yMax,
-                "Хвост стрелки начинается внутри мысли — арт нельзя перечёркивать.");
-            Assert.Greater(arrow.To.y, arrow.From.y, "Стрелка идёт вверх, а джойстик снизу.");
+            // …the tail is clear of the DRAWING, pips and their discs included.
+            float painted = ArtThoughtView.DrawnBottomY(thought.Position, thought.Size);
+            Assert.GreaterOrEqual(arrow.From.y, painted + MinSwipeArrowClearance,
+                "Хвост стрелки прижат к нарисованному низу мысли (" + arrow.From.y.ToString("0") +
+                " против " + painted.ToString("0") + "): пипсы с подложками рисуются НИЖЕ прямоугольника.");
 
-            Color ink = HintCard.ToneColour(HintTone.Shake);
+            // …the tip is on the panel, at the bottom edge of the frame.
+            Assert.AreEqual(LevelScreen.SensorsCue.x, arrow.To.x, 0.5f,
+                "Остриё уехало с середины нижней кромки — жест перестал называть одно и то же место.");
+            Assert.GreaterOrEqual(arrow.To.y, DesignStage.DesignHeight - MaxSwipeArrowTipGap,
+                "Остриё обрывается в небе: панель с датчиками физически внизу кадра.");
+            Assert.Greater(arrow.To.y, arrow.From.y, "Стрелка идёт вверх, а пульт с датчиками снизу.");
+
+            // …and it is the same point a moment later, when the thought has drifted and the swing has
+            // moved on: a name has to be the same word twice.
+            Vector2 tip = arrow.To;
+            Vector2 tail = arrow.From;
+            fake.Next = new BackendSnapshot();
+            yield return GameTestHarness.Until(() => Vector2.Distance(tail, arrow.From) > 2f,
+                "хвост стрелки качнулся");
+
+            Assert.AreEqual(tip.x, arrow.To.x, 0.5f, "Остриё поехало за мыслью по X.");
+            Assert.AreEqual(tip.y, arrow.To.y, 0.5f, "Остриё поехало за мыслью по Y.");
+
+            Color ink = HintCard.ToneColour(HintTone.Swipe);
             Assert.Greater(ink.b, ink.r + 0.2f, "Цвет отгона не бирюзовый — это снова кирпич грейбокса.");
             Assert.Greater(ink.g, ink.r + 0.2f, "Цвет отгона не бирюзово-зелёный.");
 
             LogAssert.NoUnexpectedReceived();
         }
 
-        /// <summary>The gesture is a stroke, not a line across the frame — design px.</summary>
-        private const float MaxShakeArrowLength = 340f;
+        /// <summary>Air the tail owes the thought's own drawing, design px — less is «растёт из пипсов».</summary>
+        private const float MinSwipeArrowClearance = 8f;
+
+        /// <summary>How far short of the bottom edge the tip may stop, design px.</summary>
+        private const float MaxSwipeArrowTipGap = 60f;
 
         /// <summary>The hint has no text any more, so «which hint» is a question about WHICH PICTURE.</summary>
         private static void AssertHintIs(LevelScreen screen, string buttonKey, string what)
@@ -675,13 +835,13 @@ namespace Meditation.Tests
 
         /// <summary>
         /// SCREENS «Обучение», beat 3: «сбор заблокирован её появлением поверх следующей детали». Not
-        /// «slowed», not «the next detail is skipped» — nothing is collected until the cat is shaken
+        /// «slowed», not «the next detail is skipped» — nothing is collected until the cat is beaten
         /// off. The block used to be a hope: the fixed order picked the covered detail anyway and the
         /// gaze looked straight through the blob, so the crank alone finished the level while the beat
         /// was still asking for the joystick.
         /// </summary>
         [UnityTest]
-        public IEnumerator TheShakeBeat_BlocksCollecting_UntilTheThoughtIsShakenOff()
+        public IEnumerator TheSwipeBeat_BlocksCollecting_UntilTheThoughtIsBeatenOff()
         {
             TuningConfig.CollectSeconds = TestOnlyFastCollectSeconds;
 
@@ -692,7 +852,7 @@ namespace Meditation.Tests
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
 
             yield return GameTestHarness.CollectOneDetail(fake, screen);
-            Assert.AreEqual(TutorialBeat.Shake, screen.Beat, "После первой детали должен идти бит отгона.");
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "После первой детали должен идти бит отгона.");
             Assert.IsTrue(screen.CollectionBlockedByTutorial, "Мысль над деталью обязана блокировать сбор.");
 
             int collected = screen.Runtime.CollectedCount;
@@ -708,8 +868,8 @@ namespace Meditation.Tests
             Assert.AreEqual(-1, screen.Runtime.NoticedIndex, "Деталь под мыслью замечать нельзя.");
             Assert.AreEqual(1, screen.Runtime.Field.Thoughts.Count, "Мысль обучения обязана быть на месте.");
 
-            // Shaken off — and the same hand, doing the same thing, now works.
-            yield return GameTestHarness.ShakeUntil(fake,
+            // Beaten off — and the same hand, doing the same thing, now works.
+            yield return GameTestHarness.SwipeUntil(fake,
                 () => screen.Runtime.Field.Thoughts.Count == 0, "мысль отбита");
             yield return GameTestHarness.Frames(3);
             Assert.IsFalse(screen.CollectionBlockedByTutorial, "Мысль отбита — блок обязан сняться.");
@@ -721,21 +881,69 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        /// <summary>
+        /// «Обучение не повторяется после поражения» (founder, 2026-08-07): the FIRST run through
+        /// level 1 teaches; the attempt after a defeat goes straight into play — no beats, no обзор.
+        ///
+        /// Played through the real flow rather than by poking a flag, because the flag is the whole
+        /// point: a LevelScreen is rebuilt for every attempt and can remember nothing, so what is under
+        /// test is that the memory lives one level up and survives the card in between.
+        /// </summary>
         [UnityTest]
-        public IEnumerator TheTutorialTimerToggle_LetsTheClockRunFromTheStart()
+        public IEnumerator TheTutorial_DoesNotComeBack_OnTheAttemptAfterADefeat()
         {
-            TuningConfig.TutorialTimerPaused = false;
+            TuningConfig.AutoRetry = true;
 
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
             yield return GameTestHarness.EnterLevel(fake, 0);
 
-            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
-            Assert.IsTrue(screen.TimerRunning, "С выключенным тогглером таймер идёт с самого начала.");
+            var first = (LevelScreen)GameTestHarness.Flow().Screen;
+            Assert.IsTrue(first.Teaches, "Первый заход на первый уровень обязан учить.");
+            Assert.AreEqual(TutorialBeat.Aim, first.Beat);
+            Assert.IsFalse(first.SkipsTheIntro, "Первый заход обязан открываться обзором.");
 
-            float before = screen.Rules.TimeLeft;
-            yield return GameTestHarness.Idle(fake, 30);
-            Assert.Less(screen.Rules.TimeLeft, before, "Таймер обязан убывать.");
+            // Lose it, and let the flow take the level's own card and come back.
+            GameTestHarness.BuryTheScreen(first);
+            yield return GameTestHarness.Until(() => first.Stage == LevelStage.Lose, "поражение");
+            yield return GameTestHarness.Until(
+                () => GameTestHarness.Flow().Phase == GamePhase.Level &&
+                      GameTestHarness.Flow().Screen != first, "первый уровень заново");
+
+            var again = (LevelScreen)GameTestHarness.Flow().Screen;
+            Assert.AreEqual(0, GameTestHarness.Flow().LevelIndex, "Рестарт обязан быть того же уровня.");
+            Assert.IsFalse(again.Teaches, "Обучение повторилось после поражения.");
+            Assert.AreEqual(TutorialBeat.Done, again.Beat, "Биты обучения обязаны быть пропущены.");
+            Assert.IsTrue(again.SkipsTheIntro);
+            Assert.AreEqual(LevelStage.Play, again.Stage, "Рестарт обязан начинаться СРАЗУ в игре.");
+            Assert.IsFalse(again.View.Hint.IsShown, "На рестарте подсказок быть не должно.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// …and a NEW run gets it back. The cabinet hands one process to one stranger after another,
+        /// so a flag that outlived the run would show the second player a game that assumes they
+        /// watched the first player's tutorial.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheTutorial_ComesBackForANewRun()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            Assert.IsTrue(((LevelScreen)GameTestHarness.Flow().Screen).Teaches);
+
+            GameFlow flow = GameTestHarness.Flow();
+            flow.ExitToLauncher();                          // back to the title (editor fallback)
+            yield return GameTestHarness.Until(() => flow.Phase == GamePhase.Title, "титул");
+
+            yield return GameTestHarness.EnterLevel(fake, 0);
+            Assert.IsTrue(((LevelScreen)GameTestHarness.Flow().Screen).Teaches,
+                "Новый прогон обязан снова учить — иначе второй игрок у автомата начинает вслепую.");
+
+            LogAssert.NoUnexpectedReceived();
         }
 
         [UnityTest]
@@ -747,7 +955,7 @@ namespace Meditation.Tests
 
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
             Assert.AreEqual(TutorialBeat.Done, screen.Beat, "Обучение — только на первом уровне.");
-            Assert.IsTrue(screen.TimerRunning, "Без обучения таймер идёт сразу.");
+            Assert.IsFalse(screen.SkipsTheIntro, "Обзор пропускается только на рестарте первого уровня.");
             Assert.IsFalse(screen.View.Hint.IsShown,
                 "Уровень " + (levelIndex + 1) + ": карточек обучения быть не должно.");
         }
@@ -957,7 +1165,7 @@ namespace Meditation.Tests
         // ---- the intro state (SCREENS S3) ------------------------------------------------------------
 
         [UnityTest]
-        public IEnumerator ALevelOpensOnItsTwoSecondSurvey_WithNoThoughtsAndAHeldClock()
+        public IEnumerator ALevelOpensOnItsTwoSecondSurvey_WithNoThoughts()
         {
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
@@ -969,7 +1177,6 @@ namespace Meditation.Tests
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
             Assert.AreEqual(LevelStage.Intro, screen.Stage, "Уровень обязан открываться обзором.");
             Assert.AreEqual(0, screen.Runtime.Field.Thoughts.Count, "В обзоре мыслей нет.");
-            Assert.IsFalse(screen.TimerRunning, "В обзоре таймер стоит.");
 
             yield return GameTestHarness.Until(() => screen.Stage == LevelStage.Play, "обзор закончился");
             LogAssert.NoUnexpectedReceived();
@@ -1050,31 +1257,38 @@ namespace Meditation.Tests
 
         // ---- both defeats and the retry (done contract §5) -------------------------------------------
 
+        /// <summary>
+        /// There is exactly ONE way to lose now (founder, 2026-08-07): the thoughts close over the
+        /// screen. The old «время вышло» is gone, and this is the case that used to prove it.
+        ///
+        /// Both halves are worth keeping: the HUD carries no clock at all (no sun, no caption — a level
+        /// that still drew them would be advertising a rule it does not have), and the drawn defeat
+        /// screen behaves exactly as it did, because S5 never depended on WHICH way the level was lost.
+        /// </summary>
         [UnityTest]
-        public IEnumerator TheClockRunningOut_LosesTheLevel()
+        public IEnumerator TheOnlyDefeat_IsTheScreenFillingUp_AndTheHudCarriesNoClock()
         {
             TuningConfig.AutoRetry = false;
-            TuningConfig.SetLevelSeconds(1, 60f);   // the shortest the spec's own slider allows
 
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
             yield return GameTestHarness.EnterLevel(fake, 1);
 
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
-
-            // Burn the clock through the rules rather than by waiting a real minute: what is under test
-            // is what happens AT zero, not how long a minute is.
+            DesignStage stage = StandTestHarness.Stage();
             yield return GameTestHarness.Until(() => screen.Stage == LevelStage.Play, "уровень пошёл");
-            GameTestHarness.DrainTheClock(screen);
+
+            Assert.IsNull(StandTestHarness.FindOrNull(stage, "Sun"), "В HUD осталось солнце-таймер.");
+            Assert.IsNull(StandTestHarness.FindOrNull(stage, "SunDial"), "В HUD остался циферблат.");
+            Assert.IsNull(StandTestHarness.FindOrNull(stage, "TimerLabel"), "В HUD осталась подпись таймера.");
+            Assert.IsNull(StandTestHarness.FindOrNull(stage, "TimerPlate"), "В HUD осталась плашка таймера.");
+
+            GameTestHarness.BuryTheScreen(screen);
             yield return GameTestHarness.Idle(fake, 4);
 
-            Assert.AreEqual(LevelStage.Lose, screen.Stage, "Истёкший таймер обязан быть поражением.");
-            Assert.AreEqual(LevelRules.LoseByTimer, screen.Rules.LoseReason);
+            Assert.AreEqual(LevelStage.Lose, screen.Stage, "Заполненный экран обязан быть поражением.");
+            Assert.AreEqual(LevelRules.LoseByThoughts, screen.Rules.LoseReason);
 
-            // SCREENS S5 since the drop: the defeat screen IS the designer's render, whole and opaque,
-            // whichever way the level was lost. The old version had to bury the frame under thoughts
-            // first, because the wallpaper WAS the screen — a loss on the clock could leave a nearly
-            // empty picture with the lines floating on it.
             StandTestHarness.AssertVisible(screen.View.OutcomeScreen.rectTransform, "Экран поражения");
             Assert.AreEqual(ArtLibrary.Get(ArtScreens.GameOver), screen.View.OutcomeScreen.sprite,
                 "На поражении показан не тот готовый экран.");
@@ -1237,7 +1451,8 @@ namespace Meditation.Tests
 
                 // Every level's tuning band is the one that is live while it is on screen.
                 Assert.AreEqual(levelIndex, TuningConfig.ActiveLevelIndex);
-                Assert.AreEqual(TuningConfig.LevelSecondsOf(levelIndex), TuningConfig.LevelSeconds, 1e-3f);
+                Assert.AreEqual(TuningConfig.WaveIntervalOf(levelIndex),
+                    TuningConfig.WaveIntervalSeconds, 1e-3f);
             }
 
             yield return GameTestHarness.Until(() => flow.Phase == GamePhase.Finale, "финал",

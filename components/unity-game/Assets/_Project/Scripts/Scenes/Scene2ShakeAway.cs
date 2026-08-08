@@ -8,9 +8,14 @@ using UnityEngine;
 namespace Meditation.Scenes
 {
     /// <summary>
-    /// Scenette 2 «Тряска-отгон» (MECHANICS §7.2): thoughts only, no collecting. Waves roll in, each
-    /// blob carries its pips, and the joystick shake knocks them out by the toughness of their type —
-    /// walkthrough frames 7–8, without the collecting hand.
+    /// Scenette 2 «Отгон взмахами» (MECHANICS §7.2): thoughts only, no collecting. Waves roll in, each
+    /// blob carries its pips, and swipes over the height sensors knock them out by the toughness of
+    /// their type — walkthrough frames 7–8, without the collecting hand.
+    ///
+    /// The scenette moved to the sensors with the game (founder, 2026-08-07) and by the same code: the
+    /// stand judges RULES, and a stand whose отгон lives on a controller the game no longer uses would
+    /// be teaching a rule the game does not have. The scene FILE keeps its name — a rename would touch
+    /// Build Settings and every GUID for nothing the founder can see.
     /// </summary>
     [AddComponentMenu("Meditation/Scene 2 — Shake Away")]
     public sealed class Scene2ShakeAway : PreviewSceneController
@@ -34,11 +39,19 @@ namespace Meditation.Scenes
 
         public int Popped => _popped;
 
-        protected override string Title => "Сценка 2 · Тряска-отгон";
+        protected override string Title => "Сценка 2 · Отгон взмахами";
+
+        /// <summary>
+        /// What the stand's card says now. «Тряси джойстик!» is a WITHDRAWN line (<see cref="Game.GameTexts"/>)
+        /// and, since 2026-08-07, also a false one: the отгон is on the height sensors. The registry
+        /// governs what the GAME renders — it renders no strings at all — and the stand is a dev
+        /// instrument whose one job is to say which controller a rule belongs to.
+        /// </summary>
+        private const string HintLine = "Маши над датчиком!";
 
         protected override StageOptions Options => new StageOptions
         {
-            ShowDetails = false, ShowThoughts = true, TimerRunning = false
+            ShowDetails = false, ShowThoughts = true
         };
 
         protected override IList<TuningParam> Parameters() => TuningCatalog.ShakeAway();
@@ -60,10 +73,8 @@ namespace Meditation.Scenes
             _hintTarget = dishes;
             _field.ResetWaveTimer(TuningConfig.WaveIntervalSeconds);
 
-            // Registry string, verbatim (walkthrough frame 25).
             // Стрелка останавливается у габарита блоба, а не на его подписи (макет 7).
-            Composition.ShowHint("Тряси джойстик!", HintTone.Shake, HintCentre, dishes.Position,
-                BlobStandoff);
+            Composition.ShowHint(HintLine, HintTone.Swipe, HintCentre, dishes.Position, BlobStandoff);
         }
 
         protected override void Tick(float deltaTime)
@@ -74,7 +85,7 @@ namespace Meditation.Scenes
 
             // The card teaches until its thought is gone — then the screen is the founder's again.
             if (_hintTarget != null)
-                Composition.ShowHint("Тряси джойстик!", HintTone.Shake, HintCentre,
+                Composition.ShowHint(HintLine, HintTone.Swipe, HintCentre,
                     _hintTarget.Position, BlobStandoff);
         }
 
@@ -91,8 +102,8 @@ namespace Meditation.Scenes
             string targeting;
             switch (TuningConfig.Targeting)
             {
-                case ShakeTargeting.AllOnScreen: targeting = "A: все"; break;
-                case ShakeTargeting.StickDirection: targeting = "C: по стику"; break;
+                case HitTargeting.AllOnScreen: targeting = "A: все"; break;
+                case HitTargeting.StickDirection: targeting = "C: по прицелу"; break;
                 default: targeting = "B: ближняя"; break;
             }
 

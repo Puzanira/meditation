@@ -12,8 +12,9 @@ using UnityEngine.TestTools;
 namespace Meditation.Tests
 {
     /// <summary>
-    /// Done contract §2–§6, played through the real scenes with both hands driven from code: cranking
-    /// collects, stalling loses the detail, shaking pops thoughts, and the full level ends and restarts.
+    /// Done contract §2–§6, played through the real scenes with all three controllers driven from code:
+    /// cranking collects, stalling loses the detail, swipes over the height sensors pop thoughts, and
+    /// the full level ends and restarts.
     /// </summary>
     public class ScenetteGameplayTests
     {
@@ -57,30 +58,31 @@ namespace Meditation.Tests
             }
         }
 
-        private static IEnumerator Shake(FakeBackend fake, float seconds)
+        /// <summary>The отгон: a hand passing over height sensor A, one pass per frame.</summary>
+        private static IEnumerator Swipe(FakeBackend fake, float seconds)
         {
             float end = Time.time + seconds;
-            bool right = true;
+            bool up = true;
             while (Time.time < end)
             {
-                fake.Next = new BackendSnapshot { Joystick = new Vector2(right ? 1f : -1f, 0f) };
-                right = !right;
+                fake.Next = new BackendSnapshot { HeightA = up ? 1f : 0f };
+                up = !up;
                 yield return null;
             }
         }
 
-        private static IEnumerator CrankAndShake(FakeBackend fake, float seconds)
+        private static IEnumerator CrankAndSwipe(FakeBackend fake, float seconds)
         {
             float end = Time.time + seconds;
-            bool right = true;
+            bool up = true;
             while (Time.time < end)
             {
                 fake.Next = new BackendSnapshot
                 {
                     CrankDeltaDegrees = CrankPerFrame,
-                    Joystick = new Vector2(right ? 1f : -1f, 0f)
+                    HeightA = up ? 1f : 0f
                 };
-                right = !right;
+                up = !up;
                 yield return null;
             }
         }
@@ -163,11 +165,11 @@ namespace Meditation.Tests
         // ---- scenette 2 ------------------------------------------------------------------------
 
         [UnityTest]
-        public IEnumerator Scenette2_ShakingPopsThoughts_ByTheirDurability()
+        public IEnumerator Scenette2_SwipingOverTheSensors_PopsThoughts_ByTheirDurability()
         {
             TuningConfig.DurabilityWeak = 2;
             TuningConfig.DurabilityMedium = 3;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             TuningConfig.HitDecayEnabled = false;
             TuningConfig.WaveIntervalSeconds = 20f;
 
@@ -183,19 +185,19 @@ namespace Meditation.Tests
             StandTestHarness.AssertVisible(blob, "thought blob");
 
             int before = scene.Field.Thoughts.Count;
-            yield return Shake(fake, 1f);
+            yield return Swipe(fake, 1f);
 
-            Assert.Greater(scene.Popped, 0, "Shaking must knock thoughts out.");
+            Assert.Greater(scene.Popped, 0, "Взмахи над датчиком обязаны сбивать мысли.");
             Assert.Less(scene.Field.Thoughts.Count, before, "…and take them off the screen.");
 
             LogAssert.NoUnexpectedReceived();
         }
 
         [UnityTest]
-        public IEnumerator Scenette2_SmoothTilt_DoesNotPopAnything()
+        public IEnumerator Scenette2_TheJoystick_PopsNothingAtAll()
         {
             TuningConfig.DurabilityWeak = 2;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             TuningConfig.WaveIntervalSeconds = 20f;
 
             yield return StandTestHarness.LoadScene(PreviewScenes.ShakeAway);
@@ -204,16 +206,27 @@ namespace Meditation.Tests
             var scene = Object.FindAnyObjectByType<Scene2ShakeAway>();
             int before = scene.Field.Thoughts.Count;
 
-            // Hold the stick still to one side — that is the gaze gesture, not a shake.
-            float end = Time.time + 1f;
+            // Done contract §4: the joystick may not land a hit in ANY mode of choosing a detail — not
+            // held over, not slammed from stop to stop. The second half is the one that used to be the
+            // отгон itself, so it is the half worth playing here.
+            float end = Time.time + 0.5f;
             while (Time.time < end)
             {
                 fake.Next = new BackendSnapshot { Joystick = new Vector2(1f, 0f) };
                 yield return null;
             }
 
+            end = Time.time + 1f;
+            bool right = true;
+            while (Time.time < end)
+            {
+                fake.Next = new BackendSnapshot { Joystick = new Vector2(right ? 1f : -1f, 0f) };
+                right = !right;
+                yield return null;
+            }
+
             Assert.AreEqual(before, scene.Field.Thoughts.Count,
-                "A held tilt must not clear the screen (only the initial flick counts as one hit).");
+                "Джойстик — только прицел: ни наклон, ни тряска не имеют права сбивать мысли.");
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -228,7 +241,7 @@ namespace Meditation.Tests
             TuningConfig.DurabilityWeak = 2;
             TuningConfig.DurabilityMedium = 2;
             TuningConfig.DurabilityStrong = 2;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             TuningConfig.HitDecayEnabled = false;
             TuningConfig.WaveIntervalSeconds = 1f;
             TuningConfig.WaveWeak = 1;
@@ -241,17 +254,17 @@ namespace Meditation.Tests
             var scene = Object.FindAnyObjectByType<Scene3TwoHands>();
             Assert.IsNotNull(scene);
 
-            yield return CrankAndShake(fake, 3f);
+            yield return CrankAndSwipe(fake, 3f);
 
             Assert.Greater(scene.Runtime.CollectedCount, 0,
-                "The crank hand must keep collecting while the other one shakes.");
-            Assert.Greater(scene.TotalHits, 0, "The shake hand must be landing hits at the same time.");
+                "The crank hand must keep collecting while the other one waves over the sensor.");
+            Assert.Greater(scene.TotalHits, 0, "Рука на датчике обязана набивать удары в это же время.");
 
             LogAssert.NoUnexpectedReceived();
         }
 
         [UnityTest]
-        public IEnumerator Scenette3_DroppingTheCrankForTheJoystick_CostsTheDetail()
+        public IEnumerator Scenette3_DroppingTheCrankForTheSensors_CostsTheDetail()
         {
             TuningConfig.Notice = NoticeMode.FixedOrder;
             TuningConfig.CollectSeconds = TuningConfig.Defaults.CollectSeconds;
@@ -267,20 +280,28 @@ namespace Meditation.Tests
             Assert.Greater(scene.Runtime.Collector.Progress01, 0.1f);
 
             // Let go of the crank to deal with the thoughts — this is the whole conflict of the game.
-            yield return Shake(fake, 1.5f);
+            yield return Swipe(fake, 1.5f);
 
             Assert.AreEqual(0f, scene.Runtime.Collector.Progress01, 1e-3f,
-                "Dropping the crank for the joystick must cost the detail.");
+                "Бросил ручку ради датчиков — деталь обязана сорваться.");
 
             LogAssert.NoUnexpectedReceived();
         }
 
         // ---- scenette 4 ------------------------------------------------------------------------
 
+        /// <summary>
+        /// The auto-retry, and the absence of the clock that used to trigger it.
+        ///
+        /// This case was «таймер вышел → рестарт» until 2026-08-07. The timer is gone (founder), so the
+        /// defeat it waits for is the only one left — the screen closing over — and the SUN it used to
+        /// assert on is checked the other way round: it must not be on the stand either. A stand still
+        /// drawing a dial would be teaching a rule the game does not have.
+        /// </summary>
         [UnityTest]
-        public IEnumerator Scenette4_TimerRunsOut_AndTheLevelRestartsWithoutLeavingTheBuild()
+        public IEnumerator Scenette4_ADefeat_RestartsTheLevelWithoutLeavingTheBuild()
         {
-            TuningConfig.LevelSeconds = 2f;
+            TuningConfig.LossOverlapPercent = 85f;
             TuningConfig.WaveIntervalSeconds = 20f;
             TuningConfig.AutoRetry = true;
 
@@ -289,23 +310,27 @@ namespace Meditation.Tests
 
             var scene = Object.FindAnyObjectByType<Scene4FullLevel>();
             Assert.IsNotNull(scene);
-            StandTestHarness.AssertVisible(StandTestHarness.Find(StandTestHarness.Stage(), "SunDial"), "timer dial");
+            Assert.IsNull(StandTestHarness.FindOrNull(StandTestHarness.Stage(), "SunDial"),
+                "На стенде остался циферблат таймера.");
+            Assert.IsNull(StandTestHarness.FindOrNull(StandTestHarness.Stage(), "Sun"),
+                "На стенде осталось солнце-таймер.");
 
-            float startTime = scene.Rules.TimeLeft;
-            Assert.AreEqual(2f, startTime, 0.2f, "The timer must start from the tuned level length.");
+            scene.Runtime.Field.CoverScreen();
+            fake.Next = new BackendSnapshot();
+            yield return null;
 
-            bool sawLow = false;
+            bool lost = false;
             bool restarted = false;
-            float deadline = Time.time + 8f;
+            float deadline = Time.time + 10f;
             while (Time.time < deadline && !restarted)
             {
                 fake.Next = new BackendSnapshot();
-                if (scene.Rules.TimeLeft < 0.4f) sawLow = true;
-                if (sawLow && scene.Rules.TimeLeft > 1.5f) restarted = true;
+                if (scene.Rules.Outcome == LevelOutcome.Lose) lost = true;
+                if (lost && scene.Rules.Outcome == LevelOutcome.Playing) restarted = true;
                 yield return null;
             }
 
-            Assert.IsTrue(sawLow, "The timer must actually run down.");
+            Assert.IsTrue(lost, "Закрытый мыслями экран обязан быть поражением.");
             Assert.IsTrue(restarted, "After the defeat the scenette must restart in place.");
             Assert.AreEqual(PreviewScenes.FullLevel, UnityEngine.SceneManagement.SceneManager.GetActiveScene().name,
                 "…without leaving the build.");
@@ -319,7 +344,6 @@ namespace Meditation.Tests
             TuningConfig.Notice = NoticeMode.FixedOrder;
             TuningConfig.CollectSeconds = TestOnlyFastCollectSeconds;
             TuningConfig.GraceMs = 800f;
-            TuningConfig.LevelSeconds = 60f;
             TuningConfig.WaveIntervalSeconds = 30f;
             TuningConfig.BreatherEnabled = false;
 
@@ -338,7 +362,7 @@ namespace Meditation.Tests
                 yield return null;
             }
 
-            Assert.IsTrue(won, "Five details in the vessel before the timer must be a win.");
+            Assert.IsTrue(won, "Five details in the vessel must be a win.");
 
             // The victory is staged like mock 18 — dissolve, silence, then the tableau with its line.
             deadline = Time.time + 8f;
@@ -360,7 +384,6 @@ namespace Meditation.Tests
         [UnityTest]
         public IEnumerator Scenette4_ThoughtsCoveringTheScreen_LoseTheLevel()
         {
-            TuningConfig.LevelSeconds = 120f;
             TuningConfig.LossOverlapPercent = 85f;
             TuningConfig.WaveIntervalSeconds = 30f;
 
@@ -369,6 +392,7 @@ namespace Meditation.Tests
             var scene = Object.FindAnyObjectByType<Scene4FullLevel>();
 
             // Blanket the screen the way a run of unanswered waves would: many L blobs, spec-sized.
+            TuningConfig.ThoughtGrowthPercentPerSec = 0f;
             for (int row = 0; row < 4; row++)
             for (int col = 0; col < 5; col++)
             {

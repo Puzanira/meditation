@@ -287,8 +287,39 @@ namespace Meditation.Tests
                 Assert.GreaterOrEqual(slots.yMin, 0f, level.Title + ": ряд слотов уходит за верхний край.");
                 Assert.LessOrEqual(slots.yMax, DesignStage.DesignHeight,
                     level.Title + ": ряд слотов уходит за нижний край.");
-                Assert.Less(slots.xMax, LevelCatalog.SunRectOf(level).xMin,
-                    level.Title + ": ряд слотов дотягивается до таймера-солнца.");
+                Assert.LessOrEqual(slots.xMax, DesignStage.DesignWidth,
+                    level.Title + ": ряд слотов уходит за правый край.");
+            }
+        }
+
+        /// <summary>
+        /// The progress bar under the vessel — «на всех уровнях» since 2026-08-07 (founder).
+        ///
+        /// Two claims, and the second one is why this is a test rather than a line in the view. «Под
+        /// сосудом» reads as arithmetic that cannot fail until you meet the library: its backpack is
+        /// 230 px tall centred at y 974, so its own lower edge is NINE PIXELS PAST the frame, and an
+        /// unclamped bar would have been drawn off screen on exactly the level with the most details
+        /// to keep track of. The clamp is the fix; this is what holds it.
+        /// </summary>
+        [Test]
+        public void TheVesselBar_IsOnScreenAndUnderItsVessel_OnEveryLevel()
+        {
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            {
+                Rect bar = LevelCatalog.VesselBarRectOf(level);
+                Rect vessel = LevelCatalog.VesselRectOf(level);
+
+                Assert.GreaterOrEqual(bar.xMin, 0f, level.Title + ": полоса уходит за левый край.");
+                Assert.LessOrEqual(bar.xMax, DesignStage.DesignWidth,
+                    level.Title + ": полоса уходит за правый край.");
+                Assert.LessOrEqual(bar.yMax, DesignStage.DesignHeight,
+                    level.Title + ": полоса уходит за нижний край кадра.");
+                Assert.Greater(bar.yMin, vessel.center.y,
+                    level.Title + ": полоса обязана быть ПОД серединой сосуда, а не над ним.");
+                Assert.AreEqual(level.VesselCentre.x, bar.center.x, 1e-3f,
+                    level.Title + ": полоса не по центру своего сосуда.");
+                Assert.Greater(bar.width, 60f,
+                    level.Title + ": полоса уже 60 px — заполнение на ней не прочитать.");
             }
         }
 
@@ -305,8 +336,9 @@ namespace Meditation.Tests
         /// a detail the player cannot find, and every detail has to be collectable for the level to be
         /// winnable at all.
         ///
-        /// Footprints are the ones actually drawn, not the nominal ones from SCREENS: the sun carries
-        /// its caption underneath, and the crank indicator carries an arc at r + 14 and a halo at 86.
+        /// Footprints are the ones actually drawn, not the nominal ones from SCREENS: the crank
+        /// indicator carries an arc at r + 14 and a halo at 86. The sun and its caption left this list
+        /// on 2026-08-07 with the timer; the bar under the vessel joined it the same day.
         /// </summary>
         [Test]
         public void NoHudWidget_OverlapsAnyDetail_OnAnyLevel()
@@ -317,9 +349,8 @@ namespace Meditation.Tests
                 Rect art = LevelCatalog.RectOf(detail);
                 string what = level.Title + " · «" + detail.Name + "»";
 
-                AssertClear(LevelCatalog.SunRectOf(level), art, what, "таймер-солнце");
-                AssertClear(LevelCatalog.TimerLabelRectOf(level), art, what, "подпись таймера");
                 AssertClear(LevelCatalog.CrankRectOf(level), art, what, "индикатор динамо");
+                AssertClear(LevelCatalog.VesselBarRectOf(level), art, what, "полоса наполнения сосуда");
                 AssertClear(LevelCatalog.SlotsRectOf(level), art, what, "ряд слотов");
             }
         }
@@ -332,8 +363,6 @@ namespace Meditation.Tests
                 Rect vessel = LevelCatalog.VesselRectOf(level);
                 string what = level.Title + " · сосуд";
 
-                AssertClear(LevelCatalog.SunRectOf(level), vessel, what, "таймер-солнце");
-                AssertClear(LevelCatalog.TimerLabelRectOf(level), vessel, what, "подпись таймера");
                 AssertClear(LevelCatalog.CrankRectOf(level), vessel, what, "индикатор динамо");
                 AssertClear(LevelCatalog.SlotsRectOf(level), vessel, what, "ряд слотов");
             }
@@ -532,20 +561,14 @@ namespace Meditation.Tests
 
         /// <summary>
         /// …and the widgets stay in the corners SCREENS gives them. Without this the test above is
-        /// satisfied by parking the sun in the middle of the sky: «не пересекается» is only half the
-        /// requirement, the other half is that the player finds the timer where the timer always is.
+        /// satisfied by parking the indicator in the middle of the sky: «не пересекается» is only half
+        /// the requirement, the other half is that the player finds a widget where it always is.
         /// </summary>
         [Test]
         public void EveryHudWidget_StaysInItsCorner()
         {
             foreach (LevelDefinition level in LevelCatalog.Levels)
             {
-                Rect sun = LevelCatalog.SunRectOf(level);
-                Assert.Greater(sun.center.x, DesignStage.DesignWidth * 0.75f,
-                    level.Title + ": солнце ушло из правого верхнего угла по X.");
-                Assert.Less(sun.center.y, DesignStage.DesignHeight * 0.33f,
-                    level.Title + ": солнце ушло из правого верхнего угла по Y.");
-
                 Rect crank = LevelCatalog.CrankRectOf(level);
                 Assert.Less(crank.center.x, DesignStage.DesignWidth * 0.33f,
                     level.Title + ": индикатор динамо ушёл из левого нижнего угла по X.");
@@ -564,17 +587,10 @@ namespace Meditation.Tests
         [Test]
         public void HudWidgets_MoveOffTheScreensBase_OnlyWhereTheArtDemandedIt()
         {
-            // The five shifts of SCREENS §S3 travelled with their scenes when the levels were
-            // renumbered — the same widget still yields to the same painted object — and ONE was
-            // cancelled: the metro's crank indicator moved for a puddle the drop has removed.
-            Assert.AreEqual(LevelOneData.SunCentre, LevelCatalog.At(0).SunCentre,
-                "Набережная: солнцу нечего было уступать — оно должно стоять на базе SCREENS.");
-            Assert.AreEqual(LevelOneData.SunCentre, LevelCatalog.At(1).SunCentre,
-                "Офис: солнцу нечего было уступать — оно должно стоять на базе SCREENS.");
-            Assert.AreEqual(LevelOneData.SunCentre, LevelCatalog.At(2).SunCentre,
-                "Метро: солнцу нечего было уступать — оно должно стоять на базе SCREENS.");
-            Assert.AreEqual(LevelOneData.SunCentre, LevelCatalog.At(3).SunCentre,
-                "Библиотека: солнцу нечего было уступать — оно должно стоять на базе SCREENS.");
+            // The shifts of SCREENS §S3 travelled with their scenes when the levels were renumbered —
+            // the same widget still yields to the same painted object — and two were cancelled: the
+            // metro's crank indicator moved for a puddle the drop has removed, and the city's sun for
+            // a moon it no longer has to share a corner with (the timer is gone, 2026-08-07).
             Assert.AreEqual(LevelOneData.CrankIndicatorCentre, LevelCatalog.At(0).CrankIndicatorCentre,
                 "Набережная: индикатору нечего было уступать — он должен стоять на базе SCREENS.");
             Assert.AreEqual(LevelOneData.CrankIndicatorCentre, LevelCatalog.At(4).CrankIndicatorCentre,
@@ -589,8 +605,6 @@ namespace Meditation.Tests
             // …and the ones that did move stayed as close to the base as the art allowed.
             foreach (LevelDefinition level in LevelCatalog.Levels)
             {
-                Assert.LessOrEqual(Vector2.Distance(level.SunCentre, LevelOneData.SunCentre), 200f,
-                    level.Title + ": солнце уехало от базы SCREENS дальше, чем нужно.");
                 Assert.LessOrEqual(
                     Vector2.Distance(level.CrankIndicatorCentre, LevelOneData.CrankIndicatorCentre), 300f,
                     level.Title + ": индикатор уехал от базы SCREENS дальше, чем нужно.");
@@ -773,27 +787,188 @@ namespace Meditation.Tests
             }
         }
 
+        /// <summary>
+        /// «Мысли НИКОГДА не спавнить меньше класса» — checked on the size a thought is actually
+        /// SPAWNED at, for every silhouette of every level in every class.
+        ///
+        /// The old version of this test asked <see cref="ArtLibrary.FitThought(string,ThoughtStrength)"/>
+        /// to stay INSIDE the box, which is the same sentence read backwards, and it passed while the
+        /// game spawned the wine bottle 42 px wide against a class of 180 (Codex review, 2026-08-08).
+        /// It is asked of <see cref="Thought.SpawnSize"/> and not of the fit, because the fit is an
+        /// implementation detail and the founder's rule is about the blob that appears on the screen:
+        /// whatever the library does, the thing that spawns must not be smaller than its class.
+        /// </summary>
         [Test]
-        public void EveryThoughtSilhouette_FitsInsideItsSizeClass()
+        public void EveryThoughtSilhouette_SpawnsNoSmallerThanItsSizeClass()
         {
-            // Thought.Size clamps to the class box, but the fit is what decides the picture: coverage
-            // is meant to be won by the NUMBER of thoughts, never by one silhouette growing.
             foreach (LevelDefinition level in LevelCatalog.Levels)
             foreach (string key in level.ThoughtSprites)
             foreach (ThoughtStrength strength in new[]
                      { ThoughtStrength.Weak, ThoughtStrength.Medium, ThoughtStrength.Strong })
             {
                 Vector2 box = Thought.SizeOf(strength);
-                Vector2 fitted = ArtLibrary.FitThought(key, strength);
+                var thought = new Thought { Strength = strength, Label = key };
+                ArtLibrary.FitThought(thought);
+                Vector2 spawn = thought.SpawnSize;
 
-                Assert.LessOrEqual(fitted.x, box.x + 0.5f, key + " шире своего класса.");
-                Assert.LessOrEqual(fitted.y, box.y + 0.5f, key + " выше своего класса.");
-                Assert.Greater(fitted.x, 20f, key + ": силуэт выродился в точку.");
-                Assert.Greater(fitted.y, 20f, key + ": силуэт выродился в точку.");
+                string what = key + " (" + strength + ", класс " + box.x + "×" + box.y + "): ";
+                Assert.GreaterOrEqual(spawn.x, box.x - 0.5f,
+                    what + "спавнится УЖЕ класса — " + spawn.x.ToString("0") + " px.");
+                Assert.GreaterOrEqual(spawn.y, box.y - 0.5f,
+                    what + "спавнится НИЖЕ класса — " + spawn.y.ToString("0") + " px.");
 
-                // …and one dimension has to actually touch the box, or "contain" silently shrank it.
-                bool touches = Mathf.Abs(fitted.x - box.x) < 1f || Mathf.Abs(fitted.y - box.y) < 1f;
-                Assert.IsTrue(touches, key + ": силуэт не вписан в класс, а просто уменьшен.");
+                // …and one side has to sit ON the box, or "cover" quietly became "blow up".
+                bool touches = Mathf.Abs(spawn.x - box.x) < 1f || Mathf.Abs(spawn.y - box.y) < 1f;
+                Assert.IsTrue(touches,
+                    what + "силуэт не подогнан под класс, а просто раздут до " +
+                    spawn.x.ToString("0") + "×" + spawn.y.ToString("0") + ".");
+
+                // A cover-fit silhouette overhangs its box on the long side, and that is allowed —
+                // but not to the point where one thought IS the screen.
+                Assert.LessOrEqual(spawn.x, DesignStage.DesignWidth,
+                    what + "силуэт шире кадра.");
+                Assert.LessOrEqual(spawn.y, DesignStage.DesignHeight * 1.5f,
+                    what + "силуэт выше полутора кадров — это уже не мысль, а занавес.");
+            }
+        }
+
+        /// <summary>
+        /// The baked ink shares are the PNGs' own numbers, re-measured here.
+        ///
+        /// They decide how much screen a thought hides (<see cref="ThoughtField.OverlapPercent"/>) and
+        /// therefore when the level is lost, so a stale number after an art re-drop would move the
+        /// defeat threshold silently. The drop imports unreadable, so the file is read off disk and
+        /// decoded into a texture of this test's own.
+        /// </summary>
+        [Test]
+        public void EveryThoughtsInkShare_MatchesItsPng()
+        {
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            foreach (string key in level.ThoughtSprites)
+            {
+                Sprite sprite = ArtLibrary.Get(key);
+                Assert.IsNotNull(sprite, key + ": спрайт мысли не найден.");
+
+                string path = UnityEditor.AssetDatabase.GetAssetPath(sprite);
+                Assert.IsNotEmpty(path, key + ": у спрайта нет файла — нечего перемерить.");
+
+                var decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                try
+                {
+                    Assert.IsTrue(decoded.LoadImage(System.IO.File.ReadAllBytes(path)),
+                        key + ": PNG не читается — " + path);
+
+                    Color32[] pixels = decoded.GetPixels32();
+                    int ink = 0;
+                    for (int i = 0; i < pixels.Length; i++)
+                        if (pixels[i].a >= 128) ink++;
+
+                    float measured = ink / (float)pixels.Length;
+                    Assert.AreEqual(measured, ArtLibrary.InkShareOf(key), 0.02f,
+                        key + ": записанная заполненность разошлась с PNG (" +
+                        measured.ToString("0.000") + " по файлу).");
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(decoded);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The baked stroke thicknesses are the PNGs' own numbers too, re-measured here.
+        ///
+        /// They cap the neon rim (<see cref="LevelView.RimRadiusPx"/>), so a stale one after a re-drop
+        /// would quietly put the office paperclip back to being a turquoise blob. Same treatment as the
+        /// ink shares and for the same reason: the drop imports unreadable, so the file is decoded here.
+        ///
+        /// Twice the ink area over the ink perimeter — the thickness of a stroke, and a quantity that
+        /// does not care how much empty margin the export left around the drawing.
+        /// </summary>
+        [Test]
+        public void EveryDetailsStrokeThickness_MatchesItsPng()
+        {
+            foreach (string key in ArtLibrary.StrokeKeys)
+            {
+                Sprite sprite = ArtLibrary.Get(key);
+                Assert.IsNotNull(sprite, key + ": спрайт детали не найден.");
+
+                string path = UnityEditor.AssetDatabase.GetAssetPath(sprite);
+                Assert.IsNotEmpty(path, key + ": у спрайта нет файла — нечего перемерить.");
+
+                var decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                try
+                {
+                    Assert.IsTrue(decoded.LoadImage(System.IO.File.ReadAllBytes(path)),
+                        key + ": PNG не читается — " + path);
+
+                    float measured = StrokeThicknessOf(decoded);
+                    Assert.AreEqual(measured, ArtLibrary.StrokeThicknessOf(key), 0.6f,
+                        key + ": записанная толщина штриха разошлась с PNG (" +
+                        measured.ToString("0.0") + " px по файлу).");
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(decoded);
+                }
+            }
+        }
+
+        /// <summary>Twice the ink area over the ink perimeter, in the PNG's own pixels.</summary>
+        private static float StrokeThicknessOf(Texture2D png)
+        {
+            Color32[] pixels = png.GetPixels32();
+            int w = png.width;
+            int h = png.height;
+
+            bool Ink(int x, int y) =>
+                x >= 0 && y >= 0 && x < w && y < h && pixels[y * w + x].a >= 128;
+
+            int area = 0;
+            int perimeter = 0;
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                if (!Ink(x, y)) continue;
+                area++;
+                if (!Ink(x - 1, y) || !Ink(x + 1, y) || !Ink(x, y - 1) || !Ink(x, y + 1)) perimeter++;
+            }
+
+            return perimeter > 0 ? 2f * area / perimeter : 0f;
+        }
+
+        /// <summary>
+        /// No detail's neon rim is wider than its own drawing can carry.
+        ///
+        /// A rim is a dilation, and a dilation adds twice its radius to every stroke it goes around: at
+        /// the shipped 6 px the office paperclip — a 10.7 px wire at the size it is drawn — came out a
+        /// solid turquoise blob and the librarian's glasses lost both lenses (design gate, 2026-08-08).
+        /// The rule is «the rim may add at most half the stroke's own width», i.e. a quarter of it, and
+        /// it is checked here rather than on a frame because it is arithmetic about every detail of
+        /// every level and a frame can only ever show one.
+        /// </summary>
+        [Test]
+        public void NoDetailsNeonRim_IsWiderThanItsOwnStrokeCanCarry()
+        {
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            foreach (ArtDetail detail in level.Details)
+            {
+                float rim = LevelView.RimRadiusPx(detail, TuningConfig.Defaults.DetailOutlinePx);
+                Assert.LessOrEqual(rim, TuningConfig.Defaults.DetailOutlinePx,
+                    detail.Name + ": обводка шире, чем ручка на панели.");
+
+                Sprite sprite = ArtLibrary.Get(detail.Sprite);
+                Assert.IsNotNull(sprite, detail.Name + ": спрайт не найден.");
+
+                float scale = Mathf.Min(detail.Size.x / sprite.rect.width,
+                    detail.Size.y / sprite.rect.height);
+                float stroke = ArtLibrary.StrokeThicknessOf(detail.Sprite) * scale;
+
+                Assert.LessOrEqual(rim, Mathf.Max(LevelView.MinRimPx,
+                        stroke * LevelView.RimShareOfStroke) + 0.01f,
+                    "Уровень " + level.Number + ", «" + detail.Name + "»: обводка " +
+                    rim.ToString("0.0") + " px на штрихе шириной " + stroke.ToString("0.0") +
+                    " px — ободок смыкается в заливку.");
             }
         }
 
@@ -802,70 +977,211 @@ namespace Meditation.Tests
         [Test]
         public void TheShippedLadder_GetsHarderEveryLevel()
         {
-            // «С каждым уровнем больше мыслей, выше прочность, быстрее наплыв» — monotonic in every
-            // dimension of PRESSURE. Read off the live values after a reset, so this is a statement
-            // about what ships rather than about whatever the last test left behind.
+            // «С каждым уровнем больше мыслей, выше прочность, быстрее наплыв» — and since 2026-08-07
+            // the ladder is ONE quantity, not a column per knob.
             //
-            // The level's LENGTH is deliberately not in this list any more. It used to be, and it could
-            // be, only while the levels also got smaller as they got harder (9 details down to 5). The
-            // drop of 2026-08-07 turned that around — 5·5·6·8·8 — so the last levels are the ones with
-            // the most to find, and a monotonically shrinking clock would make them unwinnable. What
-            // stayed true is the thing the founder actually tuned: less time PER DETAIL as it goes on.
+            // It had to become one. The founder's order for this round is «на первом мыслей больше, на
+            // втором их МЕНЬШЕ, но крупнее», and a rung-by-rung «не меньше мыслей в волне» forbids
+            // exactly that — it can only read «меньше блобов» as a step down, when the step is sideways
+            // and the pressure still climbs. So what is measured is the screen the waves buy per
+            // second: the AREA of one wave divided by the interval between two. Sending fewer bigger
+            // blobs and sending more smaller ones are two ways of spending the same budget, and the
+            // budget is what the player feels.
+            //
+            // That area is the one the thoughts are really SPAWNED at since 2026-08-08 (see
+            // WavePressureOf), not the class box. In class boxes the shipped ladder read
+            // 10 080 → 12 320 → 49 156 → 70 700 → 88 000 px²/с and was green; in the sizes the game
+            // actually draws, the same numbers read 23 695 → 17 318 → …, i.e. the very first step went
+            // DOWN — the ladder was being proved on arithmetic about a rectangle nothing is drawn at.
+            //
+            // The level's LENGTH used to be a column here too, and went out with the timer.
             for (int i = 1; i < LevelCatalog.Count; i++)
             {
                 string step = "У" + i + " → У" + (i + 1) + ": ";
 
+                Assert.Greater(WavePressureOf(i), WavePressureOf(i - 1),
+                    step + "давление волн обязано расти (" + WavePressureOf(i - 1).ToString("0") +
+                    " → " + WavePressureOf(i).ToString("0") + " px²/с).");
                 Assert.LessOrEqual(TuningConfig.WaveIntervalOf(i), TuningConfig.WaveIntervalOf(i - 1),
                     step + "волны должны приходить не реже.");
-                Assert.GreaterOrEqual(TuningConfig.ThoughtsPerWaveOf(i), TuningConfig.ThoughtsPerWaveOf(i - 1),
-                    step + "мыслей в волне должно быть не меньше.");
                 Assert.GreaterOrEqual(TuningConfig.DurabilityStrongOf(i), TuningConfig.DurabilityStrongOf(i - 1),
                     step + "крепкие мысли должны быть не слабее.");
                 Assert.GreaterOrEqual(TuningConfig.DriftOf(i), TuningConfig.DriftOf(i - 1),
                     step + "наплыв должен быть не медленнее.");
+                Assert.GreaterOrEqual(TuningConfig.ThoughtGrowthPercentPerSecOf(i),
+                    TuningConfig.ThoughtGrowthPercentPerSecOf(i - 1),
+                    step + "мысли должны разрастаться не медленнее.");
+                Assert.GreaterOrEqual(TuningConfig.ThoughtGrowthCapOf(i),
+                    TuningConfig.ThoughtGrowthCapOf(i - 1),
+                    step + "потолок роста мыслей не должен опускаться.");
             }
 
-            // And the ladder must really climb somewhere, not merely fail to descend — measured across
-            // the whole run, so adding a level to the end cannot leave the last steps flat.
             int last = LevelCatalog.Count - 1;
-            Assert.Greater(TuningConfig.ThoughtsPerWaveOf(last), TuningConfig.ThoughtsPerWaveOf(0),
-                "Последний уровень не шлёт больше мыслей, чем первый — прогрессии нет.");
             Assert.Greater(TuningConfig.DurabilityStrongOf(last), TuningConfig.DurabilityStrongOf(0),
                 "Крепкие мысли последнего уровня не крепче первого — прогрессии нет.");
+            Assert.Greater(WavePressureOf(last), WavePressureOf(0) * 2f,
+                "Давление последнего уровня не выросло даже вдвое против первого — прогрессии нет.");
         }
 
         /// <summary>
-        /// The timers, which are the one column the renumbering had to recompute (MECHANICS §6).
+        /// The founder's own order of 2026-08-07, as a test rather than as a comment: level 1 sends
+        /// MORE thoughts than level 2, and level 2 sends BIGGER ones («чуть больше первого»).
         ///
-        /// Stated as «seconds per detail», not as «seconds»: the shipped 80·75·84·104·96 is not a
-        /// falling curve and must not be — the last two levels hold eight details each and the first
-        /// holds five. What has to fall is the room the player is given per detail, and it is the
-        /// number the founder will actually be moving on the panel at the gate. Bands rather than
-        /// exact values, so a tuning pass is not a red suite.
+        /// Written as its own case because the ladder above cannot say it — the ladder only knows that
+        /// pressure climbs, and it would stay green if somebody « fixed » the dip in blob count by
+        /// making level 2 a swarm again, which is the shape the founder asked us to move away from.
         /// </summary>
         [Test]
-        public void TheTimers_LeaveLessRoomPerDetail_AsTheRunGoesOn()
+        public void TheFirstTwoLevels_SwapCountForSize()
         {
-            int last = LevelCatalog.Count - 1;
-            float first = TuningConfig.LevelSecondsOf(0) / LevelCatalog.At(0).DetailCount;
-            float final = TuningConfig.LevelSecondsOf(last) / LevelCatalog.At(last).DetailCount;
+            Assert.Greater(TuningConfig.ThoughtsPerWaveOf(0), TuningConfig.ThoughtsPerWaveOf(1),
+                "У1 обязан слать БОЛЬШЕ мыслей за волну, чем У2 (решение founder 2026-08-07).");
+            Assert.Greater(HeaviestClassOf(1), HeaviestClassOf(0),
+                "Класс размера У2 обязан быть выше, чем у У1 — «меньше, но крупнее».");
+            Assert.Greater(WavePressureOf(1), WavePressureOf(0),
+                "…и при этом давление У2 обязано остаться выше первого.");
+        }
 
-            Assert.Less(final, first,
-                "На деталь в конце прогона должно оставаться меньше времени, чем в начале (" +
-                final.ToString("0.0") + " с против " + first.ToString("0.0") + " с).");
+        /// <summary>
+        /// Area one wave of level <paramref name="i"/> puts on screen, per second — measured on the
+        /// thoughts that level ACTUALLY sends.
+        ///
+        /// It used to be measured in class boxes, and that made the whole ladder arithmetic about a
+        /// rectangle nothing is drawn at (Codex review, 2026-08-08): a level's five silhouettes are
+        /// cover-fitted to the class, so how much screen a wave buys depends on how elongated that
+        /// level's drawings are. Measured properly, level 1 — whose set holds a 454×1521 bottle and a
+        /// 645×1688 guitar — was sending MORE screen per second than level 2, i.e. the shipped ladder
+        /// stepped down where the test said it stepped up.
+        ///
+        /// Averaged over the level's set because which silhouette a wave draws is the field's own
+        /// round-robin, not a per-level choice: what the ladder can state is the expected wave.
+        /// </summary>
+        private static float WavePressureOf(int i)
+        {
+            float area =
+                TuningConfig.WaveWeakOf(i) * SpawnAreaOf(i, ThoughtStrength.Weak) +
+                TuningConfig.WaveMediumOf(i) * SpawnAreaOf(i, ThoughtStrength.Medium) +
+                TuningConfig.WaveStrongOf(i) * SpawnAreaOf(i, ThoughtStrength.Strong);
+            return area / Mathf.Max(0.5f, TuningConfig.WaveIntervalOf(i));
+        }
 
-            // …and every one of them stays inside the slider the panel declares, so the founder can
-            // tune in both directions without the value snapping.
+        /// <summary>The area an average thought of level <paramref name="i"/> spawns at, in class <paramref name="strength"/>.</summary>
+        private static float SpawnAreaOf(int i, ThoughtStrength strength)
+        {
+            string[] set = LevelCatalog.At(i).ThoughtSprites;
+            float total = 0f;
+            foreach (string key in set)
+            {
+                var thought = new Thought { Strength = strength, Label = key };
+                ArtLibrary.FitThought(thought);
+                Vector2 spawn = thought.SpawnSize;
+                total += spawn.x * spawn.y;
+            }
+            return total / Mathf.Max(1, set.Length);
+        }
+
+        /// <summary>The biggest class this level's wave contains, 0 = S, 1 = M, 2 = L.</summary>
+        private static int HeaviestClassOf(int i)
+        {
+            if (TuningConfig.WaveStrongOf(i) > 0) return 2;
+            if (TuningConfig.WaveMediumOf(i) > 0) return 1;
+            return 0;
+        }
+
+        /// <summary>
+        /// A level nobody plays still ends: with the sensors never touched, every level's screen fills
+        /// up and the level is LOST, inside <see cref="DefeatBudgetSeconds"/>.
+        ///
+        /// This is the other half of «поражение = мысли заполнили экран», and until 2026-08-08 the
+        /// first two levels did not have it: level 1's coverage settled around half the frame and
+        /// stayed there — its wave clock never shortened and the thoughts drift straight across — so
+        /// the only failure condition the game has was, on the level that teaches it, unreachable.
+        /// The ladder test could not see that; it compares levels to each other, and a ladder of
+        /// unreachable rungs is monotonic too.
+        ///
+        /// Run on the model rather than in PlayMode: this is three simulated minutes per level, and
+        /// what is being asked about is the rules — waves, drift, growth, coverage — none of which
+        /// needs a renderer. The field is driven at 4 Hz, which the same simulation says is within a
+        /// few seconds of the frame-rate answer (the thoughts move 6–15 px per step).
+        /// </summary>
+        [Test]
+        public void EveryLevel_FillsUpAndIsLost_WhenNobodyBeatsAThoughtOff()
+        {
             for (int i = 0; i < LevelCatalog.Count; i++)
             {
-                float seconds = TuningConfig.LevelSecondsOf(i);
-                Assert.That(seconds, Is.InRange(60f, 180f),
-                    "У" + (i + 1) + ": таймер вне диапазона слайдера 60–180 с.");
-                float perDetail = seconds / LevelCatalog.At(i).DetailCount;
-                Assert.Greater(perDetail, 6f,
-                    "У" + (i + 1) + ": на деталь остаётся " + perDetail.ToString("0.0") +
-                    " с — при времени сбора 6 с уровень непроходим.");
+                TuningConfig.ResetToDefaults();
+                TuningConfig.ApplyLevel(i);
+
+                var field = new ThoughtField { Labels = LevelCatalog.At(i).ThoughtSprites };
+                field.ArtFitter = ArtLibrary.FitThought;
+                var rules = new LevelRules();
+                rules.Restart(LevelCatalog.At(i).DetailCount);
+
+                float elapsed = 0f;
+                while (elapsed < DefeatBudgetSeconds && rules.Outcome == LevelOutcome.Playing)
+                {
+                    // No hits: the отгон is exactly what is being left out.
+                    field.Tick(DefeatStepSeconds, Vector2.zero, 0, rules.SpawningAllowed);
+                    rules.Tick(DefeatStepSeconds, field.OverlapPercent);
+                    elapsed += DefeatStepSeconds;
+                }
+
+                Assert.AreEqual(LevelOutcome.Lose, rules.Outcome,
+                    LevelCatalog.At(i).Title + ": за " + DefeatBudgetSeconds +
+                    " с бездействия экран так и не заполнился (дошёл до " +
+                    field.OverlapPercent.ToString("0") + " % при пороге " +
+                    TuningConfig.LossOverlapPercent.ToString("0") + " %) — поражения на этом уровне нет.");
+                Assert.AreEqual(LevelRules.LoseByThoughts, rules.LoseReason,
+                    LevelCatalog.At(i).Title + ": уровень проигран не мыслями.");
+
+                // Written out rather than only asserted: the budget is loose on purpose, so the number
+                // that actually matters — how long a level survives an idle player — has to be visible
+                // somewhere the founder's tuning round can read it off.
+                TestContext.WriteLine("У" + (i + 1) + " «" + LevelCatalog.At(i).Title +
+                                      "»: экран заполнен за " + elapsed.ToString("0.0") +
+                                      " с бездействия, мыслей на экране " + field.Thoughts.Count + ".");
             }
+        }
+
+        /// <summary>
+        /// How long a player may do nothing before the screen has to have closed over them. Three
+        /// minutes is deliberately generous — the shipped ladder loses in 124 s on level 1 and 18 s on
+        /// level 5 — so that this guards the RULE (a level that cannot be lost) and not a balance
+        /// number the founder is free to move.
+        /// </summary>
+        private const float DefeatBudgetSeconds = 180f;
+
+        /// <summary>Simulation step — coverage is recomputed on every one of these.</summary>
+        private const float DefeatStepSeconds = 0.25f;
+
+        /// <summary>
+        /// The clock is gone, and the ladder must not have quietly kept it: no per-level band may
+        /// still carry a duration, and nothing may reintroduce «поражение по времени».
+        ///
+        /// Stated as a test rather than left to the compiler because the removal is a DESIGN decision
+        /// (founder, 2026-08-07) — the field could come back as a knob nobody reads, which is exactly
+        /// how a superseded rule survives a supersede.
+        /// </summary>
+        [Test]
+        public void TheLevelBands_CarryNoDuration_TheTimerIsGone()
+        {
+            string[] gone = System.Linq.Enumerable.ToArray(
+                System.Linq.Enumerable.Select(
+                    System.Linq.Enumerable.Where(
+                        typeof(TuningConfig).GetFields(
+                            System.Reflection.BindingFlags.Public |
+                            System.Reflection.BindingFlags.Static),
+                        f => f.Name.Contains("LevelSeconds") || f.Name.Contains("TutorialTimer")),
+                    f => f.Name));
+
+            Assert.IsEmpty(gone,
+                "В TuningConfig остались таймерные ручки: " + string.Join(", ", gone));
+
+            var rules = new LevelRules();
+            rules.Restart(5);
+            for (int frame = 0; frame < 60 * 200; frame++) rules.Tick(1f / 60f, 0f);
+            Assert.AreEqual(LevelOutcome.Playing, rules.Outcome,
+                "Уровень всё ещё умеет кончаться по времени.");
         }
 
         [Test]
@@ -875,8 +1191,10 @@ namespace Meditation.Tests
             {
                 TuningConfig.ApplyLevel(i);
 
-                Assert.AreEqual(TuningConfig.LevelSecondsOf(i), TuningConfig.LevelSeconds, 1e-3f);
                 Assert.AreEqual(TuningConfig.WaveIntervalOf(i), TuningConfig.WaveIntervalSeconds, 1e-3f);
+                Assert.AreEqual(TuningConfig.ThoughtGrowthPercentPerSecOf(i),
+                    TuningConfig.ThoughtGrowthPercentPerSec, 1e-3f);
+                Assert.AreEqual(TuningConfig.ThoughtGrowthCapOf(i), TuningConfig.ThoughtGrowthCap, 1e-3f);
                 Assert.AreEqual(TuningConfig.DurabilityWeakOf(i), TuningConfig.DurabilityWeak);
                 Assert.AreEqual(TuningConfig.DurabilityMediumOf(i), TuningConfig.DurabilityMedium);
                 Assert.AreEqual(TuningConfig.DurabilityStrongOf(i), TuningConfig.DurabilityStrong);

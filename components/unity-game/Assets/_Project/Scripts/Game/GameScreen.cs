@@ -3,7 +3,11 @@ using UnityEngine;
 
 namespace Meditation.Game
 {
-    /// <summary>Both hands as the game reads them this frame — nothing here comes from a keyboard.</summary>
+    /// <summary>
+    /// All three controllers as the game reads them this frame — nothing here comes from a keyboard.
+    /// The name is older than the hands: since 2026-08-07 there are three of them (crank, joystick as
+    /// a pure aim, height sensors for the отгон), and <see cref="Hits"/> is the sensors' line.
+    /// </summary>
     public readonly struct Hands
     {
         /// <summary>Smoothed crank speed, deg/s.</summary>
@@ -20,7 +24,7 @@ namespace Meditation.Game
 
         public readonly Vector2 Stick;
 
-        /// <summary>Shake hits registered this frame.</summary>
+        /// <summary>Hits of the отгон registered this frame — swipes over the height sensors.</summary>
         public readonly int Hits;
 
         public Hands(float crankSpeed, bool crankSpinning, float crankDelta, float crankTotal,

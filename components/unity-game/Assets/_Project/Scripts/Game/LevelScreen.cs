@@ -34,8 +34,8 @@ namespace Meditation.Game
         Aim = 0,
         /// <summary>«КРУТИ РУЧКУ» at the dynamo, «ТАЩИ» beside the detail on its thread.</summary>
         Crank = 1,
-        /// <summary>The first thought lands on the next detail; an arrow at the joystick, no words.</summary>
-        Shake = 2,
+        /// <summary>The first thought lands on the next detail; an arrow at the sensors, no words.</summary>
+        Swipe = 2,
         /// <summary>Taught. Ordinary play, and the clock starts.</summary>
         Done = 3
     }
@@ -71,28 +71,40 @@ namespace Meditation.Game
         public const float WipeSharePerTurn = 0.1f;
 
         /// <summary>
-        /// Which way the arrow of the shake beat points: DOWN, at the physical joystick under the screen
-        /// (CABINET_BRIEF: «слот этой игры — ДЖОЙСТИК»). There is no drawn «ТРЯСИ» in the drop, so this
-        /// beat is an arrow and a wobble and nothing else.
+        /// Where the arrow of the отгон beat POINTS, and it is a fixed place: the middle of the frame's
+        /// bottom edge, because that is where the panel with the two height sensors physically is
+        /// (founder, 2026-08-07: «отгоняем на датчики движения»). There is no drawn «ТРЯСИ» in the drop,
+        /// so this beat is an arrow and a stroke and nothing else.
         ///
-        /// The cue is only the fallback anchor for a beat whose thought has already gone: the arrow
-        /// itself is drawn from just below the thought (<see cref="ShakeArrowStart"/>), because pointing
-        /// at the joystick is a gesture, and a 1047 px line to the bottom of the frame is a barrier.
+        /// Fixed, and that is the fix of 2026-08-08. The tip used to hang off the thought — 240 px below
+        /// whatever the cat happened to be sitting on — so it ended in empty sky and its X moved with the
+        /// blob: an arrow that points at a different place every time it is drawn is not naming
+        /// anything. Now the tail moves and the tip does not, which is also what a gesture towards a
+        /// piece of furniture looks like.
         /// </summary>
-        private static readonly Vector2 JoystickCue = new Vector2(960f, 1046f);
-
-        /// <summary>How far the shake arrow swings, design px, and how fast — the gesture, drawn.</summary>
-        private const float ShakeWobblePx = 70f;
-        private const float ShakeWobbleHz = 2.5f;
-
-        /// <summary>Air between the thought's lower edge and the tail of the shake arrow, design px.</summary>
-        private const float ShakeArrowGap = 26f;
+        public static readonly Vector2 SensorsCue = new Vector2(960f, 1046f);
 
         /// <summary>
-        /// Length of that arrow — a stroke, not a line across the frame. 240 px is about a third of the
-        /// way down from where the teaching thought sits, which is what «жест вниз» looks like.
+        /// The stroke of that arrow — the gesture, drawn. It swings ALONG its own axis, not across it:
+        /// a height sensor is answered by a hand passing up and down over it, so the stroke travels up
+        /// and down the way the hand is meant to. (Until 2026-08-07 the swing was sideways, because the
+        /// gesture then was a stick being shaken from side to side.) Since 2026-08-08 it is the TAIL
+        /// that swings, the tip staying on the panel — the same 60 px, the same beat.
         /// </summary>
-        private const float ShakeArrowLength = 240f;
+        private const float SwipeWobblePx = 60f;
+        private const float SwipeWobbleHz = 2.5f;
+
+        /// <summary>
+        /// Air between everything the thought PAINTS and the tail of the arrow, design px.
+        ///
+        /// Measured off the whole drawing, not off the blob's rectangle: the pips hang below the blob on
+        /// their own discs, so a gap measured from the rectangle left the arrow growing straight out of
+        /// them (frame 05 at the design gate of 2026-08-08 had no gap at all).
+        /// </summary>
+        private const float SwipeArrowGap = 26f;
+
+        /// <summary>The shortest the stroke gets at the top of its swing — still an arrow, not a dash.</summary>
+        private const float SwipeArrowMinLength = 100f;
 
         private readonly LevelDefinition _level;
         private readonly int _levelIndex;
@@ -107,7 +119,7 @@ namespace Meditation.Game
         private bool _wasSlipping;
         private bool _completeScreenUp;
         private Thought _tutorialThought;
-        private int _shakeBeatDetail = -1;
+        private int _swipeBeatDetail = -1;
         private float _dragHintSide = StartingDragSide;
 
         /// <summary>Everything a teaching plate may not cover on THIS level — the same list all beat.</summary>
@@ -119,7 +131,19 @@ namespace Meditation.Game
         {
             _levelIndex = levelIndex;
             _level = LevelCatalog.At(levelIndex);
-            _teaches = levelIndex == 0;
+
+            // «Обучение не повторяется после поражения» (founder, 2026-08-07). Level 1 teaches on the
+            // FIRST attempt only; a player who has just watched three scripted beats and then lost is
+            // told the same three things again before being allowed to try, which is the shape of a
+            // punishment rather than of a lesson. The flow is what remembers — a screen cannot, it is
+            // built fresh for every attempt.
+            _teaches = levelIndex == 0 && !flow.TutorialAlreadyGiven;
+
+            // Marked on ENTRY, not when the beats finish: a player who lost while being taught has
+            // still been taught, and «обучение не повторяется после поражения» has to hold for that
+            // attempt too. The flag is a property of the RUN — GameFlow.StartRun clears it, so the
+            // next person at the cabinet gets the tutorial the first player got.
+            if (levelIndex == 0) flow.NoteTutorialGiven();
 
             TuningConfig.ActiveLevelIndex = levelIndex;
             TuningConfig.ApplyLevel(levelIndex);
@@ -148,7 +172,7 @@ namespace Meditation.Game
             _runtime.Gaze.MaxY = DesignStage.DesignHeight;
 
             _runtime.Field.Labels = _level.ThoughtSprites;
-            _runtime.Field.ArtSizer = t => ArtLibrary.FitThought(t.Label, t.Strength);
+            _runtime.Field.ArtFitter = ArtLibrary.FitThought;
             _runtime.DetailCollected += OnDetailCollected;
 
             Restart();
@@ -170,12 +194,10 @@ namespace Meditation.Game
         public DetailSweep Sweep => _sweep;
 
         /// <summary>The detail the teaching thought sits on, or -1 — named so the suite can check it.</summary>
-        public int ShakeBeatDetailIndex => _shakeBeatDetail;
+        public int SwipeBeatDetailIndex => _swipeBeatDetail;
 
-        /// <summary>Does the sun-dial advance right now? The tutorial holds it [toggle].</summary>
-        public bool TimerRunning =>
-            Stage == LevelStage.Play && (!_teaches || !TuningConfig.TutorialTimerPaused ||
-                                         Beat >= TutorialBeat.Done);
+        /// <summary>Is this attempt the one that teaches? Level 1, first time through.</summary>
+        public bool Teaches => _teaches;
 
         /// <summary>True while the reward beat — the vessel in the centre with its haul — is on screen.</summary>
         public bool VictoryPresented =>
@@ -202,7 +224,7 @@ namespace Meditation.Game
             _wasSlipping = false;
             _completeScreenUp = false;
             _tutorialThought = null;
-            _shakeBeatDetail = -1;
+            _swipeBeatDetail = -1;
             _dragHintSide = StartingDragSide;
             Beat = _teaches ? TutorialBeat.Aim : TutorialBeat.Done;
             _sweep.Reset();
@@ -215,9 +237,19 @@ namespace Meditation.Game
             _view.SetDesaturated(false);
             _view.ClearDefeatStaging();
             _view.SetThoughtsAlpha(1f);
-            _view.SetTimer(1f, TuningConfig.LevelSeconds);
-            _view.SetTimerRunning(false);
+            _view.ApplyNeonOutline();
+
+            // «Сразу в игру»: a repeat of level 1 skips the 2 s обзор along with the beats. The обзор
+            // is the tutorial's own opening — «сцена без мыслей, все детали пульсируют разом» is what
+            // introduces a level you have not seen, and the player who is retrying has seen it.
+            if (SkipsTheIntro) EnterStage(LevelStage.Play);
         }
+
+        /// <summary>
+        /// True when this attempt goes straight to <see cref="LevelStage.Play"/>: level 1, taught
+        /// already, i.e. the restart after a defeat.
+        /// </summary>
+        public bool SkipsTheIntro => _levelIndex == 0 && !_teaches;
 
         private void EnterStage(LevelStage stage)
         {
@@ -279,8 +311,8 @@ namespace Meditation.Game
         {
             bool spawningAllowed = _rules.SpawningAllowed && TutorialAllowsSpawning;
 
-            // The shake beat blocks collection outright (SCREENS §Обучение, п. 3): the cat is ON the
-            // next detail and nothing is collected until it is shaken off. Covering alone would only
+            // The отгон beat blocks collection outright (SCREENS §Обучение, п. 3): the cat is ON the
+            // next detail and nothing is collected until it is beaten off. Covering alone would only
             // produce that under the fixed order — with the shipped gaze the player would look past it.
             _runtime.CollectionSuspended = CollectionBlockedByTutorial;
 
@@ -291,15 +323,10 @@ namespace Meditation.Game
             _runtime.Tick(deltaTime, hands.Stick, hands.Hits, hands.CrankSpeed, spawningAllowed);
             NoteSlipForTheAudio();
 
-            // The tutorial holds the CLOCK, not the rules: victory and defeat keep being watched for
-            // while it teaches. A zero-length tick would have switched both off with the timer.
-            bool running = TimerRunning;
-            _view.SetTimerRunning(running);
-            _rules.ClockPaused = !running;
             _rules.Tick(deltaTime, _runtime.Field.OverlapPercent);
-            _view.SetTimer(_rules.TimeLeft01, _rules.TimeLeft);
 
             TickSweep(deltaTime);
+            _view.ApplyNeonOutline();
 
             if (_teaches)
             {
@@ -319,13 +346,13 @@ namespace Meditation.Game
         /// Public because the suite has to be able to name the state it is testing.
         /// </summary>
         public bool CollectionBlockedByTutorial =>
-            _teaches && Beat == TutorialBeat.Shake && StillOnScreen(_tutorialThought);
+            _teaches && Beat == TutorialBeat.Swipe && StillOnScreen(_tutorialThought);
 
         private void OnDetailCollected(int index)
         {
             _rules.OnDetailCollected();
             Flow.Audio?.Mix.NoteDetailLanded();
-            if (_teaches && Beat == TutorialBeat.Crank) BeginShakeBeat(index);
+            if (_teaches && Beat == TutorialBeat.Crank) BeginSwipeBeat(index);
         }
 
         /// <summary>A detail that slipped ends the meditation layer at once, tail and all (§8).</summary>
@@ -411,54 +438,83 @@ namespace Meditation.Game
         private const float StartingDragSide = 90f;
 
 
-        private void BeginShakeBeat(int justCollected)
+        private void BeginSwipeBeat(int justCollected)
         {
-            Beat = TutorialBeat.Shake;
+            Beat = TutorialBeat.Swipe;
             _view.HideSecondHint();
 
-            // The cat lands ON the next detail, so collection really is blocked until it is shaken off
+            // The cat lands ON the next detail, so collection really is blocked until it is beaten off
             // (SCREENS: «сбор заблокирован её появлением поверх следующей детали»).
-            _shakeBeatDetail = FirstUncollectedThatFitsAThought(justCollected);
-            Vector2 over = _shakeBeatDetail >= 0
-                ? LevelCatalog.AnchorOf(_level.Details[_shakeBeatDetail])
+            _swipeBeatDetail = FirstUncollectedThatFitsAThought(justCollected);
+            Vector2 over = _swipeBeatDetail >= 0
+                ? LevelCatalog.AnchorOf(_level.Details[_swipeBeatDetail])
                 : new Vector2(960f, 420f);
 
             _tutorialThought = _runtime.Field.SpawnAt(ThoughtStrength.Weak, _level.ThoughtSprites[0], over);
 
-            // No «ТРЯСИ» in the drop: an arrow at the joystick and no words at all (walkthrough Э6).
-            AimTheShakeArrow(0f);
+            // No «ТРЯСИ» in the drop: an arrow at the sensors and no words at all (walkthrough Э6).
+            AimTheSwipeArrow(0f);
         }
 
         /// <summary>
-        /// The shake beat's arrow: a short downward stroke that starts BELOW the thought and swings.
+        /// The отгон beat's arrow: a stroke that leaves the thought and lands on the sensor panel at the
+        /// bottom edge of the frame, swinging along its own length — the hand passing over the sensor.
         ///
-        /// It used to run from the middle of the thought to (960, 1046) — 1047 px of brick-red line
-        /// through the drawn thought, across the whole frame, ending on empty asphalt. All three were
-        /// leftovers of the greybox era, when a hint was a white card with a word on it and the frame
-        /// underneath was rectangles. The drop's own hint buttons are turquoise (<see cref="HintTone"/>),
-        /// the thought is art that must not be crossed out, and the joystick is BELOW the screen — the
-        /// gesture that names it is a short push down, not a line drawn to the bottom edge.
+        /// Two rewrites, and the second one is the point. It first ran from the MIDDLE of the thought to
+        /// (960, 1046) — 1047 px of brick-red line through the drawn art, a barrier rather than a
+        /// gesture. The answer then was to make it short: 240 px down from the blob and stop. That
+        /// bought the wrong thing — the tip now ended in empty sky and, worse, its X came off whatever
+        /// the cat was sitting on, so the one hint of this beat pointed somewhere different every run
+        /// (design gate, 2026-08-08).
+        ///
+        /// So the two ends have different jobs now. The TIP is <see cref="SensorsCue"/> and never moves:
+        /// it names a thing that exists in the room — the panel under the screen — and a name has to be
+        /// the same word twice. The TAIL starts clear of everything the thought paints (pips included)
+        /// and is what the swing moves, up and down its own axis, because a height sensor reads how high
+        /// the hand is. Length is what is left between them, and the stroke stays off the art either
+        /// way: it begins outside the drawing and travels away from it.
         /// </summary>
-        private void AimTheShakeArrow(float wobble)
+        /// <param name="slide">
+        /// How far past the gap the tail has slid this frame, 0…<see cref="SwipeWobblePx"/>. One-sided
+        /// on purpose: the swing may shorten the stroke, never lengthen it back INTO the drawing it was
+        /// just measured clear of.
+        /// </param>
+        private void AimTheSwipeArrow(float slide)
         {
-            Vector2 from = ShakeArrowStart();
-            float length = Mathf.Min(ShakeArrowLength, DesignStage.DesignHeight - 16f - from.y);
-            var to = new Vector2(from.x + wobble, from.y + Mathf.Max(80f, length));
-            _view.ShowArrowHint(HintTone.Shake, from, to);
+            Vector2 tip = SensorsCue;
+            Vector2 anchor = SwipeArrowAnchor();
+
+            Vector2 away = tip - anchor;
+            float span = away.magnitude;
+            if (span < 1f)
+            {
+                _view.ShowArrowHint(HintTone.Swipe, tip - new Vector2(0f, SwipeArrowMinLength), tip);
+                return;
+            }
+
+            Vector2 axis = away / span;
+
+            // The gap is air between the DRAWING and the tail, so on a slanted stroke it takes more than
+            // its own length of travel to buy it — the floor on the divisor keeps a nearly horizontal
+            // arrow (a thought already down by the panel) from backing off half the frame for it.
+            float clearance = SwipeArrowGap / Mathf.Max(0.4f, axis.y);
+            float back = Mathf.Clamp(span - clearance - Mathf.Max(0f, slide),
+                SwipeArrowMinLength, Mathf.Max(SwipeArrowMinLength, span));
+
+            _view.ShowArrowHint(HintTone.Swipe, tip - axis * back, tip);
         }
 
         /// <summary>
-        /// Just off the thought's lower edge — the tail may not start inside the drawing. Falls back to
-        /// the joystick's own cue when the thought has already been beaten off.
+        /// The point on the thought the stroke has to clear: the middle of the lowest line it PAINTS.
+        /// Falls back to a plain stroke above the panel once the thought has been beaten off.
         /// </summary>
-        private Vector2 ShakeArrowStart()
+        private Vector2 SwipeArrowAnchor()
         {
-            if (_tutorialThought == null) return JoystickCue - new Vector2(0f, ShakeArrowLength);
+            if (_tutorialThought == null) return SensorsCue - new Vector2(0f, SwipeArrowMinLength * 2f);
 
-            Vector2 size = _tutorialThought.Size;
             return new Vector2(
                 _tutorialThought.Position.x,
-                _tutorialThought.Position.y + size.y * 0.5f + ShakeArrowGap);
+                ArtThoughtView.DrawnBottomY(_tutorialThought.Position, _tutorialThought.Size));
         }
 
         /// <summary>
@@ -505,7 +561,7 @@ namespace Meditation.Game
                     BeginCrankBeat();
                     return;
 
-                case TutorialBeat.Shake:
+                case TutorialBeat.Swipe:
                     if (StillOnScreen(_tutorialThought)) return;
                     // «Мысль отбита → таймер запускается, дальше обычный play» (SCREENS §Обучение п.4).
                     FinishTeaching();
@@ -521,10 +577,12 @@ namespace Meditation.Game
         /// </summary>
         private void AimTheHints()
         {
-            if (Beat == TutorialBeat.Shake)
+            if (Beat == TutorialBeat.Swipe)
             {
-                // The arrow swings the way the hand is meant to.
-                AimTheShakeArrow(Mathf.Sin(Age * ShakeWobbleHz * Mathf.PI * 2f) * ShakeWobblePx);
+                // The arrow swings the way the hand is meant to — the tail sliding down the stroke and
+                // back, the tip staying on the sensor panel.
+                AimTheSwipeArrow(
+                    (1f + Mathf.Sin(Age * SwipeWobbleHz * Mathf.PI * 2f)) * 0.5f * SwipeWobblePx);
                 return;
             }
 
@@ -589,6 +647,7 @@ namespace Meditation.Game
             _view.HideHint();
             _view.HideSecondHint();
             _view.ApplySweep(false, 0f, 0f, 0f, -1);
+            _view.ApplyNeonOutline(false);
         }
 
         private void TickWin(float deltaTime)
@@ -632,6 +691,7 @@ namespace Meditation.Game
             _view.HideHint();
             _view.HideSecondHint();
             _view.ApplySweep(false, 0f, 0f, 0f, -1);
+            _view.ApplyNeonOutline(false);
 
             // The wallpaper of thoughts used to BE the defeat screen, and the level had to be buried
             // under it before the crank had anything to wipe. The designer has drawn that screen now
@@ -639,7 +699,10 @@ namespace Meditation.Game
             // the field is left exactly as the player lost it — which is what shows through as the
             // handle wipes the screen away.
             _view.StageDefeat();
-            _view.ShowOutcomeScreen(ArtScreens.GameOver);
+            // …with a plate under its copy: the picture is what dissolves, and half-dissolved it puts
+            // the level's own marker hatching straight through the words «Мысли захватили тебя…»
+            // (design skeptic, 2026-08-08 — frame Game12).
+            _view.ShowOutcomeScreen(ArtScreens.GameOver, withTextPlate: true);
             _view.OutcomeAlpha = 1f;
             _wipeTurns = 0f;
         }
@@ -679,8 +742,8 @@ namespace Meditation.Game
             return "уровень " + _level.Number + " · " + _level.Title + "   [" + stage + "]\n" +
                    (_teaches ? "обучение: " + Beat + "\n" : "") +
                    _runtime.Readout() +
-                   "таймер: " + _rules.TimeLeft.ToString("0") + " с" +
-                   (TimerRunning ? "" : " (стоит)") + "\n" +
+                   "перекрытие: " + _runtime.Field.OverlapPercent.ToString("0") + " % / " +
+                   TuningConfig.LossOverlapPercent.ToString("0") + " %\n" +
                    "передышка: " + _rules.BreatherLeft.ToString("0.0") + " с\n" +
                    "луч: " + (_sweep.Active ? "идёт" : "ждёт") +
                    ", период " + _sweep.PeriodOfThisLevel.ToString("0.0") + " с";

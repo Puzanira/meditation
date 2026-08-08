@@ -7,8 +7,8 @@ namespace Meditation.View
 {
     /// <summary>
     /// Screen S3 for a real level: the art drop's background plate, its details on the positions the
-    /// designer authored, its vessel, its turquoise thoughts, and the HUD SCREENS.md fixes (N slots,
-    /// the sun-dial timer, the crank indicator).
+    /// designer authored, its vessel with its progress bar, its thoughts, and the HUD (N slots and the
+    /// crank indicator — the sun-dial went out with the timer, founder 2026-08-07).
     ///
     /// It is the art twin of <see cref="StageView"/>, not a replacement: the stand keeps its greybox
     /// so the mechanics can still be judged without a picture in the way. Both implement
@@ -43,11 +43,13 @@ namespace Meditation.View
 
         private readonly List<Image> _detailImages = new List<Image>();
         private readonly List<Image> _detailRings = new List<Image>();
+        private readonly List<Image> _detailOutlines = new List<Image>();
         private readonly List<Image> _slots = new List<Image>();
         private readonly List<Image> _slotFills = new List<Image>();
         private readonly List<Image> _vesselContents = new List<Image>();
         private readonly List<Vector2> _vesselContentSizes = new List<Vector2>();
         private readonly List<Material> _sweepMaterials = new List<Material>();
+        private readonly List<Material> _outlineMaterials = new List<Material>();
 
         /// <summary>
         /// The thoughts as of the last <see cref="SyncThoughts"/> — kept only so a progress ring can
@@ -63,9 +65,10 @@ namespace Meditation.View
         private CanvasGroup _thoughtsGroup;
         private CanvasGroup _vesselGroup;
         private Image _outcome;
+        private Image _outcomePlate;
         private Image _crankHalo;
-        private Image _timerPlate;
         private RectTransform _vesselWindow;
+        private Material _gazeMaterial;
 
         private float _vesselBounce;
         private float _pulse;
@@ -107,15 +110,22 @@ namespace Meditation.View
         public RectTransform VesselRect => _vesselWindow != null ? _vesselWindow : _vessel.rectTransform;
         public Image Background => _background;
 
-        public Image Sun { get; private set; }
-        public Image SunDial { get; private set; }
-        public Text TimerLabel { get; private set; }
         public Image CrankDial { get; private set; }
         public Image CrankArc { get; private set; }
         public RectTransform CrankNeedle { get; private set; }
         public Image Thread { get; private set; }
+
+        /// <summary>
+        /// The neon aim (<c>Meditation/GazeNeon</c>). One image where there used to be three: the pale
+        /// disc, the dashed ring sprite and their outline were all invisible on a photographic plate,
+        /// and the founder asked for the circle to be «крупнее и заметнее». Kept under its old name
+        /// because everything that asks «виден ли взгляд» asks about this rect.
+        /// </summary>
         public Image Gaze { get; private set; }
-        public Image GazeRing { get; private set; }
+
+        /// <summary>Same object as <see cref="Gaze"/> — the ring IS the circle now, not a second layer.</summary>
+        public Image GazeRing => Gaze;
+
         public Image GazeArc { get; private set; }
         public Image PeakVignette { get; private set; }
 
@@ -139,6 +149,11 @@ namespace Meditation.View
         /// </summary>
         public Image OutcomeScreen => _outcome;
 
+        /// <summary>
+        /// The dark plate under the defeat screen's own copy — see <see cref="DefeatTextPlate"/>.
+        /// </summary>
+        public Image OutcomeTextPlate => _outcomePlate;
+
         public IReadOnlyList<Image> Slots => _slots;
         public IReadOnlyList<Image> DetailImages => _detailImages;
         public IReadOnlyList<ArtThoughtView> ThoughtViews => _thoughtPool;
@@ -154,6 +169,9 @@ namespace Meditation.View
 
         /// <summary>The vessel's fill indicator — present on level 3, where the bag is baked in.</summary>
         public Image VesselFillLevel => _vesselFillLevel;
+
+        /// <summary>The bar's track — its own place on the screen, which the suite measures against.</summary>
+        public Image VesselFillTrack => _vesselFillTrack;
 
         /// <summary>The haul inside the vessel, in collection order — the render gate measures these.</summary>
         public IReadOnlyList<Image> VesselContents => _vesselContents;
@@ -228,6 +246,7 @@ namespace Meditation.View
                 Ui.Place(image.rectTransform, spec.Home.x, spec.Home.y, spec.Size.x, spec.Size.y);
                 GiveItsOwnSweepMaterial(image);
                 _detailImages.Add(image);
+                GiveItsOwnNeonOutline(image, spec);
 
                 // The ring goes round the INK, not round the rectangle: the plane is drawn with 600 px
                 // of contrail behind it, so a ring centred on its box circles empty sky.
@@ -254,22 +273,86 @@ namespace Meditation.View
                 ? RingRadius(_level.Details[index].Size)
                 : 0f;
 
+        /// <summary>
+        /// The neon aim: one quad, one shader, a radius that comes off the panel every frame.
+        ///
+        /// The quad is drawn BIGGER than the circle (<see cref="GazeQuadMargin"/>) because the glow is
+        /// the half of neon that reads — clipped at the ring's own radius it goes back to being a
+        /// hard-edged outline, which is the thing that was invisible in the first place.
+        /// </summary>
         private void BuildGaze()
         {
-            Gaze = Ui.Circle(DetailsLayer, "Gaze", 960f, 540f, GazeSelector.Radius,
-                new Color(0.478f, 0.655f, 0.851f, 0.25f), Color.clear);
-            GazeRing = Ui.NewImage(DetailsLayer, "GazeRing");
-            GazeRing.sprite = UiSprites.DashedRing;
-            GazeRing.color = LevelOneData.Gaze;
-            Ui.Place(GazeRing.rectTransform, 960f, 540f, GazeSelector.Radius * 2f, GazeSelector.Radius * 2f);
+            Gaze = Ui.NewImage(DetailsLayer, "Gaze");
+            Gaze.sprite = UiSprites.Circle;   // any opaque quad: the shader decides what is drawn
+            Gaze.color = Color.white;
+            Gaze.raycastTarget = false;
+
+            // Ui.Place, not a bare sizeDelta: a fresh RectTransform anchors to its parent's CENTRE,
+            // and every design coordinate in this project is measured from the top-left. Placed once
+            // here so ApplyGazeSize below can move the SIZE alone (this cost the neon aim its first
+            // gate run — the circle was drawn a screen and a half off the frame and the picture test
+            // read «прицела нет»).
+            Ui.Place(Gaze.rectTransform, 960f, 540f, 1f, 1f);
+
+            var shader = Resources.Load<Shader>(LevelCatalog.ArtRoot + "shaders/gaze-neon");
+            if (shader != null)
+            {
+                _gazeMaterial = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+                _gazeMaterial.SetColor(NeonColourId, NeonAim);
+                Gaze.material = _gazeMaterial;
+            }
+            else
+            {
+                // No shader must not mean no aim: fall back to the flat disc the stand draws.
+                Gaze.color = new Color(0.478f, 0.655f, 0.851f, 0.4f);
+            }
+
             GazeArc = Ui.Ring(DetailsLayer, "GazeArc", 960f, 540f, GazeSelector.Radius + 14f,
-                LevelOneData.VesselStroke);
+                NeonAim);
             GazeArc.fillAmount = 0f;
 
+            ApplyGazeSize();
+
             Gaze.gameObject.SetActive(false);
-            GazeRing.gameObject.SetActive(false);
             GazeArc.gameObject.SetActive(false);
         }
+
+        /// <summary>How much wider than the circle the neon quad is drawn, so the bloom is not clipped.</summary>
+        public const float GazeQuadMargin = 1.45f;
+
+        /// <summary>
+        /// The neon's colour — the same turquoise the drop's own hint buttons are painted in (#8fd7d6,
+        /// measured across навoди / крути ручку / тащи). The aim belongs to the same set of things that
+        /// say «сюда», so it is the same ink.
+        /// </summary>
+        public static readonly Color NeonAim = new Color(0.561f, 0.843f, 0.839f, 1f);
+
+        /// <summary>
+        /// Push the panel's radius / glow / ring width into the material and the rect. Called every
+        /// frame the aim is drawn, because these are sliders and «правки действуют сразу».
+        /// </summary>
+        private void ApplyGazeSize()
+        {
+            float radius = GazeSelector.Radius;
+            float quad = radius * 2f * GazeQuadMargin;
+            Gaze.rectTransform.sizeDelta = new Vector2(quad, quad);
+
+            if (_gazeMaterial != null)
+            {
+                // In fractions of the quad, which is what the shader works in.
+                _gazeMaterial.SetFloat(GazeRingId, 0.5f / GazeQuadMargin);
+                _gazeMaterial.SetFloat(GazeRingWidthId,
+                    Mathf.Clamp(Tuning.TuningConfig.GazeNeonRingPx * 0.5f / Mathf.Max(1f, quad), 0.002f, 0.25f));
+                _gazeMaterial.SetFloat(GazeGlowId, Mathf.Max(0f, Tuning.TuningConfig.GazeNeonGlow));
+            }
+
+            GazeArc.rectTransform.sizeDelta = new Vector2((radius + 14f) * 2f, (radius + 14f) * 2f);
+        }
+
+        private static readonly int NeonColourId = Shader.PropertyToID("_Neon");
+        private static readonly int GazeRingId = Shader.PropertyToID("_RingU");
+        private static readonly int GazeRingWidthId = Shader.PropertyToID("_RingWidthU");
+        private static readonly int GazeGlowId = Shader.PropertyToID("_Glow");
 
         private void BuildVessel()
         {
@@ -301,18 +384,27 @@ namespace Meditation.View
                 Ui.Place(_vessel.rectTransform, centre.x, centre.y, size.x, size.y);
             }
 
-            if (!_level.VesselIsBaked) return;
+            // The progress bar under the vessel, on EVERY level (founder, 2026-08-07).
+            //
+            // It started as level 3's own workaround: that vessel is painted into the plate, so
+            // «наполнение» could not be shown by putting things inside it and SCREENS asked for an
+            // overlay indicator. The bar that came out of it turned out to be the thing the other four
+            // levels were missing too — the haul inside a bucket or a briefcase is readable only if you
+            // already know how many details this level has, and the slot row at the top of the frame is
+            // the other side of the screen from where the player is looking. Same widget, same numbers,
+            // same colour on all five: the metro's indicator is left exactly as it was, and the reason
+            // it can be is that there was never anything metro-specific about it beyond where it stood.
+            // …and it lives on the HUD LAYER, not on the vessel's (design gate, 2026-08-08). SCREENS
+            // files it under the HUD — «мысли HUD не закрывают» — and it was the one HUD widget that
+            // did not obey that, because it was built here, beside the thing it stands under. With the
+            // cover toggle on (the chaos peak, the office's foreground strip) the thought layer draws
+            // above the vessel, so the bar disappeared under the blobs at exactly the moment it is the
+            // only thing telling the player how much of the level is left. Where it STANDS is still the
+            // vessel's business (LevelCatalog.VesselBarRectOf); what may cover it is the HUD's.
+            Rect track = LevelCatalog.VesselBarRectOf(_level);
 
-            // Level 3's vessel is painted into the plate, so «наполнение» cannot be shown by putting
-            // things inside it — SCREENS asks for an overlay indicator instead. The first one sat ON
-            // the bag: a translucent card over 85 % of it, which reported on a bag it was hiding.
-            // So the indicator stepped off the bag — a slim bar on the floor UNDER it, in the metro's
-            // own warm orange (the seats), filling left to right with the haul.
-            float trackWidth = size.x * 0.72f;
-            float trackY = centre.y + size.y * 0.5f + FillBarGap;
-
-            _vesselFillTrack = Ui.Rounded(VesselLayer, "VesselFillTrack",
-                centre.x, trackY, trackWidth, FillBarHeight,
+            _vesselFillTrack = Ui.Rounded(HudLayer, "VesselFillTrack",
+                track.center.x, track.center.y, track.width, track.height,
                 new Color(0f, 0f, 0f, 0.22f), new Color(1f, 1f, 1f, 0.32f), 2f, 7);
 
             _vesselFillLevel = Ui.NewImage(_vesselFillTrack.transform, "VesselFillLevel");
@@ -326,13 +418,7 @@ namespace Meditation.View
             fill.sizeDelta = new Vector2(0f, -6f);
         }
 
-        /// <summary>Height of the baked vessel's fill bar, design px.</summary>
-        public const float FillBarHeight = 16f;
-
-        /// <summary>Gap between the bag's lower edge and its bar — the bar never touches the bag.</summary>
-        public const float FillBarGap = 22f;
-
-        /// <summary>The metro's own warm orange (the seats), so the indicator belongs to the level.</summary>
+        /// <summary>The warm orange the metro's indicator was painted in, now the bar's colour on all five.</summary>
         private static readonly Color MetroFill = new Color(0.89f, 0.45f, 0.28f, 0.92f);
 
         /// <summary>Padding between a slot's border and the picture inside it, design px.</summary>
@@ -387,31 +473,11 @@ namespace Meditation.View
 
             // Positions come from the level, not from LevelOneData: the stand keeps the SCREENS base,
             // a real level moves the widget off whatever the art drop painted there (founder 2026-07-31).
-            Vector2 sun = _level.SunCentre;
+            //
+            // The sun-dial and its caption stood here until 2026-08-07. They are gone with the timer:
+            // there is no clock to draw, and a dial that reports nothing is worse than an empty corner
+            // because it still claims a corner of every plate (see LevelRules).
             Vector2 crank = _level.CrankIndicatorCentre;
-
-            Sun = Ui.Circle(HudLayer, "Sun", sun.x, sun.y,
-                LevelOneData.SunRadius, new Color(1f, 1f, 1f, 0.35f), LevelOneData.SunStroke, 4f);
-            SunDial = Ui.NewImage(HudLayer, "SunDial");
-            SunDial.sprite = UiSprites.Circle;
-            SunDial.type = Image.Type.Filled;
-            SunDial.fillMethod = Image.FillMethod.Radial360;
-            SunDial.fillOrigin = (int)Image.Origin360.Top;
-            // The SPENT sector grows clockwise from 12, so the REMAINING wedge fills anticlockwise.
-            SunDial.fillClockwise = false;
-            SunDial.color = LevelOneData.SunFill;
-            Ui.Place(SunDial.rectTransform, sun.x, sun.y,
-                LevelOneData.SunRadius * 2f - 8f, LevelOneData.SunRadius * 2f - 8f);
-
-            // SCREENS «Зоны»: подпись-коробка 300×40 под таймером. A bare number floating over a
-            // photograph is not a HUD element — the plate is what makes it one, on any plate.
-            Rect caption = LevelCatalog.TimerLabelRectOf(_level);
-            _timerPlate = Ui.Rounded(HudLayer, "TimerPlate", caption.center.x, caption.center.y,
-                caption.width, caption.height, new Color(0.09f, 0.10f, 0.12f, 0.55f), Color.clear, 0f, 10);
-            TimerLabel = Ui.Label(HudLayer, "TimerLabel", "", caption.center.x, caption.center.y,
-                caption.width, caption.height, 30, Color.white);
-
-            SetTimerRunning(false);
 
             _crankHalo = Ui.Circle(HudLayer, "CrankHalo", crank.x, crank.y,
                 LevelOneData.CrankHaloRadius, LevelOneData.CrankHaloOk, Color.clear);
@@ -450,8 +516,46 @@ namespace Meditation.View
         /// the retry acts on — «каждый оборот динамо стирает ~10 % штриховки с экрана» (SCREENS S5) is
         /// this image dissolving back into the level the player just lost.
         /// </summary>
+        /// <summary>
+        /// Where the defeat screen's copy lives, in design px: the three lines «Мысли захватили тебя…»
+        /// plus the underline that stands for the retry, with a margin around them.
+        ///
+        /// Measured off the render itself (`арт/экраны/game-over-screen.png`, 3840×2160 → ×0.5): the lit
+        /// pixels of the text run x 480…1448, y 440…660. The plate is that box grown by ~60 px, so no
+        /// glyph and no part of the glow sits on its edge.
+        /// </summary>
+        public static readonly Rect DefeatTextPlate = new Rect(404f, 385f, 1120f, 330f);
+
+        /// <summary>
+        /// How dark the plate is at full strength. The text is neon on near-black in the render, so the
+        /// plate only has to give it back the near-black — anything lighter and the marker hatching of
+        /// the level underneath comes back through the letters.
+        /// </summary>
+        private const float DefeatPlateOpacity = 0.85f;
+
+        /// <summary>
+        /// Below this much of the screen left, the plate fades out with it.
+        ///
+        /// The plate cannot simply follow the screen's own alpha: at the retry's midpoint that would
+        /// leave it at half strength, which is where the hatching wins (the frame the design skeptic
+        /// returned on 2026-08-08 measured 49/255 of contrast between the copy and what was behind it).
+        /// It also cannot stay: the last turn of the handle clears the screen, and a black rectangle
+        /// outliving the picture it was holding up is a bug of its own. So it holds full strength for
+        /// the part of the wipe where there is still text to read, and leaves over the last quarter.
+        /// </summary>
+        private const float DefeatPlateFadeTail = 0.25f;
+
         private void BuildOutcome()
         {
+            // Built BEFORE the screen itself, so it draws under it: the plate is scaffolding for the
+            // render's own text, not something laid over the designer's picture.
+            _outcomePlate = Ui.Rounded(OutcomeLayer, "OutcomeTextPlate",
+                DefeatTextPlate.center.x, DefeatTextPlate.center.y,
+                DefeatTextPlate.width, DefeatTextPlate.height,
+                new Color(0f, 0f, 0f, DefeatPlateOpacity), Color.clear, 0f, 28);
+            _outcomePlate.raycastTarget = false;
+            _outcomePlate.gameObject.SetActive(false);
+
             _outcome = Ui.NewImage(OutcomeLayer, "OutcomeScreen");
             _outcome.color = new Color(1f, 1f, 1f, 0f);
             _outcome.raycastTarget = false;
@@ -460,13 +564,21 @@ namespace Meditation.View
         }
 
         /// <summary>Put a drawn screen over the level, fully opaque.</summary>
-        public void ShowOutcomeScreen(string artKey)
+        /// <param name="withTextPlate">
+        /// Only the defeat screen asks for it, and only because it is the one screen that DISSOLVES:
+        /// while it does, the level's thoughts show through its own copy. The victory screen is up at
+        /// full opacity for its two seconds and needs nothing under it.
+        /// </param>
+        public void ShowOutcomeScreen(string artKey, bool withTextPlate = false)
         {
             _outcome.sprite = ArtLibrary.Get(artKey);
             // A missing render must not be an invisible «screen»: black is what the flow means here,
             // and it is loud enough that the design gate cannot miss it.
             _outcome.color = _outcome.sprite != null ? Color.white : Color.black;
             _outcome.gameObject.SetActive(true);
+
+            if (_outcomePlate != null) _outcomePlate.gameObject.SetActive(withTextPlate);
+            SyncPlateToScreen();
         }
 
         /// <summary>How much of the outcome screen is still up, 1 = whole, 0 = wiped away.</summary>
@@ -479,7 +591,16 @@ namespace Meditation.View
                 Color c = _outcome.color;
                 c.a = Mathf.Clamp01(value);
                 _outcome.color = c;
+                SyncPlateToScreen();
             }
+        }
+
+        private void SyncPlateToScreen()
+        {
+            if (_outcomePlate == null || !_outcomePlate.gameObject.activeSelf) return;
+            float left = _outcome != null ? _outcome.color.a : 0f;
+            _outcomePlate.color = new Color(0f, 0f, 0f,
+                DefeatPlateOpacity * Mathf.Clamp01(left / DefeatPlateFadeTail));
         }
 
         public void HideOutcomeScreen()
@@ -487,57 +608,10 @@ namespace Meditation.View
             if (_outcome == null) return;
             _outcome.gameObject.SetActive(false);
             _outcome.sprite = null;
+            if (_outcomePlate != null) _outcomePlate.gameObject.SetActive(false);
         }
 
         // ---- state -------------------------------------------------------------------------------
-
-        /// <summary>
-        /// Pale sun = the timer is not running (frames 4–8); bright = it is.
-        ///
-        /// «Pale» used to mean a translucent disc with no dial, no hand and no number — a blur in the
-        /// corner rather than a clock that happens to be stopped. Now the whole instrument stays
-        /// legible and only loses strength: the ring, the full (untouched) sector and the caption are
-        /// all there, so the player reads «время ещё не пошло», not «что-то белое справа сверху».
-        /// </summary>
-        public void SetTimerRunning(bool running)
-        {
-            float alpha = running ? 1f : 0.72f;
-
-            Color sun = Sun.color;
-            sun.a = alpha;
-            Sun.color = sun;
-
-            Image sunFill = Sun.transform.childCount > 0
-                ? Sun.transform.GetChild(0).GetComponent<Image>()
-                : null;
-            if (sunFill != null)
-            {
-                Color c = sunFill.color;
-                c.a = (running ? 0.35f : 0.22f);
-                sunFill.color = c;
-            }
-
-            Color dial = SunDial.color;
-            dial.a = running ? 1f : 0.55f;
-            SunDial.color = dial;
-
-            // The caption stays up while the clock is held: the number is what says how long the level
-            // WILL be, and its plate is the one SCREENS draws under the sun (300×40).
-            TimerLabel.gameObject.SetActive(true);
-            TimerLabel.color = running ? Color.white : new Color(1f, 1f, 1f, 0.8f);
-            if (_timerPlate != null)
-            {
-                Color plate = _timerPlate.color;
-                plate.a = running ? 0.55f : 0.4f;
-                _timerPlate.color = plate;
-            }
-        }
-
-        public void SetTimer(float remaining01, float secondsLeft)
-        {
-            SunDial.fillAmount = Mathf.Clamp01(remaining01);
-            TimerLabel.text = Mathf.CeilToInt(Mathf.Max(0f, secondsLeft)) + " с";
-        }
 
         public void SetCrank(float totalDegrees, bool spinning, bool alarm = false)
         {
@@ -887,12 +961,14 @@ namespace Meditation.View
         public void SetGaze(Vector2 position, float dwell01, bool visible)
         {
             Gaze.gameObject.SetActive(visible);
-            GazeRing.gameObject.SetActive(visible);
             GazeArc.gameObject.SetActive(visible && dwell01 > 0f);
             if (!visible) return;
 
+            // Radius, glow and ring width are sliders, so they are re-read here rather than baked at
+            // build time — the founder moves them while the level she is judging is on screen.
+            ApplyGazeSize();
+
             Ui.MoveTo(Gaze.rectTransform, position);
-            Ui.MoveTo(GazeRing.rectTransform, position);
             Ui.MoveTo(GazeArc.rectTransform, position);
             GazeArc.fillAmount = Mathf.Clamp01(dwell01);
         }
@@ -1117,6 +1193,166 @@ namespace Meditation.View
             _sweepMaterials.Add(material);
         }
 
+        // ---- неон-обводка деталей [toggle] ---------------------------------------------------------
+
+        /// <summary>
+        /// Hang a neon rim on a detail (<c>Meditation/DetailOutline</c>), as a CHILD of its Image.
+        ///
+        /// A child, not a sibling, and that is the whole design: the rim then inherits the detail's
+        /// position as it travels the thread, its pulse scale, its reparenting into the vessel layer
+        /// while it is being dragged, and its disappearance when it is collected. A sibling would have
+        /// to be walked through all four by hand, and the ring above it is the standing proof of how
+        /// that goes — <see cref="SetDetailProgress"/> exists mostly to keep one extra object in step
+        /// with one sprite. In UGUI a child draws ABOVE its parent, which is exactly why the shader
+        /// subtracts the sprite's own alpha: what is left is the rim outside the ink.
+        /// </summary>
+        private void GiveItsOwnNeonOutline(Image detail, ArtDetail spec)
+        {
+            var shader = Resources.Load<Shader>(LevelCatalog.ArtRoot + "shaders/detail-outline");
+            if (shader == null)
+            {
+                _detailOutlines.Add(null);
+                _outlineMaterials.Add(null);
+                return;
+            }
+
+            Image rim = Ui.NewImage(detail.transform, "Neon_" + spec.Name);
+            rim.sprite = detail.sprite;
+            // NOT preserveAspect: the quad is deliberately not the sprite's own rectangle any more (it
+            // is padded, see ApplyNeonOutline), and letterboxing it would slide the drawing inside the
+            // quad out from under the mapping the shader undoes.
+            rim.preserveAspect = false;
+            rim.raycastTarget = false;
+            RectTransform rt = rim.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            var material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+            material.SetColor(NeonColourId, NeonAim);
+            material.SetVector(OutlineUvRectId, UvRectOf(detail.sprite));
+            rim.material = material;
+            rim.gameObject.SetActive(false);   // [toggle] ships OFF
+
+            _detailOutlines.Add(rim);
+            _outlineMaterials.Add(material);
+        }
+
+        /// <summary>
+        /// Show/hide the rims and push the panel's numbers into them. Called every frame the level
+        /// ticks, because both the toggle and the two sliders act at once.
+        ///
+        /// The dilation goes in as UV of each sprite's own rectangle — same reason as the light band
+        /// and the thought halo: one texel radius would be a sixth of the office paperclip and a
+        /// eightieth of the plane's contrail.
+        /// </summary>
+        /// <param name="allowed">
+        /// False on the outcome screens: the win dissolves into a tableau and the loss into a drawn
+        /// screen, and neither of them is a moment when the game is still pointing at details.
+        /// </param>
+        public void ApplyNeonOutline(bool allowed = true)
+        {
+            bool on = allowed && Tuning.TuningConfig.DetailNeonOutline;
+
+            for (int i = 0; i < _detailOutlines.Count; i++)
+            {
+                Image rim = _detailOutlines[i];
+                if (rim == null) continue;
+
+                if (rim.gameObject.activeSelf != on) rim.gameObject.SetActive(on);
+                if (!on) continue;
+
+                Material material = _outlineMaterials[i];
+                if (material == null) continue;
+
+                ArtDetail spec = _level.Details[i];
+                Vector2 box = spec.Size;
+                float px = RimRadiusPx(spec, Mathf.Max(0f, Tuning.TuningConfig.DetailOutlinePx));
+
+                // The quad is grown by the radius (plus a pixel of air, so the outermost tap is not the
+                // very last row of the quad) and the shader maps the drawing back inside it.
+                float pad = px + RimPadAirPx;
+                RectTransform rt = rim.rectTransform;
+                rt.offsetMin = new Vector2(-pad, -pad);
+                rt.offsetMax = new Vector2(pad, pad);
+
+                material.SetVector(OutlineSpreadId, new Vector4(
+                    px / Mathf.Max(1f, box.x), px / Mathf.Max(1f, box.y), 0f, 0f));
+                material.SetVector(OutlinePadId, new Vector4(
+                    pad / Mathf.Max(1f, box.x + 2f * pad), pad / Mathf.Max(1f, box.y + 2f * pad), 0f, 0f));
+                material.SetFloat(OutlineStrengthId, Mathf.Clamp01(Tuning.TuningConfig.DetailOutlineStrength));
+            }
+        }
+
+        /// <summary>
+        /// How wide the rim may be drawn around THIS detail, design px — the panel's number, capped by
+        /// the detail's own drawing.
+        ///
+        /// The rim is a dilation, and a dilation is only an outline while it is narrower than the thing
+        /// it goes around: a rim of radius r adds 2r to the width of every stroke, so at the shipped
+        /// 6 px the office paperclip — a 10.7 px wire once it is drawn at 40×56 — grew into a solid
+        /// turquoise blob, and the librarian's glasses lost both lenses and their bridge (design gate,
+        /// 2026-08-08). The cap is therefore a quarter of the stroke's own thickness, which is the same
+        /// sentence as «the rim may add at most half of the stroke's width to it».
+        ///
+        /// The thickness comes from <see cref="ArtLibrary.StrokeThicknessOf"/> in the PNG's pixels and is
+        /// brought down to the size the detail is DRAWN at — the paperclip's canvas is 79×113 and its
+        /// place on the plate is 40×56, and a cap taken in canvas pixels would be twice as generous as
+        /// the picture allows. An unmeasured sprite keeps the panel's number, so this can only ever take
+        /// the rim in, never make the slider a lie in the other direction.
+        /// </summary>
+        public static float RimRadiusPx(ArtDetail spec, float wanted)
+        {
+            if (wanted <= MinRimPx) return wanted;
+
+            float canvasThickness = ArtLibrary.StrokeThicknessOf(spec.Sprite);
+            if (float.IsInfinity(canvasThickness) || canvasThickness > 1e6f) return wanted;
+
+            Sprite sprite = ArtLibrary.Get(spec.Sprite);
+            if (sprite == null) return wanted;
+
+            Vector2 canvas = sprite.rect.size;
+            if (canvas.x < 1f || canvas.y < 1f) return wanted;
+
+            float scale = Mathf.Min(spec.Size.x / canvas.x, spec.Size.y / canvas.y);
+            return Mathf.Clamp(canvasThickness * scale * RimShareOfStroke, MinRimPx, wanted);
+        }
+
+        /// <summary>A rim adds twice its radius to a stroke; a quarter of the stroke is half its width.</summary>
+        public const float RimShareOfStroke = 0.25f;
+
+        /// <summary>Below this a rim is not a rim any more, so the cap stops taking it in.</summary>
+        public const float MinRimPx = 1.5f;
+
+        /// <summary>Air past the outermost tap, so the rim's last row is not the quad's last row.</summary>
+        private const float RimPadAirPx = 2f;
+
+        /// <summary>
+        /// The patch of texture an <c>Image</c> stretches across its quad, as (min, size) in UV.
+        ///
+        /// Needed because the outline shader has to be able to answer «outside the drawing» with zero,
+        /// and «outside» is a statement about the SPRITE, not about the texture: a sprite that is a
+        /// region of a bigger texture would otherwise have its neighbours dilated into its rim.
+        /// </summary>
+        private static Vector4 UvRectOf(Sprite sprite)
+        {
+            if (sprite == null || sprite.texture == null) return new Vector4(0f, 0f, 1f, 1f);
+
+            Rect rect = sprite.textureRect;
+            float w = Mathf.Max(1, sprite.texture.width);
+            float h = Mathf.Max(1, sprite.texture.height);
+            return new Vector4(rect.x / w, rect.y / h, rect.width / w, rect.height / h);
+        }
+
+        /// <summary>The rims, in catalogue order — null where the shader is missing. The suite reads these.</summary>
+        public IReadOnlyList<Image> DetailOutlines => _detailOutlines;
+
+        private static readonly int OutlineSpreadId = Shader.PropertyToID("_SpreadUV");
+        private static readonly int OutlinePadId = Shader.PropertyToID("_PadUV");
+        private static readonly int OutlineUvRectId = Shader.PropertyToID("_UvRect");
+        private static readonly int OutlineStrengthId = Shader.PropertyToID("_OutlineStrength");
+
         private static readonly int SweepCentreId = Shader.PropertyToID("_SweepU");
         private static readonly int SweepWidthId = Shader.PropertyToID("_SweepWidthU");
         private static readonly int SweepStrengthId = Shader.PropertyToID("_SweepStrength");
@@ -1165,6 +1401,14 @@ namespace Meditation.View
             for (int i = 0; i < _sweepMaterials.Count; i++)
                 if (_sweepMaterials[i] != null) Object.DestroyImmediate(_sweepMaterials[i]);
             _sweepMaterials.Clear();
+
+            for (int i = 0; i < _outlineMaterials.Count; i++)
+                if (_outlineMaterials[i] != null) Object.DestroyImmediate(_outlineMaterials[i]);
+            _outlineMaterials.Clear();
+            _detailOutlines.Clear();
+
+            if (_gazeMaterial != null) Object.DestroyImmediate(_gazeMaterial);
+            _gazeMaterial = null;
 
             if (Root != null) Object.Destroy(Root.gameObject);
             Root = null;

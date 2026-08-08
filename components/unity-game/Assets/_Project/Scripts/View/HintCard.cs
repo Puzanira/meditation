@@ -9,7 +9,7 @@ namespace Meditation.View
         /// <summary>Динамо / сбор — зелёный #1a6e46.</summary>
         Crank = 0,
         /// <summary>
-        /// Тряска — бирюза дропа #8fd7d6.
+        /// Отгон (взмах над датчиком) — бирюза дропа #8fd7d6.
         ///
         /// Was the mock's brick red #8f2f2c, and the mock was greybox: a white card with a word on it,
         /// standing on flat rectangles. This beat is now the ONLY hint with no button — the drop ships
@@ -18,7 +18,7 @@ namespace Meditation.View
         /// (measured off навoди / крути ручку / тащи: 45 756 px of #8fd7d6, their single dominant
         /// colour), so the arrow reads as the fourth button's line rather than as an alarm.
         /// </summary>
-        Shake = 1,
+        Swipe = 1,
         /// <summary>Взгляд — синий #39587a.</summary>
         Gaze = 2
     }
@@ -26,7 +26,7 @@ namespace Meditation.View
     /// <summary>
     /// The teaching card of the mock: a white rounded card (rx=18) with a 4 px coloured border and
     /// 44 pt text, standing NEXT TO the thing it talks about, with a curved arrow pointing at it.
-    /// Colour says which hand: green = crank, turquoise = shake, blue = gaze.
+    /// Colour says which controller: green = crank, turquoise = the sensors' отгон, blue = the aim.
     ///
     /// The stand had a grey centred line instead; the colour pairing is a through-line of the mock,
     /// so it is rebuilt here rather than approximated.
@@ -163,7 +163,7 @@ namespace Meditation.View
             switch (tone)
             {
                 case HintTone.Crank: return Mechanics.LevelOneData.Hex("1a6e46");
-                case HintTone.Shake: return Mechanics.LevelOneData.Hex("8fd7d6");
+                case HintTone.Swipe: return Mechanics.LevelOneData.Hex("8fd7d6");
                 default: return Mechanics.LevelOneData.Hex("39587a");
             }
         }

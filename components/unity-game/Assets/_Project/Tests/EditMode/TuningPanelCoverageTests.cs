@@ -42,7 +42,9 @@ namespace Meditation.Tests
             "интервал волн",
             "в волне: слабых",
             "в волне: средних",
-            "в волне: крепких"
+            "в волне: крепких",
+            "рост мыслей",
+            "потолок роста"
         };
 
         private static readonly string[] TwoHandsRows =
@@ -51,10 +53,15 @@ namespace Meditation.Tests
             "выбор детали",
             "скорость взгляда",
             "удержание взгляда",
+            "прицел: радиус",
+            "прицел: свечение",
+            "прицел: толщина кольца",
             "интервал волн",
             "в волне: слабых",
             "в волне: средних",
             "в волне: крепких",
+            "рост мыслей",
+            "потолок роста",
             "рост давления в уровне",
             "сокращение интервала за волну",
             "дрейф мыслей к центру",
@@ -67,8 +74,7 @@ namespace Meditation.Tests
 
         private static readonly string[] FullLevelRows =
         {
-            // MECHANICS §5 + §4
-            "длительность уровня",
+            // MECHANICS §5 + §4 («длительность уровня» ушла с таймером, 2026-08-07)
             "передышка после детали",
             "длина передышки",
             "авто-ретрай после поражения",
@@ -76,6 +82,8 @@ namespace Meditation.Tests
             "в волне: слабых",
             "в волне: средних",
             "в волне: крепких",
+            "рост мыслей",
+            "потолок роста",
             "рост давления в уровне",
             "сокращение интервала за волну",
             "дрейф мыслей к центру",
@@ -84,7 +92,10 @@ namespace Meditation.Tests
             "порог поражения (перекрытие)",
             "выбор детали",
             "скорость взгляда",
-            "удержание взгляда"
+            "удержание взгляда",
+            "прицел: радиус",
+            "прицел: свечение",
+            "прицел: толщина кольца"
         };
 
         /// <summary>
@@ -94,7 +105,6 @@ namespace Meditation.Tests
         /// </summary>
         private static readonly string[] GameLevelRows =
         {
-            "длительность уровня",
             "интервал волн",
             "в волне: слабых",
             "в волне: средних",
@@ -103,7 +113,9 @@ namespace Meditation.Tests
             "прочность: средние",
             "прочность: крепкие",
             "скорость дрейфа",
-            "сокращение интервала за волну"
+            "сокращение интервала за волну",
+            "рост мыслей",
+            "потолок роста"
         };
 
         private static readonly string[] GameSharedRows =
@@ -127,7 +139,6 @@ namespace Meditation.Tests
             "передышка после детали",
             "длина передышки",
             "авто-ретрай после поражения",
-            "таймер в обучении стоит",
 
             // MECHANICS §8 «Звук» — заказ founder 2026-08-07: три слоя, все ручки на панель.
             "звук: громкость фона",
@@ -147,7 +158,15 @@ namespace Meditation.Tests
             "луч: ширина полосы",
             "луч: сила подсветки",
             "луч: только по незамеченным",
-            "луч: реже на поздних уровнях"
+            "луч: реже на поздних уровнях",
+
+            // Неон-прицел и неон-обводка деталей — заказ founder 2026-08-07.
+            "прицел: радиус",
+            "прицел: свечение",
+            "прицел: толщина кольца",
+            "неон-обводка деталей",
+            "обводка: толщина",
+            "обводка: яркость"
         };
 
         /// <summary>
@@ -168,7 +187,12 @@ namespace Meditation.Tests
                 { "луч: период", (4f, 20f) },                            // SCREENS «Детали в сцене»
                 { "луч: длительность прохода", (0.6f, 2.5f) },
                 { "луч: ширина полосы", (150f, 600f) },
-                { "луч: сила подсветки", (0.1f, 1f) }
+                { "луч: сила подсветки", (0.1f, 1f) },
+                { "прицел: радиус", (60f, 220f) },                       // founder 2026-08-07
+                { "прицел: свечение", (0.2f, 3f) },
+                { "прицел: толщина кольца", (4f, 40f) },
+                { "обводка: толщина", (2f, 20f) },
+                { "обводка: яркость", (0.1f, 1f) }
             };
 
         [Test]
@@ -214,6 +238,17 @@ namespace Meditation.Tests
             Assert.AreEqual(0.45f, TuningConfig.SweepStrength, 1e-3f);
             Assert.IsTrue(TuningConfig.SweepOnlyUnnoticed);
             Assert.IsTrue(TuningConfig.SweepRarerOnLateLevels);
+
+            // Неон-прицел и обводка. The toggle is the one that matters: the founder asked for the
+            // outline precisely so she could compare it with the pulse and the sweep, and a toggle
+            // that shipped ON would have answered that for her.
+            Assert.AreEqual(130f, TuningConfig.GazeRadiusPx, 1e-3f);
+            Assert.AreEqual(1.2f, TuningConfig.GazeNeonGlow, 1e-3f);
+            Assert.AreEqual(12f, TuningConfig.GazeNeonRingPx, 1e-3f);
+            Assert.IsFalse(TuningConfig.DetailNeonOutline,
+                "Неон-обводка обязана приезжать ВЫКЛЮЧЕННОЙ — её заказали для сравнения.");
+            Assert.AreEqual(6f, TuningConfig.DetailOutlinePx, 1e-3f);
+            Assert.AreEqual(0.8f, TuningConfig.DetailOutlineStrength, 1e-3f);
         }
 
         [Test]
@@ -234,11 +269,12 @@ namespace Meditation.Tests
             // one section would leave the other four free to drift.
             var ranges = new Dictionary<string, (float Min, float Max)>
             {
-                { "длительность уровня", (60f, 180f) },     // MECHANICS §5
                 { "прочность: слабые", (2f, 12f) },         // MECHANICS §3
                 { "прочность: средние", (2f, 12f) },
                 { "прочность: крепкие", (2f, 12f) },
-                { "скорость дрейфа", (20f, 60f) }           // SCREENS §Мысли
+                { "скорость дрейфа", (20f, 60f) },          // SCREENS §Мысли
+                { "рост мыслей", (0f, 10f) },               // founder 2026-08-07
+                { "потолок роста", (1f, 3f) }
             };
 
             for (int level = 0; level < TuningConfig.LevelBands; level++)
@@ -289,6 +325,46 @@ namespace Meditation.Tests
         [Test]
         public void ShakeAwayPanel_MatchesTheSpec() =>
             AssertRows("Сценка 2", TuningCatalog.ShakeAway(), ShakeAwayRows);
+
+        /// <summary>
+        /// The two «порог удара» rows kept their labels when the отгон moved to the height sensors
+        /// (2026-08-07), and that is precisely why their RANGES have to be pinned: the numbers under
+        /// them are now доли хода датчика and ед/с of sensor speed, not stick deflection, so a slider
+        /// left at the joystick's 0.1–1 / 0.5–20 would be a row the founder cannot tune to anything
+        /// the sensor can do. Both panels that carry them are checked, because they are the same two
+        /// rows and a copy that drifted would be worse than a missing one.
+        /// </summary>
+        [Test]
+        public void TheSwipeThresholds_CarryTheSensorsRanges_OnEveryPanelThatShowsThem()
+        {
+            foreach ((string where, IList<TuningParam> rows) in new[]
+                     {
+                         ("Сценка 2", TuningCatalog.ShakeAway()),
+                         ("панель игры", TuningCatalog.GameShared())
+                     })
+            {
+                var amplitude = rows.OfType<FloatParam>().FirstOrDefault(p => p.Label == "порог удара: амплитуда");
+                var sharpness = rows.OfType<FloatParam>().FirstOrDefault(p => p.Label == "порог удара: резкость");
+
+                Assert.IsNotNull(amplitude, where + ": нет строки порога амплитуды взмаха.");
+                Assert.IsNotNull(sharpness, where + ": нет строки резкости взмаха.");
+
+                Assert.AreEqual(0.05f, amplitude.Min, 1e-3f, where + ": амплитуда — доли хода датчика (0..1).");
+                Assert.AreEqual(0.6f, amplitude.Max, 1e-3f, where + ": амплитуда — доли хода датчика (0..1).");
+                Assert.AreEqual(0.1f, sharpness.Min, 1e-3f, where + ": резкость — единицы датчика в секунду.");
+                Assert.AreEqual(3f, sharpness.Max, 1e-3f, where + ": резкость — единицы датчика в секунду.");
+            }
+
+            TuningConfig.ResetToDefaults();
+            Assert.AreEqual(0.2f, TuningConfig.SwipeAmplitude, 1e-3f,
+                "Стартовая амплитуда взмаха — пятая часть хода датчика.");
+            Assert.AreEqual(0.6f, TuningConfig.SwipeSharpness, 1e-3f,
+                "Стартовая резкость — половина скорости клавиатурной симуляции (1.25 ед/с).");
+            Assert.That(TuningConfig.SwipeAmplitude, Is.InRange(0.05f, 0.6f),
+                "Стартовое значение обязано лежать внутри своего же слайдера.");
+            Assert.That(TuningConfig.SwipeSharpness, Is.InRange(0.1f, 3f),
+                "Стартовое значение обязано лежать внутри своего же слайдера.");
+        }
 
         [Test]
         public void TwoHandsPanel_MatchesTheSpec() =>
@@ -375,8 +451,10 @@ namespace Meditation.Tests
             AssertRangeEverywhere("пауза затухания", 400f, 1500f);
             AssertRangeEverywhere("скорость дрейфа", 20f, 60f);              // SCREENS §Мысли
             AssertRangeEverywhere("порог поражения (перекрытие)", 85f, 100f);
-            AssertRangeEverywhere("длительность уровня", 60f, 180f);
             AssertRangeEverywhere("длина передышки", 0f, 5f);
+            AssertRangeEverywhere("рост мыслей", 0f, 10f);              // founder 2026-08-07
+            AssertRangeEverywhere("потолок роста", 1f, 3f);
+            AssertRangeEverywhere("прицел: радиус", 60f, 220f);
         }
 
         /// <summary>Assert the range on every panel that has the row, and that at least one does.</summary>

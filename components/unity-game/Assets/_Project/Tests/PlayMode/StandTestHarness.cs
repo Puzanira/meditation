@@ -98,6 +98,19 @@ namespace Meditation.Tests
         }
 
         /// <summary>
+        /// The same search, without the assertion — for the cases where ABSENCE is the claim. «Солнца
+        /// на экране больше нет» is one of them (founder, 2026-08-07), and it cannot be written with
+        /// <see cref="Find"/>, which fails precisely when the thing is gone.
+        /// </summary>
+        public static RectTransform FindOrNull(DesignStage stage, string name)
+        {
+            RectTransform[] all = stage.GetComponentsInChildren<RectTransform>(true);
+            for (int i = 0; i < all.Length; i++)
+                if (all[i].name == name) return all[i];
+            return null;
+        }
+
+        /// <summary>
         /// The check the studio learned to insist on: not "is the object enabled" but "is this thing
         /// actually drawn, at a real size, inside the screen".
         /// </summary>
@@ -239,6 +252,57 @@ namespace Meditation.Tests
 
             Assert.IsTrue(File.Exists(path), "No frame was written for " + shotName);
             Assert.Greater(new FileInfo(path).Length, 5000, shotName + " rendered an empty frame.");
+        }
+
+        /// <summary>
+        /// The same render, cut down to one design-space rectangle and magnified — a close-up.
+        ///
+        /// The frame is 1920×1080 and some of the things the design gate has to judge are forty pixels
+        /// wide: the neon rim on the office paperclip is a two-pixel line, and «покажи, что ободок не
+        /// вырождается в заливку» cannot be answered by pointing at a screenshot of a whole level. The
+        /// magnification is NEAREST-neighbour on purpose — a smooth upscale would invent the very
+        /// smoothness the rim is being judged for.
+        /// </summary>
+        /// <param name="design">What to cut out, in design px (origin top-left).</param>
+        /// <param name="zoom">Whole-number magnification, so one rendered pixel stays one square.</param>
+        public static void ShootCloseUp(string shotName, Color letterbox, Rect design, int zoom = 6)
+        {
+            Directory.CreateDirectory(ScreenshotFolder);
+
+            Texture2D shot = Capture(letterbox);
+            try
+            {
+                int x = Mathf.Clamp(Mathf.RoundToInt(design.xMin), 0, 1919);
+                int y = Mathf.Clamp(Mathf.RoundToInt(design.yMin), 0, 1079);
+                int w = Mathf.Clamp(Mathf.RoundToInt(design.width), 1, 1920 - x);
+                int h = Mathf.Clamp(Mathf.RoundToInt(design.height), 1, 1080 - y);
+
+                Color[] cut = PixelsOf(shot, new RectInt(x, y, w, h));
+                var big = new Texture2D(w * zoom, h * zoom, TextureFormat.RGB24, false);
+                try
+                {
+                    var blown = new Color[w * zoom * h * zoom];
+                    for (int row = 0; row < h * zoom; row++)
+                    for (int column = 0; column < w * zoom; column++)
+                        blown[row * w * zoom + column] = cut[(row / zoom) * w + column / zoom];
+
+                    big.SetPixels(blown);
+                    big.Apply();
+
+                    string path = Path.Combine(ScreenshotFolder, shotName + ".png");
+                    File.WriteAllBytes(path, big.EncodeToPNG());
+                    Assert.IsTrue(File.Exists(path), "No frame was written for " + shotName);
+                    Assert.Greater(new FileInfo(path).Length, 2000, shotName + " rendered an empty frame.");
+                }
+                finally
+                {
+                    Object.DestroyImmediate(big);
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(shot);
+            }
         }
 
         /// <summary>

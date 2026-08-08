@@ -35,10 +35,7 @@ namespace Meditation.Tuning
         {
             return new List<TuningParam>
             {
-                FloatParam.Make("порог удара: амплитуда", 0.1f, 1f,
-                    () => TuningConfig.ShakeAmplitude, v => TuningConfig.ShakeAmplitude = v, "", "0.00"),
-                FloatParam.Make("порог удара: резкость", 0.5f, 20f,
-                    () => TuningConfig.ShakeGestureSpeed, v => TuningConfig.ShakeGestureSpeed = v, "ед/с", "0.0"),
+                SwipeAmplitude(), SwipeSharpness(),
                 FloatParam.Make("прочность: слабые", 2f, 12f,
                     () => TuningConfig.DurabilityWeak, v => TuningConfig.DurabilityWeak = (int)v, "уд.", "0", true),
                 FloatParam.Make("прочность: средние", 2f, 12f,
@@ -49,13 +46,35 @@ namespace Meditation.Tuning
                     () => TuningConfig.HitDecayEnabled, v => TuningConfig.HitDecayEnabled = v),
                 FloatParam.Make("пауза затухания", 400f, 1500f,
                     () => TuningConfig.HitDecayMs, v => TuningConfig.HitDecayMs = v, "мс", "0"),
-                ChoiceParam.Make("таргетинг ударов", new[] { "A: все", "B: ближняя", "C: по стику" },
-                    () => (int)TuningConfig.Targeting, v => TuningConfig.Targeting = (ShakeTargeting)v),
+                ChoiceParam.Make("таргетинг ударов", new[] { "A: все", "B: ближняя", "C: по прицелу" },
+                    () => (int)TuningConfig.Targeting, v => TuningConfig.Targeting = (HitTargeting)v),
                 FloatParam.Make("интервал волн", 1f, 20f,
                     () => TuningConfig.WaveIntervalSeconds, v => TuningConfig.WaveIntervalSeconds = v, "с", "0.0"),
-                WaveWeak(), WaveMedium(), WaveStrong()
+                WaveWeak(), WaveMedium(), WaveStrong(),
+                ThoughtGrowth(), ThoughtGrowthCap()
             };
         }
+
+        // --- MECHANICS §3: порог взмаха над датчиком (заменил параметры тряски джойстика) -------
+        //
+        // Both rows kept their LABELS on purpose: they are still «порог удара», and the panel is where
+        // the founder tunes the same feeling. What changed under them is the unit — доли хода датчика
+        // instead of отклонение стика — so the ranges are the sensor's, not the joystick's.
+
+        /// <summary>Travel inside one stroke, in fractions of the sensor's 0..1 range.</summary>
+        private static FloatParam SwipeAmplitude() => FloatParam.Make("порог удара: амплитуда", 0.05f, 0.6f,
+            () => TuningConfig.SwipeAmplitude, v => TuningConfig.SwipeAmplitude = v, "хода", "0.00");
+
+        /// <summary>How fast the sensor has to be moving for that travel to count at all.</summary>
+        private static FloatParam SwipeSharpness() => FloatParam.Make("порог удара: резкость", 0.1f, 3f,
+            () => TuningConfig.SwipeSharpness, v => TuningConfig.SwipeSharpness = v, "ед/с", "0.00");
+
+        private static FloatParam ThoughtGrowth() => FloatParam.Make("рост мыслей", 0f, 10f,
+            () => TuningConfig.ThoughtGrowthPercentPerSec,
+            v => TuningConfig.ThoughtGrowthPercentPerSec = v, "%/с", "0.0");
+
+        private static FloatParam ThoughtGrowthCap() => FloatParam.Make("потолок роста", 1f, 3f,
+            () => TuningConfig.ThoughtGrowthCap, v => TuningConfig.ThoughtGrowthCap = v, "×", "0.00");
 
         // --- MECHANICS §4 "состав волны: сколько и каких мыслей" -------------------------------
 
@@ -83,16 +102,31 @@ namespace Meditation.Tuning
         private static FloatParam GazeDwell() => FloatParam.Make("удержание взгляда", 0.1f, 1.5f,
             () => TuningConfig.GazeDwellSeconds, v => TuningConfig.GazeDwellSeconds = v, "с", "0.00");
 
+        // --- Неон-прицел: круг взгляда крупнее и заметнее (founder, 2026-08-07) ---------------
+
+        private static FloatParam GazeRadius() => FloatParam.Make("прицел: радиус", 60f, 220f,
+            () => TuningConfig.GazeRadiusPx, v => TuningConfig.GazeRadiusPx = v, "px", "0");
+
+        private static FloatParam GazeGlow() => FloatParam.Make("прицел: свечение", 0.2f, 3f,
+            () => TuningConfig.GazeNeonGlow, v => TuningConfig.GazeNeonGlow = v, "", "0.00");
+
+        private static FloatParam GazeRingWidth() => FloatParam.Make("прицел: толщина кольца", 4f, 40f,
+            () => TuningConfig.GazeNeonRingPx, v => TuningConfig.GazeNeonRingPx = v, "px", "0");
+
+        private static BoolParam DetailOutlineToggle() => BoolParam.Make("неон-обводка деталей",
+            () => TuningConfig.DetailNeonOutline, v => TuningConfig.DetailNeonOutline = v);
+
         public static IList<TuningParam> TwoHands()
         {
             return new List<TuningParam>
             {
                 ChoiceParam.Make("выбор детали", new[] { "A: порядок", "B: взгляд", "C: авто" },
                     () => (int)TuningConfig.Notice, v => TuningConfig.Notice = (NoticeMode)v),
-                GazeSpeed(), GazeDwell(),
+                GazeSpeed(), GazeDwell(), GazeRadius(), GazeGlow(), GazeRingWidth(),
                 FloatParam.Make("интервал волн", 1f, 20f,
                     () => TuningConfig.WaveIntervalSeconds, v => TuningConfig.WaveIntervalSeconds = v, "с", "0.0"),
                 WaveWeak(), WaveMedium(), WaveStrong(),
+                ThoughtGrowth(), ThoughtGrowthCap(),
                 PressureRamp(), PressureRampPercent(),
                 BoolParam.Make("дрейф мыслей к центру",
                     () => TuningConfig.ThoughtDrift, v => TuningConfig.ThoughtDrift = v),
@@ -138,8 +172,6 @@ namespace Meditation.Tuning
 
             return new List<TuningParam>
             {
-                FloatParam.Make(p + "длительность уровня", 60f, 180f,
-                    () => TuningConfig.LevelSecondsOf(i), v => TuningConfig.SetLevelSeconds(i, v), "с", "0"),
                 FloatParam.Make(p + "интервал волн", 1f, 20f,
                     () => TuningConfig.WaveIntervalOf(i), v => TuningConfig.SetWaveInterval(i, v), "с", "0.0"),
                 FloatParam.Make(p + "в волне: слабых", 0f, 5f,
@@ -157,7 +189,13 @@ namespace Meditation.Tuning
                 FloatParam.Make(p + "скорость дрейфа", 20f, 60f,
                     () => TuningConfig.DriftOf(i), v => TuningConfig.SetDrift(i, v), "px/с", "0"),
                 FloatParam.Make(p + "сокращение интервала за волну", 0f, 50f,
-                    () => TuningConfig.PressureRampPercentOf(i), v => TuningConfig.SetPressureRampPercent(i, v), "%", "0")
+                    () => TuningConfig.PressureRampPercentOf(i), v => TuningConfig.SetPressureRampPercent(i, v), "%", "0"),
+                FloatParam.Make(p + "рост мыслей", 0f, 10f,
+                    () => TuningConfig.ThoughtGrowthPercentPerSecOf(i),
+                    v => TuningConfig.SetThoughtGrowthPercentPerSec(i, v), "%/с", "0.0"),
+                FloatParam.Make(p + "потолок роста", 1f, 3f,
+                    () => TuningConfig.ThoughtGrowthCapOf(i),
+                    v => TuningConfig.SetThoughtGrowthCap(i, v), "×", "0.00")
             };
         }
 
@@ -178,16 +216,13 @@ namespace Meditation.Tuning
                 ChoiceParam.Make("выбор детали", new[] { "A: порядок", "B: взгляд", "C: авто" },
                     () => (int)TuningConfig.Notice, v => TuningConfig.Notice = (NoticeMode)v),
                 GazeSpeed(), GazeDwell(),
-                FloatParam.Make("порог удара: амплитуда", 0.1f, 1f,
-                    () => TuningConfig.ShakeAmplitude, v => TuningConfig.ShakeAmplitude = v, "", "0.00"),
-                FloatParam.Make("порог удара: резкость", 0.5f, 20f,
-                    () => TuningConfig.ShakeGestureSpeed, v => TuningConfig.ShakeGestureSpeed = v, "ед/с", "0.0"),
+                SwipeAmplitude(), SwipeSharpness(),
                 BoolParam.Make("затухание счётчика ударов",
                     () => TuningConfig.HitDecayEnabled, v => TuningConfig.HitDecayEnabled = v),
                 FloatParam.Make("пауза затухания", 400f, 1500f,
                     () => TuningConfig.HitDecayMs, v => TuningConfig.HitDecayMs = v, "мс", "0"),
-                ChoiceParam.Make("таргетинг ударов", new[] { "A: все", "B: ближняя", "C: по стику" },
-                    () => (int)TuningConfig.Targeting, v => TuningConfig.Targeting = (ShakeTargeting)v),
+                ChoiceParam.Make("таргетинг ударов", new[] { "A: все", "B: ближняя", "C: по прицелу" },
+                    () => (int)TuningConfig.Targeting, v => TuningConfig.Targeting = (HitTargeting)v),
                 BoolParam.Make("дрейф мыслей к центру",
                     () => TuningConfig.ThoughtDrift, v => TuningConfig.ThoughtDrift = v),
                 ThoughtsCoverVessel(),
@@ -201,8 +236,6 @@ namespace Meditation.Tuning
                     () => TuningConfig.BreatherSeconds, v => TuningConfig.BreatherSeconds = v, "с", "0.0"),
                 BoolParam.Make("авто-ретрай после поражения",
                     () => TuningConfig.AutoRetry, v => TuningConfig.AutoRetry = v),
-                BoolParam.Make("таймер в обучении стоит",
-                    () => TuningConfig.TutorialTimerPaused, v => TuningConfig.TutorialTimerPaused = v),
 
                 // ---- §8 Звук: три слоя, три группы ручек --------------------------------------
                 FloatParam.Make("звук: громкость фона", 0f, 1f,
@@ -250,7 +283,18 @@ namespace Meditation.Tuning
                     () => TuningConfig.SweepOnlyUnnoticed, v => TuningConfig.SweepOnlyUnnoticed = v),
                 BoolParam.Make("луч: реже на поздних уровнях",
                     () => TuningConfig.SweepRarerOnLateLevels,
-                    v => TuningConfig.SweepRarerOnLateLevels = v)
+                    v => TuningConfig.SweepRarerOnLateLevels = v),
+
+                // ---- Неон-прицел (заказ founder 2026-08-07) ----------------------------------
+                GazeRadius(), GazeGlow(), GazeRingWidth(),
+
+                // ---- Неон-обводка деталей [toggle], по умолчанию ВЫКЛ -------------------------
+                DetailOutlineToggle(),
+                FloatParam.Make("обводка: толщина", 2f, 20f,
+                    () => TuningConfig.DetailOutlinePx, v => TuningConfig.DetailOutlinePx = v, "px", "0"),
+                FloatParam.Make("обводка: яркость", 0.1f, 1f,
+                    () => TuningConfig.DetailOutlineStrength,
+                    v => TuningConfig.DetailOutlineStrength = v, "", "0.00")
             };
         }
 
@@ -258,8 +302,6 @@ namespace Meditation.Tuning
         {
             return new List<TuningParam>
             {
-                FloatParam.Make("длительность уровня", 60f, 180f,
-                    () => TuningConfig.LevelSeconds, v => TuningConfig.LevelSeconds = v, "с", "0"),
                 BoolParam.Make("передышка после детали",
                     () => TuningConfig.BreatherEnabled, v => TuningConfig.BreatherEnabled = v),
                 FloatParam.Make("длина передышки", 0f, 5f,
@@ -269,6 +311,7 @@ namespace Meditation.Tuning
                 FloatParam.Make("интервал волн", 1f, 20f,
                     () => TuningConfig.WaveIntervalSeconds, v => TuningConfig.WaveIntervalSeconds = v, "с", "0.0"),
                 WaveWeak(), WaveMedium(), WaveStrong(),
+                ThoughtGrowth(), ThoughtGrowthCap(),
                 PressureRamp(), PressureRampPercent(),
                 BoolParam.Make("дрейф мыслей к центру",
                     () => TuningConfig.ThoughtDrift, v => TuningConfig.ThoughtDrift = v),
@@ -279,7 +322,7 @@ namespace Meditation.Tuning
                     () => TuningConfig.LossOverlapPercent, v => TuningConfig.LossOverlapPercent = v, "%", "0"),
                 ChoiceParam.Make("выбор детали", new[] { "A: порядок", "B: взгляд", "C: авто" },
                     () => (int)TuningConfig.Notice, v => TuningConfig.Notice = (NoticeMode)v),
-                GazeSpeed(), GazeDwell()
+                GazeSpeed(), GazeDwell(), GazeRadius(), GazeGlow(), GazeRingWidth()
             };
         }
     }

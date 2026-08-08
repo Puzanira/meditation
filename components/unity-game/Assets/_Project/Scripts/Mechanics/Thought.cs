@@ -17,25 +17,95 @@ namespace Meditation.Mechanics
 
         /// <summary>
         /// The silhouette's own size once a level's art is behind the blob, or zero on the greybox
-        /// stand. Only ever set through <see cref="Meditation.View.ArtLibrary.FitThought"/>, which
-        /// fits the sprite INSIDE the class box — see <see cref="Size"/>.
+        /// stand. Only ever set through <see cref="Meditation.View.ArtLibrary.FitThought(Thought)"/>,
+        /// which scales the sprite until it COVERS the class box — see <see cref="SpawnSize"/>.
         /// </summary>
         public Vector2 ArtSize;
 
         /// <summary>
-        /// SCREENS.md fixes three sizes and only three. Screen coverage is meant to be won by the
-        /// NUMBER of thoughts rolling in (наплыв), so nothing — not gameplay, not a test — is allowed
-        /// to inflate a blob into a slab to force the peak. Art does not change that: a level's
-        /// silhouette is fitted inside its class box and can only ever be SMALLER, which is why the
-        /// art size is clamped down to the class here rather than trusted.
+        /// How much of <see cref="Rect"/> this thought's sprite actually paints, 0…1
+        /// (<see cref="Meditation.View.ArtLibrary.InkShareOf"/>). 1 on the greybox stand, where a blob
+        /// really is a solid rectangle. Read through <see cref="Ink"/>.
         /// </summary>
-        public Vector2 Size
+        public float InkShare = 1f;
+
+        /// <summary>
+        /// The share of its rectangle this thought hides, as <see cref="ThoughtField.OverlapPercent"/>
+        /// counts it.
+        ///
+        /// The defeat wallpaper answers 1 whatever its sprite paints: those blobs are not thoughts the
+        /// player is fighting but the SCREENS S5 statement «экран целиком закрыт мыслями», and a
+        /// wallpaper that measured its own hatching would report the lost screen as two thirds full.
+        /// </summary>
+        public float Ink => Wallpaper ? 1f : Mathf.Clamp01(InkShare);
+
+        /// <summary>
+        /// The size a thought is SPAWNED at: its class box (S/M/L), grown until the level's silhouette
+        /// covers it — never a pixel of either side below the class.
+        ///
+        /// This is the floor and it is a hard one (founder, 2026-08-07): «мысли НИКОГДА не спавнить
+        /// меньше класса». Growth (<see cref="GrowthScale"/>) is only ever allowed to make a thought
+        /// BIGGER than this — the obvious way to animate «разрастаются» is to start small and swell
+        /// into the class, and that is the one implementation that is forbidden, because it makes the
+        /// first seconds of every wave weaker than the class the panel asked for.
+        ///
+        /// It used to take the MINIMUM of the two, which honoured the floor only for sprites that
+        /// happened to be about as square as their box, and quietly broke it for every narrow one: the
+        /// wine bottle spawned 42×140 in class S, a sixth of the class's area, and both the growth and
+        /// the screen-coverage maths were then counted off that sliver (Codex review, 2026-08-08). The
+        /// silhouette overhanging its box on the long side is the price, and it is the right one — a
+        /// class is a claim about how big a thought looks.
+        ///
+        /// The defeat wallpaper is exempt: <see cref="ThoughtField.CoverScreen"/> sizes those blobs to
+        /// CLOSE a grid cell, and a class floor over that would only push the picture the crank rubs
+        /// off further out of frame.
+        /// </summary>
+        public Vector2 SpawnSize
         {
             get
             {
                 Vector2 box = SizeOf(Strength);
                 if (ArtSize.x < 1f || ArtSize.y < 1f) return box;
-                return new Vector2(Mathf.Min(ArtSize.x, box.x), Mathf.Min(ArtSize.y, box.y));
+                if (Wallpaper) return ArtSize;
+                return new Vector2(Mathf.Max(ArtSize.x, box.x), Mathf.Max(ArtSize.y, box.y));
+            }
+        }
+
+        /// <summary>
+        /// How much bigger than <see cref="SpawnSize"/> this thought is drawn right now — «мысли
+        /// разрастаются со временем и заполняют экран» (founder, 2026-08-07).
+        ///
+        /// Starts at exactly 1 and climbs by <see cref="TuningConfig.ThoughtGrowthPercentPerSec"/> of
+        /// the spawn size every second, up to <see cref="TuningConfig.ThoughtGrowthCap"/>. Clamped at
+        /// the bottom to 1 as well as at the top: a negative growth knob must not be a way to spawn
+        /// below the class.
+        ///
+        /// The defeat wallpaper is exempt. Those blobs are not thoughts the player is fighting — they
+        /// are sized to close their cell (<see cref="ThoughtField.CoverScreen"/>), and growing them
+        /// would push the wipe-me picture off the frame while the handle is rubbing it away.
+        ///
+        /// This supersedes the old invariant «размер жёстко зажат классом»: the class is now the
+        /// STARTING size, and the ceiling is the class times the cap.
+        /// </summary>
+        public float GrowthScale
+        {
+            get
+            {
+                if (Wallpaper) return 1f;
+                float cap = Mathf.Max(1f, TuningConfig.ThoughtGrowthCap);
+                float grown = 1f + TuningConfig.ThoughtGrowthPercentPerSec * 0.01f * Mathf.Max(0f, Age);
+                return Mathf.Clamp(grown, 1f, cap);
+            }
+        }
+
+        /// <summary>The rectangle the thought occupies right now: its class box, grown by its age.</summary>
+        public Vector2 Size
+        {
+            get
+            {
+                float k = GrowthScale;
+                Vector2 spawn = SpawnSize;
+                return k <= 1f ? spawn : spawn * k;
             }
         }
 

@@ -25,18 +25,9 @@ namespace Meditation.Mechanics
         public static readonly Vector2 VesselCentre = new Vector2(960f, 930f);
         public static readonly Vector2 VesselSize = new Vector2(240f, 150f);
 
-        /// <summary>
-        /// Sun / timer dial: centre (1800, 100), r = 60 — the SCREENS «Зоны» base position.
-        /// A real level may carry its own centre (<see cref="LevelDefinition.SunCentre"/>): where the
-        /// art drop put a detail under the widget, the HUD is what moves (founder, 2026-07-31).
-        /// </summary>
-        public static readonly Vector2 SunCentre = new Vector2(1800f, 100f);
-        public const float SunRadius = 60f;
-
-        /// <summary>The «0:42» caption: centred under the sun, gap measured from the sun's edge.</summary>
-        public const float TimerLabelWidth = 300f;
-        public const float TimerLabelHeight = 40f;
-        public const float TimerLabelGap = 30f;
+        // The sun / timer dial at (1800, 100) r 60 and its «0:42» caption lived here until 2026-08-07.
+        // Both went out with the timer (founder; see LevelRules), and the top-right corner of the frame
+        // is free on every level as a result.
 
         /// <summary>Crank indicator: centre (140, 950), r = 70 — SCREENS base, per-level in a level.</summary>
         public static readonly Vector2 CrankIndicatorCentre = new Vector2(140f, 950f);
@@ -90,8 +81,6 @@ namespace Meditation.Mechanics
         public static readonly Color VesselFill = Hex("7fc9a5");
         public static readonly Color VesselStroke = Hex("2b7a5c");
         public static readonly Color Thread = Hex("2b7a5c");
-        public static readonly Color SunFill = Hex("f0b24a");
-        public static readonly Color SunStroke = Hex("a8761d");
         public static readonly Color Gaze = Hex("4a7096");
         public static readonly Color Alarm = Hex("c0392b");
         /// <summary>Peak-of-chaos veil (walkthrough frame 16: #3a3050 @0.12).</summary>

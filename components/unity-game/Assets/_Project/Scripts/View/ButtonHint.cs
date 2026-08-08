@@ -53,7 +53,7 @@ namespace Meditation.View
         /// <summary>The drawn button — the suite asserts WHICH picture is up, since there is no text.</summary>
         public Image Button => _button;
 
-        /// <summary>The stroke itself — the shake beat is nothing else, so it has to be measurable.</summary>
+        /// <summary>The stroke itself — the отгон beat is nothing else, so it has to be measurable.</summary>
         public HintArrow Arrow => _arrow;
 
         public bool IsShown => _button.gameObject.activeSelf || _arrow.IsShown;

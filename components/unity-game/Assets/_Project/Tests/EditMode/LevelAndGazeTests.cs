@@ -32,14 +32,14 @@ namespace Meditation.Tests
             gaze.Position = new Vector2(960f, 400f);
             for (int i = 0; i < 12; i++)   // 200 ms
             {
-                gaze.Tick(Vector2.zero, Dt, targets, selectable, false);
+                gaze.Tick(Vector2.zero, Dt, targets, selectable);
                 Assert.IsFalse(gaze.NoticedThisTick, "Half the dwell must not be enough.");
             }
 
             bool noticed = false;
             for (int i = 0; i < 20 && !noticed; i++)
             {
-                gaze.Tick(Vector2.zero, Dt, targets, selectable, false);
+                gaze.Tick(Vector2.zero, Dt, targets, selectable);
                 noticed = gaze.NoticedThisTick;
             }
 
@@ -47,8 +47,16 @@ namespace Meditation.Tests
             Assert.AreEqual(0, gaze.NoticedIndex);
         }
 
+        /// <summary>
+        /// The gaze moves with the stick and NEVER stops moving with it (founder, 2026-08-07:
+        /// «джойстик — прицеливаешься»). The old half of this test was «freezes while shaking»; there
+        /// is nothing to freeze any more, because the отгон left the stick for the height sensors —
+        /// and a check that the freeze is GONE is worth more than the check that it worked. The tilt
+        /// below is deliberately the sharpest one a stick can make, the very gesture that used to be
+        /// read as a shake: it must move the aim, all of it, every frame.
+        /// </summary>
         [Test]
-        public void Gaze_MovesWithTheStick_AndFreezesWhileShaking()
+        public void Gaze_MovesWithTheStick_AndNothingEverFreezesIt()
         {
             TuningConfig.GazeSpeedPxPerSec = 900f;
             var gaze = new GazeSelector();
@@ -56,12 +64,23 @@ namespace Meditation.Tests
             var selectable = new List<bool>();
 
             Vector2 start = gaze.Position;
-            for (int i = 0; i < 30; i++) gaze.Tick(new Vector2(1f, 0f), Dt, targets, selectable, false);
+            for (int i = 0; i < 30; i++) gaze.Tick(new Vector2(1f, 0f), Dt, targets, selectable);
             Assert.Greater(gaze.Position.x, start.x + 300f, "A tilt must move the gaze.");
 
-            Vector2 held = gaze.Position;
-            for (int i = 0; i < 30; i++) gaze.Tick(new Vector2(1f, 0f), Dt, targets, selectable, true);
-            Assert.AreEqual(held, gaze.Position, "The gaze holds still while the stick is shaking.");
+            // Slammed side to side, one frame apart — the old «резкая смена направления». The swing is
+            // lopsided on purpose: a symmetric one would end where it started, and a gaze that froze
+            // solid would pass that by standing still.
+            gaze.Position = new Vector2(960f, 540f);
+            float expected = 0f;
+            for (int i = 0; i < 40; i++)
+            {
+                float x = i % 2 == 0 ? 1f : -0.5f;
+                gaze.Tick(new Vector2(x, 0f), Dt, targets, selectable);
+                expected += x * 900f * Dt;
+            }
+
+            Assert.AreEqual(960f + expected, gaze.Position.x, 1e-2f,
+                "Прицел обязан отработать КАЖДЫЙ кадр наклона — замирать ему больше не от чего.");
         }
 
         [Test]
@@ -71,7 +90,7 @@ namespace Meditation.Tests
             var targets = new List<Vector2>();
             var selectable = new List<bool>();
 
-            for (int i = 0; i < 300; i++) gaze.Tick(new Vector2(1f, -1f), Dt, targets, selectable, false);
+            for (int i = 0; i < 300; i++) gaze.Tick(new Vector2(1f, -1f), Dt, targets, selectable);
 
             Assert.LessOrEqual(gaze.Position.x, ThoughtField.ScreenWidth);
             Assert.LessOrEqual(gaze.Position.y, LevelOneData.SceneHeight,
@@ -83,7 +102,6 @@ namespace Meditation.Tests
         [Test]
         public void Level_IsWonWhenEveryDetailIsInTheVessel()
         {
-            TuningConfig.LevelSeconds = 60f;
             var rules = new LevelRules();
             rules.Restart(5);
 
@@ -93,23 +111,28 @@ namespace Meditation.Tests
             Assert.AreEqual(LevelOutcome.Win, rules.Outcome);
         }
 
+        /// <summary>
+        /// The timer is gone (founder, 2026-08-07), and «нет таймера» is a claim about what CANNOT
+        /// happen — so it is worth a test of its own. Three minutes of ticking on an empty screen: a
+        /// level that used to end at 60–180 s now simply keeps going, because the only clock left in
+        /// the room is the player's patience.
+        /// </summary>
         [Test]
-        public void Level_IsLostWhenTheTimerRunsOut()
+        public void Level_IsNeverLostOnTime_TheClockIsGone()
         {
-            TuningConfig.LevelSeconds = 1f;
             var rules = new LevelRules();
             rules.Restart(5);
 
-            for (int i = 0; i < 61; i++) rules.Tick(Dt, 0f);
+            for (int i = 0; i < 60 * 180; i++) rules.Tick(Dt, 0f);
 
-            Assert.AreEqual(LevelOutcome.Lose, rules.Outcome);
-            Assert.AreEqual(LevelRules.LoseByTimer, rules.LoseReason);
+            Assert.AreEqual(LevelOutcome.Playing, rules.Outcome,
+                "Три минуты без единой мысли — уровень обязан идти: таймера больше нет.");
+            Assert.AreEqual(string.Empty, rules.LoseReason);
         }
 
         [Test]
         public void Level_IsLostWhenThoughtsCoverTheScreen()
         {
-            TuningConfig.LevelSeconds = 120f;
             TuningConfig.LossOverlapPercent = 90f;
             var rules = new LevelRules();
             rules.Restart(5);
@@ -125,7 +148,6 @@ namespace Meditation.Tests
         [Test]
         public void Breather_BlocksSpawningForTheTunedTime()
         {
-            TuningConfig.LevelSeconds = 120f;
             TuningConfig.BreatherEnabled = true;
             TuningConfig.BreatherSeconds = 2f;
 
@@ -160,11 +182,11 @@ namespace Meditation.Tests
         public void TuningValues_SurviveAsStaticState_AndResetOnDemand()
         {
             TuningConfig.CollectSeconds = 11.5f;
-            TuningConfig.Targeting = ShakeTargeting.StickDirection;
+            TuningConfig.Targeting = HitTargeting.StickDirection;
 
             // Anything the stand does between scenettes reads the same static config.
             Assert.AreEqual(11.5f, TuningConfig.CollectSeconds, 1e-4f);
-            Assert.AreEqual(ShakeTargeting.StickDirection, TuningConfig.Targeting);
+            Assert.AreEqual(HitTargeting.StickDirection, TuningConfig.Targeting);
 
             TuningConfig.ResetToDefaults();
 

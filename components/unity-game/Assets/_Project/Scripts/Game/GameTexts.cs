@@ -17,8 +17,9 @@ namespace Meditation.Game
     /// comes back the next time somebody needs «a caption here», and it comes back in a font the
     /// designer did not choose, over a picture that already says it.
     ///
-    /// The only text the game still renders itself is the level timer's «NN с», and that is a HUD
-    /// readout with a box drawn under it in SCREENS «Зоны», not a line of copy.
+    /// The inversion is ABSOLUTE: the game renders no string of its own at all. The last one that was
+    /// its own — the level timer's «NN с», a HUD readout rather than a line of copy — went out with the
+    /// timer itself (founder, 2026-08-07: «давай уберём, он плохо работает»).
     /// </summary>
     public static class GameTexts
     {

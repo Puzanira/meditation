@@ -515,6 +515,178 @@ namespace Meditation.Tests
                 if (view.VesselContents[i] != null) view.VesselContents[i].enabled = !alone;
         }
 
+        // ---- неон-прицел (заказ founder 2026-08-07) ---------------------------------------------------
+
+        /// <summary>
+        /// «Круг взгляда крупнее и заметнее» — measured on the rendered plate, because that is the one
+        /// place the old one failed.
+        ///
+        /// The circle it replaces was three UGUI primitives (a 0.25-alpha disc, a dashed ring, an arc),
+        /// and every layout test it had was green: the rect was there, the right size, in the right
+        /// place. On a photographic plate it moved the pixel by a handful of values and the founder
+        /// could not find it. So this asks the only question that was ever the point — how much of the
+        /// frame CHANGED when the aim came on, and by how much — with the aim off as the baseline and
+        /// the same shot at glow 0 as the proof that the rig can say «no».
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheNeonAim_IsVisiblyOnThePlate_OnEveryLevel([Values(0, 1, 2, 3, 4)] int levelIndex)
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, levelIndex);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            LevelView view = screen.View;
+            string where = "уровень " + screen.Level.Number + " («" + screen.Level.Title + "»)";
+            yield return GameTestHarness.SettleScreen(fake);
+
+            // A patch of the plate the aim is put on, and the same patch with no aim at all.
+            var spot = new Vector2(960f, 420f);
+            var box = new RectInt(960 - 220, 420 - 220, 440, 440);
+
+            view.SetGaze(spot, 0f, false);
+            Texture2D bare = StandTestHarness.Capture(Color.black);
+
+            view.SetGaze(spot, 0f, true);
+            Texture2D lit = StandTestHarness.Capture(Color.black);
+
+            float glowWas = TuningConfig.GazeNeonGlow;
+            TuningConfig.GazeNeonGlow = 0f;
+            view.SetGaze(spot, 0f, true);
+            Texture2D dark = StandTestHarness.Capture(Color.black);
+            TuningConfig.GazeNeonGlow = glowWas;
+
+            try
+            {
+                float moved = MovedShare(lit, bare, box, out float lift);
+
+                Assert.Greater(moved, 0.03f,
+                    where + ": неон-прицел почти не тронул кадр — сдвинулось " +
+                    (moved * 100f).ToString("0.00") + " % площадки при пороге 3 %.");
+                Assert.Greater(lift, 24f,
+                    where + ": неон-прицел слишком бледный — +" + lift.ToString("0.0") +
+                    " ед. по сдвинувшимся пикселям при пороге 24.");
+
+                float zeroMoved = MovedShare(dark, bare, box, out _);
+                Assert.Less(zeroMoved, moved * 0.5f,
+                    where + ": замер врёт — при свечении 0 кадр изменился почти так же.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(bare);
+                Object.DestroyImmediate(lit);
+                Object.DestroyImmediate(dark);
+            }
+
+            // …and «крупнее» is the other half of the order: the drawn circle has to be bigger than
+            // the 90 px SCREENS drew for the greybox.
+            Rect drawn = StandTestHarness.Stage().DesignRectOf(view.Gaze.rectTransform);
+            Assert.Greater(drawn.width * 0.5f / LevelView.GazeQuadMargin, GazeSelector.ScreensRadius,
+                where + ": круг взгляда не стал крупнее прежних 90 px.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        // ---- неон-обводка деталей [toggle] -------------------------------------------------------------
+
+        /// <summary>
+        /// The outline ships OFF and draws NOTHING while it is off — then visibly rims the detail when
+        /// the founder turns it on.
+        ///
+        /// Both halves are the order («по умолчанию ВЫКЛ, чтобы founder сравнила с пульсом и лучом»),
+        /// and the off half is the one worth a pixel test: an outline at strength 0 that still shifts
+        /// the frame would quietly be a third highlight in every comparison she is trying to make.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheNeonOutline_DrawsNothingUntilItIsSwitchedOn_ThenRimsTheDetail()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 1);   // офис: компактные детали на плите
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            LevelView view = screen.View;
+            yield return GameTestHarness.SettleScreen(fake);
+
+            Assert.IsFalse(TuningConfig.DetailNeonOutline, "Обводка обязана приезжать выключенной.");
+            for (int i = 0; i < view.DetailOutlines.Count; i++)
+                if (view.DetailOutlines[i] != null)
+                    Assert.IsFalse(view.DetailOutlines[i].gameObject.activeSelf,
+                        "Выключенная обводка обязана быть НЕ нарисована, а не нарисована прозрачной.");
+
+            Texture2D off = StandTestHarness.Capture(Color.black);
+
+            TuningConfig.DetailNeonOutline = true;
+            view.ApplyNeonOutline();
+            yield return GameTestHarness.Frames(2);
+            Texture2D on = StandTestHarness.Capture(Color.black);
+
+            try
+            {
+                // The snail toy: 205×115 of solid ink with a clear edge — the shape a rim shows on.
+                Rect detail = LevelCatalog.RectOf(screen.Level.Details[3]);
+                var box = new RectInt(
+                    Mathf.RoundToInt(detail.xMin) - 20, Mathf.RoundToInt(detail.yMin) - 20,
+                    Mathf.RoundToInt(detail.width) + 40, Mathf.RoundToInt(detail.height) + 40);
+
+                float moved = MovedShare(on, off, box, out float lift);
+                Assert.Greater(moved, 0.02f,
+                    "Включённая обводка не тронула кадр вокруг детали — сдвинулось " +
+                    (moved * 100f).ToString("0.00") + " %.");
+                Assert.Greater(lift, 14f,
+                    "Обводка слишком бледная: +" + lift.ToString("0.0") + " ед. по сдвинувшимся пикселям.");
+
+                // …and a patch of bare plate well away from any detail must not have moved: the rim is
+                // the sprite's own alpha, so it may not be painting the level.
+                var elsewhere = new RectInt(700, 760, 160, 120);
+                float bled = MovedShare(on, off, elsewhere, out _);
+                Assert.Less(bled, 0.01f,
+                    "Обводка светит по плите, а не по спрайтам: пустой участок фона изменился на " +
+                    (bled * 100f).ToString("0.00") + " %.");
+            }
+            finally
+            {
+                TuningConfig.DetailNeonOutline = false;
+                Object.DestroyImmediate(off);
+                Object.DestroyImmediate(on);
+            }
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// Share of <paramref name="box"/> whose pixels moved between the two frames, and the p95 rise
+        /// among the ones that did.
+        ///
+        /// p95 of the MOVED pixels rather than of the whole box, and that distinction is the lesson of
+        /// the light sweep's gate (2026-08-07): a bright ring crossing a mostly-unchanged patch is a
+        /// huge rise in a small minority of pixels, and any statistic over the whole box averages it
+        /// back down to «ничего не произошло» — which was exactly the frame a human read as «луча нет».
+        /// </summary>
+        private static float MovedShare(Texture2D after, Texture2D before, RectInt box, out float lift)
+        {
+            Color[] a = StandTestHarness.PixelsOf(after, box);
+            Color[] b = StandTestHarness.PixelsOf(before, box);
+            Assert.Greater(a.Length, 100, "Площадка замера не попала в кадр.");
+            Assert.AreEqual(a.Length, b.Length);
+
+            var rises = new List<float>();
+            for (int i = 0; i < a.Length; i++)
+            {
+                float delta = MaxChannelDistance(a[i], b[i]) * 255f;
+                if (delta >= 6f) rises.Add(delta);
+            }
+
+            lift = 0f;
+            if (rises.Count > 0)
+            {
+                rises.Sort();
+                lift = rises[Mathf.Clamp(Mathf.RoundToInt(rises.Count * 0.95f) - 1, 0, rises.Count - 1)];
+            }
+
+            return rises.Count / (float)a.Length;
+        }
+
         // ---- pixel arithmetic --------------------------------------------------------------------------
 
         private static float MaxChannelDistance(Color a, Color b) =>

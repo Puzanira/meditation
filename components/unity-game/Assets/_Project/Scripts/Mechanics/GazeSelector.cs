@@ -5,13 +5,30 @@ using UnityEngine;
 namespace Meditation.Mechanics
 {
     /// <summary>
-    /// SCREENS.md, "Выбор детали", variant B (base): a soft gaze circle r = 90 px driven by a smooth
-    /// stick tilt; rest it on a detail for the dwell time and the detail is noticed. During a shake the
-    /// gaze freezes in place, which is what keeps the two stick gestures from fighting each other.
+    /// SCREENS.md, "Выбор детали", variant B (base): a soft gaze circle driven by a stick tilt; rest it
+    /// on a detail for the dwell time and the detail is noticed.
+    ///
+    /// **The stick is nothing but the aim since 2026-08-07** («джойстик — прицеливаешься», founder).
+    /// The отгон moved to the height sensors, so the two gestures that used to share this stick no
+    /// longer share anything: there is no «резкая смена направления» to tell apart from a tilt, and
+    /// therefore nothing to freeze either. The <c>frozen</c> parameter went with it — a gaze that
+    /// stops dead is a thing the player cannot explain when nothing on the stick caused it.
     /// </summary>
     public sealed class GazeSelector
     {
-        public const float Radius = 90f;
+        /// <summary>
+        /// The circle's radius, design px — a [tune] since 2026-08-07, not a constant.
+        ///
+        /// SCREENS fixed it at 90 for a greybox frame whose details were 50 px squares. On the art
+        /// plates the founder asked for it «крупнее и заметнее», and «крупнее» is not only a look: the
+        /// radius is what the hit test below uses, so a bigger circle is also a more forgiving aim.
+        /// One number therefore, read live, rather than a constant in the rules and a slider in the
+        /// view that would let the two drift apart.
+        /// </summary>
+        public static float Radius => Mathf.Max(10f, TuningConfig.GazeRadiusPx);
+
+        /// <summary>The radius SCREENS drew, kept for the stand's own layout numbers.</summary>
+        public const float ScreensRadius = 90f;
 
         /// <summary>Gaze centre in design px.</summary>
         public Vector2 Position = new Vector2(960f, 540f);
@@ -53,21 +70,17 @@ namespace Meditation.Mechanics
         /// <param name="deltaTime">Frame time.</param>
         /// <param name="targets">Detail centres in design px.</param>
         /// <param name="selectable">Per-detail: may it still be noticed (not collected / not covered)?</param>
-        /// <param name="frozen">True while shaking — the gaze holds still.</param>
         public void Tick(Vector2 stick, float deltaTime, IReadOnlyList<Vector2> targets,
-            IReadOnlyList<bool> selectable, bool frozen)
+            IReadOnlyList<bool> selectable)
         {
             NoticedThisTick = false;
             NoticedIndex = -1;
             if (deltaTime <= 0f) return;
 
-            if (!frozen)
-            {
-                // Design space grows downwards, so the stick's Y is inverted here.
-                Position += new Vector2(stick.x, -stick.y) * (TuningConfig.GazeSpeedPxPerSec * deltaTime);
-                Position.x = Mathf.Clamp(Position.x, 0f, ThoughtField.ScreenWidth);
-                Position.y = Mathf.Clamp(Position.y, 0f, MaxY);
-            }
+            // Design space grows downwards, so the stick's Y is inverted here.
+            Position += new Vector2(stick.x, -stick.y) * (TuningConfig.GazeSpeedPxPerSec * deltaTime);
+            Position.x = Mathf.Clamp(Position.x, 0f, ThoughtField.ScreenWidth);
+            Position.y = Mathf.Clamp(Position.y, 0f, MaxY);
 
             int hovered = -1;
             float best = Radius * Radius;

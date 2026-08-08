@@ -21,6 +21,14 @@ namespace Meditation.View
         /// <summary>How far the backing disc sticks out past the pip, design px.</summary>
         private const float BackingHaloPx = 3f;
 
+        /// <summary>
+        /// Half the height the row actually PAINTS, design px — the pip plus its halo.
+        ///
+        /// Public because a thought's drawn extent is the blob plus this row, and things that have to
+        /// stand clear of the whole drawing (the отгон arrow) cannot ask the blob's rectangle for it.
+        /// </summary>
+        public const float DrawnRadius = PipRadius + BackingHaloPx;
+
         private readonly List<Image> _pips = new List<Image>(MaxPips);
         private readonly List<Image> _backings = new List<Image>(MaxPips);
         private readonly RectTransform _row;

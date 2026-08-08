@@ -75,7 +75,6 @@ namespace Meditation.Tests
             StandTestHarness.AssertDesignRect(stage, "Vessel", new Rect(840f, 855f, 240f, 150f));
             StandTestHarness.AssertDesignRect(stage, "Slot1", new Rect(60f, 40f, 72f, 72f));
             StandTestHarness.AssertDesignRect(stage, "Slot5", new Rect(412f, 40f, 72f, 72f));
-            StandTestHarness.AssertDesignRect(stage, "Sun", new Rect(1740f, 40f, 120f, 120f));
             StandTestHarness.AssertDesignRect(stage, "CrankDial", new Rect(70f, 880f, 140f, 140f));
             StandTestHarness.AssertDesignRect(stage, "Building1", new Rect(100f, 250f, 230f, 560f));
 

@@ -20,14 +20,18 @@ namespace Meditation.Tuning
         SpeedScaled = 1
     }
 
-    /// <summary>Which thought(s) a shake hit lands on (MECHANICS §3).</summary>
-    public enum ShakeTargeting
+    /// <summary>Which thought(s) a hit of the отгон lands on (MECHANICS §3).</summary>
+    public enum HitTargeting
     {
         /// <summary>A. every thought on screen takes the hit.</summary>
         AllOnScreen = 0,
         /// <summary>B. one — the one nearest to the screen centre.</summary>
         NearestToCenter = 1,
-        /// <summary>C. the one the stick is pointing at.</summary>
+        /// <summary>
+        /// C. the one the joystick is pointing at. Since the отгон moved to the height sensors
+        /// (2026-08-07) the stick is nothing but the AIM, so this variant reads the aim — which is the
+        /// same number it always read, and now without the gesture conflict MECHANICS §3 warned about.
+        /// </summary>
         StickDirection = 2
     }
 
@@ -98,8 +102,35 @@ namespace Meditation.Tuning
             public const float GazeSpeedPxPerSec = 900f;
             public const float GazeDwellSeconds = 0.4f;
 
-            public const float ShakeAmplitude = 0.5f;
-            public const float ShakeGestureSpeed = 3f;
+            /// <summary>
+            /// «Круг взгляда крупнее и заметнее» (founder, 2026-08-07). 90 px was the number SCREENS
+            /// picked for a greybox frame of 50 px rectangles; on the art plates it is a faint disc
+            /// about the size of the office paperclip, and the founder loses it in the picture. 130
+            /// is a third bigger and still comfortably smaller than the gap between two details on
+            /// the tightest level (the library's lamp and glasses are 287 px apart), so widening the
+            /// circle does not turn «навёл» into «где-то там».
+            /// </summary>
+            public const float GazeRadiusPx = 130f;
+            public const float GazeNeonGlow = 1.2f;
+            public const float GazeNeonRingPx = 12f;
+
+            /// <summary>
+            /// Отгон на датчиках высоты (founder, 2026-08-07). Both numbers are in the sensor's own
+            /// units — 0..1 of its travel — so neither of them is the joystick pair renamed: 0.5 of a
+            /// stick deflection and 0.5 of a sensor's range are not the same gesture, and the two old
+            /// values would have been a lie carried over by the name.
+            ///
+            /// **Амплитуда 0.2** — a fifth of the sensor's range inside ONE stroke. A hand passing over
+            /// the sensor sweeps far more than that; a hand resting above it, and the ripple of an
+            /// analog reading, sweep far less. On the keyboard emulation (1.25 units/s, package
+            /// mapping) it is 0.16 s of a held Q — a tap, not a hold.
+            ///
+            /// **Резкость 0.6 ед/с** — half of that same emulated rise rate and under a third of the
+            /// spring-back (2.0 ед/с), so BOTH halves of a keyboard stroke clear it comfortably, while
+            /// a hand slowly lowering onto the panel — which is a rest, not a swipe — never does.
+            /// </summary>
+            public const float SwipeAmplitude = 0.2f;
+            public const float SwipeSharpness = 0.6f;
 
             // Pip counts of the walkthrough's own frames: гора посуды 4, клубок ? 3. Strong came down
             // from 7 to the level-1 band's 6 in the playtest — see the note on the globals above.
@@ -109,26 +140,36 @@ namespace Meditation.Tuning
 
             public const bool HitDecayEnabled = true;
             public const float HitDecayMs = 800f;
-            public const ShakeTargeting Targeting = ShakeTargeting.NearestToCenter;
+            public const HitTargeting Targeting = HitTargeting.NearestToCenter;
 
-            public const float WaveIntervalSeconds = 7f;
-            public const int WaveWeak = 1;
+            public const float WaveIntervalSeconds = 5f;
+            public const int WaveWeak = 3;
             public const int WaveMedium = 0;
             public const int WaveStrong = 0;
-            public const bool PressureRamp = false;
-            public const float PressureRampPercent = 0f;
+            public const bool PressureRamp = true;
+            public const float PressureRampPercent = 4f;
             public const bool ThoughtDrift = true;
             public const float DriftPxPerSec = 25f;
             public const bool ThoughtsCoverVessel = false;
             public const float LossOverlapPercent = 92f;
             public const float PeakOverlapPercent = 70f;
 
-            public const float LevelSeconds = 80f;
+            /// <summary>
+            /// «Мысли разрастаются со временем» (founder, 2026-08-07): how fast a thought grows past
+            /// its class, in per cent of its spawn size per second, and how far it may go.
+            ///
+            /// 2 %/с with a ×1.5 ceiling is the level-1 band, and it is a duration in disguise: a
+            /// thought reaches its ceiling in 25 s, i.e. two and a half wave intervals. That is the
+            /// point of the knob — a thought left alone stops being one blob you can ignore and
+            /// becomes two and a quarter of them in area, so ignoring the field costs the screen
+            /// rather than costing a clock.
+            /// </summary>
+            public const float ThoughtGrowthPercentPerSec = 2f;
+            public const float ThoughtGrowthCap = 1.5f;
+
             public const bool BreatherEnabled = true;
             public const float BreatherSeconds = 2f;
             public const bool AutoRetry = true;
-
-            public const bool TutorialTimerPaused = true;
 
             // ---- §8 Звук (заказ founder 2026-08-07) -------------------------------------------
             // Three layers, three groups of knobs. Every number below is the spec's own starting
@@ -152,6 +193,17 @@ namespace Meditation.Tuning
             public const bool SweepOnlyUnnoticed = true;
             public const bool SweepRarerOnLateLevels = true;
 
+            // ---- Неон-обводка деталей (заказ founder 2026-08-07) --------------------------------
+            /// <summary>
+            /// OFF on purpose. This is the third thing on the screen saying «вот деталь» — after the
+            /// pulse and after the light sweep — and the founder asked for it precisely so she can
+            /// compare all three and switch two of them off. A toggle that ships ON would answer that
+            /// question for her.
+            /// </summary>
+            public const bool DetailNeonOutline = false;
+            public const float DetailOutlinePx = 6f;
+            public const float DetailOutlineStrength = 0.8f;
+
             /// <summary>
             /// Is the tuning panel expanded on start? FALSE since the playtest: the panel is the
             /// founder's instrument, and on the cabinet the game opens as a game. She turns it back on
@@ -161,42 +213,77 @@ namespace Meditation.Tuning
 
             // ---- §6 Прогрессия сложности: [tune per level] ------------------------------------
             // «с каждым уровнем больше мыслей, выше прочность, быстрее наплыв». The shipped ladder
-            // is monotonic in every dimension — that monotonicity is what LevelProgressionTests
-            // pins, so re-tuning a number after the playtest cannot quietly flatten the curve.
+            // is monotonic in PRESSURE — that monotonicity is what LevelProgressionTests pins, so
+            // re-tuning a number after the playtest cannot quietly flatten the curve.
             //
-            // Everything that describes PRESSURE (wave interval, wave composition, durability, drift,
-            // ramp) is keyed to the level NUMBER rather than to the setting, so the renumbering of
-            // 2026-08-07 left those columns exactly where the playtest of 2026-08-01 put them.
+            // Everything here is keyed to the level NUMBER rather than to the setting, so the
+            // renumbering of 2026-08-07 left these columns exactly where the playtest of 2026-08-01
+            // put them.
             //
-            // The TIMERS are the one thing that had to be recomputed, and they are a starting point for
-            // the next playtest rather than a decision (MECHANICS §6). The old 112·110·100·92·85 were
-            // measured when the FIRST level held nine details and the last held five; the new order
-            // turns that around (5·5·6·8·8), so those numbers would have given 112 s for five details
-            // at the start and 85 s for eight at the end. Recomputed as «детали × секунд на деталь»
-            // with the seconds per detail falling level by level (16·15·14·13·12): 80·75·84·104·96.
-            public const float L1LevelSeconds = 80f;
-            public const float L1WaveIntervalSeconds = 7f;
-            public const int L1WaveWeak = 1;
+            // **The «длительность уровня» column is gone** (founder, 2026-08-07: the timer is out).
+            // The ladder used to be readable as two things at once — pressure going up and the clock
+            // going down — and with the clock gone the ladder is one thing: how much screen the waves
+            // buy per second. The test measures exactly that — the area of the thoughts this level
+            // ACTUALLY sends (its own five silhouettes, cover-fitted to the wave's classes) per second,
+            // not the area of the class boxes — because «больше мыслей» and «мысли крупнее» are two
+            // ways of spending the same budget and the founder's own order for this round spends it
+            // BOTH ways in the first two levels.
+            //
+            // Levels 1 and 2 are that order, and they are the only two numbers this round changed:
+            //
+            //   L1 «мыслей больше»       — 3 weak every 5.0 s. The old first level sent eight small
+            //       blobs in a whole minute (~10 % of the frame if none were ever beaten off), which
+            //       is not a level about thoughts filling the screen.
+            //   L2 «меньше, но крупнее»  — 2 MEDIUM every 4.5 s: fewer blobs than level 1 (2 < 3), a
+            //       class up (M instead of S), and still more screen per second, so the curve keeps
+            //       climbing while the FEEL changes from a swarm to a few big ones — which is what
+            //       «чуть больше первого» asks for.
+            //
+            // Both compositions were raised once more on 2026-08-08, together with a 4 % ramp on level
+            // 1, because the round's own claim turned out to be untestable arithmetic: pressure was
+            // being measured in CLASS area while the thoughts are drawn at their silhouettes' cover-fit
+            // size, and against the real sizes level 2 was the LIGHTER level (17 318 px²/с against
+            // 23 695). Worse, a player who did nothing at all could not lose levels 1 and 2 — the
+            // coverage plateaued around 49 % on level 1, and «поражение = мысли заполнили экран» was a
+            // rule the first two levels did not actually have. The numbers are now the ones that hold
+            // both statements at once (LevelCatalogTests: the ladder on real sizes, and defeat reached
+            // from a standing start inside three minutes on every level — ~124 s here, ~89 s on L2).
+            //
+            // Levels 3–5 keep the compositions of the 2026-08-01 playtest untouched: nothing in this
+            // round's feedback is about them, and re-balancing a level nobody complained about is how
+            // a tuning session turns into a regression.
+            public const float L1WaveIntervalSeconds = 5f;
+            public const int L1WaveWeak = 3;
             public const int L1WaveMedium = 0;
             public const int L1WaveStrong = 0;
             public const int L1DurabilityWeak = 3;
             public const int L1DurabilityMedium = 4;
             public const int L1DurabilityStrong = 6;
             public const float L1DriftPxPerSec = 25f;
-            public const float L1PressureRampPercent = 0f;
 
-            public const float L2LevelSeconds = 75f;
-            public const float L2WaveIntervalSeconds = 5.5f;
-            public const int L2WaveWeak = 1;
-            public const int L2WaveMedium = 1;
+            /// <summary>
+            /// The teaching level's ramp — 0 until 2026-08-08, i.e. a level whose pressure never rose.
+            /// A wave clock that never shortens plus a screen the thoughts drift straight across means
+            /// coverage settles at a plateau, and level 1's plateau was under half the frame: it was
+            /// the one level that could not be lost. 4 % is the gentlest rung that still gets there
+            /// (~124 s of doing nothing) and it stays below level 2's 8 %.
+            /// </summary>
+            public const float L1PressureRampPercent = 4f;
+            public const float L1ThoughtGrowthPercentPerSec = 2f;
+            public const float L1ThoughtGrowthCap = 1.5f;
+
+            public const float L2WaveIntervalSeconds = 4.5f;
+            public const int L2WaveWeak = 0;
+            public const int L2WaveMedium = 2;
             public const int L2WaveStrong = 0;
             public const int L2DurabilityWeak = 3;
             public const int L2DurabilityMedium = 5;
             public const int L2DurabilityStrong = 8;
             public const float L2DriftPxPerSec = 35f;
             public const float L2PressureRampPercent = 8f;
+            public const float L2ThoughtGrowthPercentPerSec = 2.5f;
+            public const float L2ThoughtGrowthCap = 1.6f;
 
-            public const float L3LevelSeconds = 84f;
             public const float L3WaveIntervalSeconds = 4.5f;
             public const int L3WaveWeak = 1;
             public const int L3WaveMedium = 1;
@@ -206,10 +293,11 @@ namespace Meditation.Tuning
             public const int L3DurabilityStrong = 9;
             public const float L3DriftPxPerSec = 45f;
             public const float L3PressureRampPercent = 15f;
+            public const float L3ThoughtGrowthPercentPerSec = 3f;
+            public const float L3ThoughtGrowthCap = 1.7f;
 
             // Levels 4 and 5 carry the same ladder on. Every number stays inside the slider range the
             // panel declares (MECHANICS §7), so the founder can tune in both directions.
-            public const float L4LevelSeconds = 104f;
             public const float L4WaveIntervalSeconds = 4f;
             public const int L4WaveWeak = 1;
             public const int L4WaveMedium = 2;
@@ -219,8 +307,9 @@ namespace Meditation.Tuning
             public const int L4DurabilityStrong = 10;
             public const float L4DriftPxPerSec = 52f;
             public const float L4PressureRampPercent = 20f;
+            public const float L4ThoughtGrowthPercentPerSec = 3.5f;
+            public const float L4ThoughtGrowthCap = 1.8f;
 
-            public const float L5LevelSeconds = 96f;
             public const float L5WaveIntervalSeconds = 3.5f;
             public const int L5WaveWeak = 2;
             public const int L5WaveMedium = 2;
@@ -230,6 +319,8 @@ namespace Meditation.Tuning
             public const int L5DurabilityStrong = 11;
             public const float L5DriftPxPerSec = 58f;
             public const float L5PressureRampPercent = 25f;
+            public const float L5ThoughtGrowthPercentPerSec = 4f;
+            public const float L5ThoughtGrowthCap = 2f;
         }
 
         /// <summary>How many per-level bands exist — one per level of <c>LevelCatalog</c>.</summary>
@@ -258,12 +349,18 @@ namespace Meditation.Tuning
         public static float GazeSpeedPxPerSec = Defaults.GazeSpeedPxPerSec;
         /// <summary>How long the gaze must rest on a detail to notice it, s. [tune]</summary>
         public static float GazeDwellSeconds = Defaults.GazeDwellSeconds;
+        /// <summary>Radius of the gaze circle, design px. [tune 60–220]</summary>
+        public static float GazeRadiusPx = Defaults.GazeRadiusPx;
+        /// <summary>How hard the neon ring of the gaze burns, 0..3. [tune]</summary>
+        public static float GazeNeonGlow = Defaults.GazeNeonGlow;
+        /// <summary>Thickness of that ring, design px. [tune 4–40]</summary>
+        public static float GazeNeonRingPx = Defaults.GazeNeonRingPx;
 
-        // ---- §3 Отгон мыслей (джойстик) ------------------------------------------------------
-        /// <summary>Stick deflection that counts as a hit, 0..1. [tune]</summary>
-        public static float ShakeAmplitude = Defaults.ShakeAmplitude;
-        /// <summary>Gesture speed that separates a shake from a smooth gaze tilt, units/s. [tune]</summary>
-        public static float ShakeGestureSpeed = Defaults.ShakeGestureSpeed;
+        // ---- §3 Отгон мыслей (датчики высоты) ------------------------------------------------
+        /// <summary>Sensor travel inside one stroke that counts as a hit, 0..1. [tune]</summary>
+        public static float SwipeAmplitude = Defaults.SwipeAmplitude;
+        /// <summary>Sensor speed below which a movement is not a pass at all, units/s. [tune]</summary>
+        public static float SwipeSharpness = Defaults.SwipeSharpness;
         /// <summary>Hits needed to pop a weak thought. [tune 2–12]</summary>
         public static int DurabilityWeak = Defaults.DurabilityWeak;
         /// <summary>Hits needed to pop a medium thought. [tune 2–12]</summary>
@@ -275,7 +372,7 @@ namespace Meditation.Tuning
         /// <summary>Pause between hits that resets the counter, ms. [tune 400–1500]</summary>
         public static float HitDecayMs = Defaults.HitDecayMs;
         /// <summary>A/B/C hit targeting. [toggle]</summary>
-        public static ShakeTargeting Targeting = Defaults.Targeting;
+        public static HitTargeting Targeting = Defaults.Targeting;
 
         // ---- §4 Мысли: волны и перекрытие ----------------------------------------------------
         /// <summary>Seconds between waves. [tune per level]</summary>
@@ -309,18 +406,19 @@ namespace Meditation.Tuning
         /// </summary>
         public static float PeakOverlapPercent = Defaults.PeakOverlapPercent;
 
-        // ---- §5 Таймер, победа, поражение ----------------------------------------------------
-        /// <summary>Level duration, s. [tune 60–180]</summary>
-        public static float LevelSeconds = Defaults.LevelSeconds;
+        /// <summary>How fast a thought grows past its class, % of its spawn size per second. [tune per level]</summary>
+        public static float ThoughtGrowthPercentPerSec = Defaults.ThoughtGrowthPercentPerSec;
+        /// <summary>Ceiling of that growth, × the spawn size (never below 1). [tune per level]</summary>
+        public static float ThoughtGrowthCap = Defaults.ThoughtGrowthCap;
+
+        // ---- §5 Победа, поражение --------------------------------------------------------------
+        // «Длительность уровня» lived here until 2026-08-07. The timer is out (see LevelRules).
         /// <summary>Breather (no spawns) after each collected detail? [toggle]</summary>
         public static bool BreatherEnabled = Defaults.BreatherEnabled;
         /// <summary>Breather length, s. [tune 0–5]</summary>
         public static float BreatherSeconds = Defaults.BreatherSeconds;
         /// <summary>Auto-restart the scenette 4 s after a defeat instead of waiting for the crank. [toggle]</summary>
         public static bool AutoRetry = Defaults.AutoRetry;
-
-        /// <summary>Does the level-1 tutorial hold the timer while it teaches? [toggle] (SCREENS §Обучение)</summary>
-        public static bool TutorialTimerPaused = Defaults.TutorialTimerPaused;
 
         // ---- §8 Звук --------------------------------------------------------------------------
         /// <summary>Ceiling of the level's own background track, 0..1. [tune]</summary>
@@ -358,13 +456,20 @@ namespace Meditation.Tuning
         /// <summary>Longer gaps on later levels (period ×1.5 per level) — fewer hints as it gets hard. [toggle]</summary>
         public static bool SweepRarerOnLateLevels = Defaults.SweepRarerOnLateLevels;
 
+        // ---- Неон-обводка деталей ----------------------------------------------------------------
+        /// <summary>Draw a neon rim around every uncollected detail? [toggle] — OFF by default.</summary>
+        public static bool DetailNeonOutline = Defaults.DetailNeonOutline;
+        /// <summary>How far that rim spreads past the sprite's own alpha, design px. [tune 2–20]</summary>
+        public static float DetailOutlinePx = Defaults.DetailOutlinePx;
+        /// <summary>How bright it burns, 0..1. [tune]</summary>
+        public static float DetailOutlineStrength = Defaults.DetailOutlineStrength;
+
         // ---- §6 Прогрессия сложности — [tune per level] ---------------------------------------
         // Flat fields, one per level, rather than an array of bands: TuningStore persists every
         // mutable static field of this class by reflection, and its round-trip test walks the same
         // set — so a per-level knob is saved, restored and covered the moment it is declared here.
         // An array would have needed a second serialiser and a second test to trust it.
 
-        public static float L1LevelSeconds = Defaults.L1LevelSeconds;
         public static float L1WaveIntervalSeconds = Defaults.L1WaveIntervalSeconds;
         public static int L1WaveWeak = Defaults.L1WaveWeak;
         public static int L1WaveMedium = Defaults.L1WaveMedium;
@@ -374,8 +479,9 @@ namespace Meditation.Tuning
         public static int L1DurabilityStrong = Defaults.L1DurabilityStrong;
         public static float L1DriftPxPerSec = Defaults.L1DriftPxPerSec;
         public static float L1PressureRampPercent = Defaults.L1PressureRampPercent;
+        public static float L1ThoughtGrowthPercentPerSec = Defaults.L1ThoughtGrowthPercentPerSec;
+        public static float L1ThoughtGrowthCap = Defaults.L1ThoughtGrowthCap;
 
-        public static float L2LevelSeconds = Defaults.L2LevelSeconds;
         public static float L2WaveIntervalSeconds = Defaults.L2WaveIntervalSeconds;
         public static int L2WaveWeak = Defaults.L2WaveWeak;
         public static int L2WaveMedium = Defaults.L2WaveMedium;
@@ -385,8 +491,9 @@ namespace Meditation.Tuning
         public static int L2DurabilityStrong = Defaults.L2DurabilityStrong;
         public static float L2DriftPxPerSec = Defaults.L2DriftPxPerSec;
         public static float L2PressureRampPercent = Defaults.L2PressureRampPercent;
+        public static float L2ThoughtGrowthPercentPerSec = Defaults.L2ThoughtGrowthPercentPerSec;
+        public static float L2ThoughtGrowthCap = Defaults.L2ThoughtGrowthCap;
 
-        public static float L3LevelSeconds = Defaults.L3LevelSeconds;
         public static float L3WaveIntervalSeconds = Defaults.L3WaveIntervalSeconds;
         public static int L3WaveWeak = Defaults.L3WaveWeak;
         public static int L3WaveMedium = Defaults.L3WaveMedium;
@@ -396,8 +503,9 @@ namespace Meditation.Tuning
         public static int L3DurabilityStrong = Defaults.L3DurabilityStrong;
         public static float L3DriftPxPerSec = Defaults.L3DriftPxPerSec;
         public static float L3PressureRampPercent = Defaults.L3PressureRampPercent;
+        public static float L3ThoughtGrowthPercentPerSec = Defaults.L3ThoughtGrowthPercentPerSec;
+        public static float L3ThoughtGrowthCap = Defaults.L3ThoughtGrowthCap;
 
-        public static float L4LevelSeconds = Defaults.L4LevelSeconds;
         public static float L4WaveIntervalSeconds = Defaults.L4WaveIntervalSeconds;
         public static int L4WaveWeak = Defaults.L4WaveWeak;
         public static int L4WaveMedium = Defaults.L4WaveMedium;
@@ -407,8 +515,9 @@ namespace Meditation.Tuning
         public static int L4DurabilityStrong = Defaults.L4DurabilityStrong;
         public static float L4DriftPxPerSec = Defaults.L4DriftPxPerSec;
         public static float L4PressureRampPercent = Defaults.L4PressureRampPercent;
+        public static float L4ThoughtGrowthPercentPerSec = Defaults.L4ThoughtGrowthPercentPerSec;
+        public static float L4ThoughtGrowthCap = Defaults.L4ThoughtGrowthCap;
 
-        public static float L5LevelSeconds = Defaults.L5LevelSeconds;
         public static float L5WaveIntervalSeconds = Defaults.L5WaveIntervalSeconds;
         public static int L5WaveWeak = Defaults.L5WaveWeak;
         public static int L5WaveMedium = Defaults.L5WaveMedium;
@@ -418,6 +527,8 @@ namespace Meditation.Tuning
         public static int L5DurabilityStrong = Defaults.L5DurabilityStrong;
         public static float L5DriftPxPerSec = Defaults.L5DriftPxPerSec;
         public static float L5PressureRampPercent = Defaults.L5PressureRampPercent;
+        public static float L5ThoughtGrowthPercentPerSec = Defaults.L5ThoughtGrowthPercentPerSec;
+        public static float L5ThoughtGrowthCap = Defaults.L5ThoughtGrowthCap;
 
         // ---- Стенд ---------------------------------------------------------------------------
         /// <summary>Is the tuning panel expanded? Remembered between scenettes like every other value.</summary>
@@ -440,9 +551,12 @@ namespace Meditation.Tuning
             Notice = Defaults.Notice;
             GazeSpeedPxPerSec = Defaults.GazeSpeedPxPerSec;
             GazeDwellSeconds = Defaults.GazeDwellSeconds;
+            GazeRadiusPx = Defaults.GazeRadiusPx;
+            GazeNeonGlow = Defaults.GazeNeonGlow;
+            GazeNeonRingPx = Defaults.GazeNeonRingPx;
 
-            ShakeAmplitude = Defaults.ShakeAmplitude;
-            ShakeGestureSpeed = Defaults.ShakeGestureSpeed;
+            SwipeAmplitude = Defaults.SwipeAmplitude;
+            SwipeSharpness = Defaults.SwipeSharpness;
             DurabilityWeak = Defaults.DurabilityWeak;
             DurabilityMedium = Defaults.DurabilityMedium;
             DurabilityStrong = Defaults.DurabilityStrong;
@@ -462,11 +576,11 @@ namespace Meditation.Tuning
             LossOverlapPercent = Defaults.LossOverlapPercent;
             PeakOverlapPercent = Defaults.PeakOverlapPercent;
 
-            LevelSeconds = Defaults.LevelSeconds;
+            ThoughtGrowthPercentPerSec = Defaults.ThoughtGrowthPercentPerSec;
+            ThoughtGrowthCap = Defaults.ThoughtGrowthCap;
             BreatherEnabled = Defaults.BreatherEnabled;
             BreatherSeconds = Defaults.BreatherSeconds;
             AutoRetry = Defaults.AutoRetry;
-            TutorialTimerPaused = Defaults.TutorialTimerPaused;
 
             AudioBackgroundVolume = Defaults.AudioBackgroundVolume;
             AudioMeditationFadeInSeconds = Defaults.AudioMeditationFadeInSeconds;
@@ -485,8 +599,10 @@ namespace Meditation.Tuning
             SweepStrength = Defaults.SweepStrength;
             SweepOnlyUnnoticed = Defaults.SweepOnlyUnnoticed;
             SweepRarerOnLateLevels = Defaults.SweepRarerOnLateLevels;
+            DetailNeonOutline = Defaults.DetailNeonOutline;
+            DetailOutlinePx = Defaults.DetailOutlinePx;
+            DetailOutlineStrength = Defaults.DetailOutlineStrength;
 
-            L1LevelSeconds = Defaults.L1LevelSeconds;
             L1WaveIntervalSeconds = Defaults.L1WaveIntervalSeconds;
             L1WaveWeak = Defaults.L1WaveWeak;
             L1WaveMedium = Defaults.L1WaveMedium;
@@ -496,8 +612,9 @@ namespace Meditation.Tuning
             L1DurabilityStrong = Defaults.L1DurabilityStrong;
             L1DriftPxPerSec = Defaults.L1DriftPxPerSec;
             L1PressureRampPercent = Defaults.L1PressureRampPercent;
+            L1ThoughtGrowthPercentPerSec = Defaults.L1ThoughtGrowthPercentPerSec;
+            L1ThoughtGrowthCap = Defaults.L1ThoughtGrowthCap;
 
-            L2LevelSeconds = Defaults.L2LevelSeconds;
             L2WaveIntervalSeconds = Defaults.L2WaveIntervalSeconds;
             L2WaveWeak = Defaults.L2WaveWeak;
             L2WaveMedium = Defaults.L2WaveMedium;
@@ -507,8 +624,9 @@ namespace Meditation.Tuning
             L2DurabilityStrong = Defaults.L2DurabilityStrong;
             L2DriftPxPerSec = Defaults.L2DriftPxPerSec;
             L2PressureRampPercent = Defaults.L2PressureRampPercent;
+            L2ThoughtGrowthPercentPerSec = Defaults.L2ThoughtGrowthPercentPerSec;
+            L2ThoughtGrowthCap = Defaults.L2ThoughtGrowthCap;
 
-            L3LevelSeconds = Defaults.L3LevelSeconds;
             L3WaveIntervalSeconds = Defaults.L3WaveIntervalSeconds;
             L3WaveWeak = Defaults.L3WaveWeak;
             L3WaveMedium = Defaults.L3WaveMedium;
@@ -518,8 +636,9 @@ namespace Meditation.Tuning
             L3DurabilityStrong = Defaults.L3DurabilityStrong;
             L3DriftPxPerSec = Defaults.L3DriftPxPerSec;
             L3PressureRampPercent = Defaults.L3PressureRampPercent;
+            L3ThoughtGrowthPercentPerSec = Defaults.L3ThoughtGrowthPercentPerSec;
+            L3ThoughtGrowthCap = Defaults.L3ThoughtGrowthCap;
 
-            L4LevelSeconds = Defaults.L4LevelSeconds;
             L4WaveIntervalSeconds = Defaults.L4WaveIntervalSeconds;
             L4WaveWeak = Defaults.L4WaveWeak;
             L4WaveMedium = Defaults.L4WaveMedium;
@@ -529,8 +648,9 @@ namespace Meditation.Tuning
             L4DurabilityStrong = Defaults.L4DurabilityStrong;
             L4DriftPxPerSec = Defaults.L4DriftPxPerSec;
             L4PressureRampPercent = Defaults.L4PressureRampPercent;
+            L4ThoughtGrowthPercentPerSec = Defaults.L4ThoughtGrowthPercentPerSec;
+            L4ThoughtGrowthCap = Defaults.L4ThoughtGrowthCap;
 
-            L5LevelSeconds = Defaults.L5LevelSeconds;
             L5WaveIntervalSeconds = Defaults.L5WaveIntervalSeconds;
             L5WaveWeak = Defaults.L5WaveWeak;
             L5WaveMedium = Defaults.L5WaveMedium;
@@ -540,6 +660,8 @@ namespace Meditation.Tuning
             L5DurabilityStrong = Defaults.L5DurabilityStrong;
             L5DriftPxPerSec = Defaults.L5DriftPxPerSec;
             L5PressureRampPercent = Defaults.L5PressureRampPercent;
+            L5ThoughtGrowthPercentPerSec = Defaults.L5ThoughtGrowthPercentPerSec;
+            L5ThoughtGrowthCap = Defaults.L5ThoughtGrowthCap;
 
             PanelVisible = Defaults.PanelVisible;
         }
@@ -572,7 +694,6 @@ namespace Meditation.Tuning
         /// </summary>
         public static void ApplyLevel(int index)
         {
-            LevelSeconds = LevelSecondsOf(index);
             WaveIntervalSeconds = WaveIntervalOf(index);
             WaveWeak = WaveWeakOf(index);
             WaveMedium = WaveMediumOf(index);
@@ -582,6 +703,8 @@ namespace Meditation.Tuning
             DurabilityStrong = DurabilityStrongOf(index);
             DriftPxPerSec = DriftOf(index);
             PressureRampPercent = PressureRampPercentOf(index);
+            ThoughtGrowthPercentPerSec = ThoughtGrowthPercentPerSecOf(index);
+            ThoughtGrowthCap = ThoughtGrowthCapOf(index);
 
             // «Рост давления внутри уровня» is on exactly when this level's band asks for it —
             // a 0 % shortening is the same statement as "no ramp", so one number says both.
@@ -615,9 +738,6 @@ namespace Meditation.Tuning
             }
         }
 
-        public static float LevelSecondsOf(int i) =>
-            Pick(i, L1LevelSeconds, L2LevelSeconds, L3LevelSeconds, L4LevelSeconds, L5LevelSeconds);
-
         public static float WaveIntervalOf(int i) =>
             Pick(i, L1WaveIntervalSeconds, L2WaveIntervalSeconds, L3WaveIntervalSeconds,
                 L4WaveIntervalSeconds, L5WaveIntervalSeconds);
@@ -650,6 +770,15 @@ namespace Meditation.Tuning
             Pick(i, L1PressureRampPercent, L2PressureRampPercent, L3PressureRampPercent,
                 L4PressureRampPercent, L5PressureRampPercent);
 
+        public static float ThoughtGrowthPercentPerSecOf(int i) =>
+            Pick(i, L1ThoughtGrowthPercentPerSec, L2ThoughtGrowthPercentPerSec,
+                L3ThoughtGrowthPercentPerSec, L4ThoughtGrowthPercentPerSec,
+                L5ThoughtGrowthPercentPerSec);
+
+        public static float ThoughtGrowthCapOf(int i) =>
+            Pick(i, L1ThoughtGrowthCap, L2ThoughtGrowthCap, L3ThoughtGrowthCap, L4ThoughtGrowthCap,
+                L5ThoughtGrowthCap);
+
         /// <summary>Thoughts sent by one wave of level <paramref name="i"/> — the progression's «больше мыслей».</summary>
         public static int ThoughtsPerWaveOf(int i) =>
             Mathf.Max(1, WaveWeakOf(i) + WaveMediumOf(i) + WaveStrongOf(i));
@@ -659,10 +788,11 @@ namespace Meditation.Tuning
         // during a level changes that level in the same frame (done contract §7 «правки действуют
         // сразу»), while editing another level's band only changes what happens when you get there.
 
-        public static void SetLevelSeconds(int i, float v) { Write(i, ref L1LevelSeconds, ref L2LevelSeconds, ref L3LevelSeconds, ref L4LevelSeconds, ref L5LevelSeconds, v); }
         public static void SetWaveInterval(int i, float v) { Write(i, ref L1WaveIntervalSeconds, ref L2WaveIntervalSeconds, ref L3WaveIntervalSeconds, ref L4WaveIntervalSeconds, ref L5WaveIntervalSeconds, v); }
         public static void SetDrift(int i, float v) { Write(i, ref L1DriftPxPerSec, ref L2DriftPxPerSec, ref L3DriftPxPerSec, ref L4DriftPxPerSec, ref L5DriftPxPerSec, v); }
         public static void SetPressureRampPercent(int i, float v) { Write(i, ref L1PressureRampPercent, ref L2PressureRampPercent, ref L3PressureRampPercent, ref L4PressureRampPercent, ref L5PressureRampPercent, v); }
+        public static void SetThoughtGrowthPercentPerSec(int i, float v) { Write(i, ref L1ThoughtGrowthPercentPerSec, ref L2ThoughtGrowthPercentPerSec, ref L3ThoughtGrowthPercentPerSec, ref L4ThoughtGrowthPercentPerSec, ref L5ThoughtGrowthPercentPerSec, v); }
+        public static void SetThoughtGrowthCap(int i, float v) { Write(i, ref L1ThoughtGrowthCap, ref L2ThoughtGrowthCap, ref L3ThoughtGrowthCap, ref L4ThoughtGrowthCap, ref L5ThoughtGrowthCap, v); }
 
         public static void SetWaveWeak(int i, int v) { Write(i, ref L1WaveWeak, ref L2WaveWeak, ref L3WaveWeak, ref L4WaveWeak, ref L5WaveWeak, v); }
         public static void SetWaveMedium(int i, int v) { Write(i, ref L1WaveMedium, ref L2WaveMedium, ref L3WaveMedium, ref L4WaveMedium, ref L5WaveMedium, v); }

@@ -27,7 +27,7 @@ namespace Meditation.Scenes
 
         protected override StageOptions Options => new StageOptions
         {
-            ShowDetails = true, ShowThoughts = true, TimerRunning = false
+            ShowDetails = true, ShowThoughts = true
         };
 
         protected override bool CrankAlarm =>

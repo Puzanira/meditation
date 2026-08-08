@@ -6,25 +6,27 @@ using UnityEngine.UI;
 namespace Meditation.View
 {
     /// <summary>
-    /// Which parts of the level-1 composition a scenette needs. The HUD is NOT part of this: slots
-    /// and the sun-dial are on every screen of the mock, and "таймер стоит" is drawn as a pale sun
-    /// (frames 4–8), never as a missing one — so a scenette can only say whether its timer runs.
+    /// Which parts of the level-1 composition a scenette needs. The HUD is NOT part of this: the slot
+    /// row is on every screen of the mock.
+    ///
+    /// «TimerRunning» lived here until 2026-08-07 and went out with the timer itself (see LevelRules):
+    /// a stand whose scenettes could still say «мой таймер идёт» would be a stand teaching a rule the
+    /// game no longer has.
     /// </summary>
     public struct StageOptions
     {
         public bool ShowDetails;
         public bool ShowThoughts;
-        public bool TimerRunning;
 
         public static StageOptions Full => new StageOptions
         {
-            ShowDetails = true, ShowThoughts = true, TimerRunning = true
+            ShowDetails = true, ShowThoughts = true
         };
     }
 
     /// <summary>
     /// The level-1 screen from SCREENS.md / gameplay-walkthrough.html, in greybox: sky, five towers,
-    /// foreground strip, briefcase-vessel, sun-dial timer, HUD slots, crank indicator, details on their
+    /// foreground strip, briefcase-vessel, HUD slots, crank indicator, details on their
     /// authored positions, the collection thread, the gaze circle and the thought layer.
     ///
     /// Z-order (SCREENS.md's list, with the foreground split in two so the walkthrough's frames are
@@ -75,9 +77,6 @@ namespace Meditation.View
         public RectTransform MessageLayer { get; private set; }
 
         public Image Vessel { get; private set; }
-        public Image Sun { get; private set; }
-        public Image SunDial { get; private set; }
-        public Text TimerLabel { get; private set; }
         public Image CrankDial { get; private set; }
         public Image CrankArc { get; private set; }
         public RectTransform CrankNeedle { get; private set; }
@@ -190,26 +189,8 @@ namespace Meditation.View
                 _slots.Add(slot);
             }
 
-            Sun = Ui.Circle(HudLayer, "Sun", LevelOneData.SunCentre.x, LevelOneData.SunCentre.y,
-                LevelOneData.SunRadius, new Color(1f, 1f, 1f, 0.35f), LevelOneData.SunStroke, 4f);
-            SunDial = Ui.NewImage(HudLayer, "SunDial");
-            SunDial.sprite = UiSprites.Circle;
-            SunDial.type = Image.Type.Filled;
-            SunDial.fillMethod = Image.FillMethod.Radial360;
-            SunDial.fillOrigin = (int)Image.Origin360.Top;
-
-            // The SPENT sector has to grow clockwise from 12 (mock frame 15), so the REMAINING
-            // wedge — which is what fillAmount draws — is filled anti-clockwise from the same origin.
-            SunDial.fillClockwise = false;
-            SunDial.color = LevelOneData.SunFill;
-            Ui.Place(SunDial.rectTransform, LevelOneData.SunCentre.x, LevelOneData.SunCentre.y,
-                LevelOneData.SunRadius * 2f - 8f, LevelOneData.SunRadius * 2f - 8f);
-            TimerLabel = Ui.Label(HudLayer, "TimerLabel", "", LevelOneData.SunCentre.x,
-                LevelOneData.SunCentre.y + LevelOneData.SunRadius + 30f, 300f, 40f, 30,
-                new Color(0.23f, 0.23f, 0.21f));
-
-            // "Таймер стоит" is a PALE sun (frames 4–8), not a missing one.
-            SetTimerRunning(_options.TimerRunning);
+            // The sun-dial and its caption stood in the top-right corner until 2026-08-07. They went
+            // out with the timer — the stand judges the rules, and there is no clock in them.
 
             // Halo behind the dial: green while the hand is in the zone, pink the moment a stall
             // starts costing a detail (walkthrough #dyn-on / frame 14).
@@ -255,30 +236,6 @@ namespace Meditation.View
             SmallMessage.gameObject.SetActive(false);
 
             ApplyCoverToggle(true);
-        }
-
-        /// <summary>Pale sun = the timer is not running (frames 4–8); bright = it is.</summary>
-        public void SetTimerRunning(bool running)
-        {
-            float alpha = running ? 1f : 0.35f;
-            Color sun = Sun.color;
-            sun.a = alpha;
-            Sun.color = sun;
-
-            Image sunFill = Sun.transform.childCount > 0
-                ? Sun.transform.GetChild(0).GetComponent<Image>()
-                : null;
-            if (sunFill != null)
-            {
-                Color c = sunFill.color;
-                c.a = 0.35f * alpha;
-                sunFill.color = c;
-            }
-
-            Color dial = SunDial.color;
-            dial.a = alpha;
-            SunDial.color = dial;
-            TimerLabel.gameObject.SetActive(running);
         }
 
         /// <summary>
@@ -508,6 +465,15 @@ namespace Meditation.View
             GazeRing.gameObject.SetActive(visible);
             GazeArc.gameObject.SetActive(visible && dwell01 > 0f);
             if (!visible) return;
+
+            // The radius is a slider since 2026-08-07, so the greybox circle is re-sized every frame
+            // too — the stand is where the founder judges whether an aim of that size still feels
+            // like an aim, and a circle built once at 90 px could not answer that.
+            float r = GazeSelector.Radius;
+            Gaze.rectTransform.sizeDelta = new Vector2(r * 2f, r * 2f);
+            GazeRing.rectTransform.sizeDelta = new Vector2(r * 2f, r * 2f);
+            GazeArc.rectTransform.sizeDelta = new Vector2((r + 14f) * 2f, (r + 14f) * 2f);
+
             Ui.MoveTo(Gaze.rectTransform, position);
             Ui.MoveTo(GazeRing.rectTransform, position);
             Ui.MoveTo(GazeArc.rectTransform, position);
@@ -532,12 +498,6 @@ namespace Meditation.View
 
             _crankHalo.gameObject.SetActive(alarm || spinning);
             _crankHalo.color = alarm ? LevelOneData.CrankHaloAlarm : LevelOneData.CrankHaloOk;
-        }
-
-        public void SetTimer(float remaining01, float secondsLeft)
-        {
-            SunDial.fillAmount = Mathf.Clamp01(remaining01);
-            TimerLabel.text = Mathf.CeilToInt(Mathf.Max(0f, secondsLeft)) + " с";
         }
 
         /// <summary>Show a teaching card next to its target (walkthrough frames 4, 7, 9).</summary>

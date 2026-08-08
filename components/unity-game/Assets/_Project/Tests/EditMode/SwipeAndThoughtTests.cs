@@ -6,8 +6,15 @@ using UnityEngine;
 
 namespace Meditation.Tests
 {
-    /// <summary>MECHANICS §3–§4 — the shaking hand, thought durability, targeting and screen coverage.</summary>
-    public class ShakeAndThoughtTests
+    /// <summary>
+    /// MECHANICS §3–§4 — the отгон on the height sensors, thought durability, targeting and coverage.
+    ///
+    /// Every claim below is about SENSOR readings (0..1), because that is what the game reads since
+    /// 2026-08-07: the joystick is the aim and lands no hits at all, and the tests that used to shake
+    /// it now wave over a sensor. The signal they feed the detector is the one the package produces —
+    /// a value ramping up and down (HeightSimulator), not a stick snapping between its stops.
+    /// </summary>
+    public class SwipeAndThoughtTests
     {
         private const float Dt = 1f / 60f;
 
@@ -17,61 +24,148 @@ namespace Meditation.Tests
         [TearDown]
         public void TearDown() => TuningConfig.ResetToDefaults();
 
-        private static int ShakeFor(ShakeDetector detector, int reversals)
+        /// <summary>
+        /// A hand waving over sensor A: <paramref name="strokes"/> passes, each one covering the whole
+        /// range at the emulated rise rate (1.25 units/s — the package's own keyboard mapping), turning
+        /// around at the top and at the bottom.
+        /// </summary>
+        private static int WaveOverSensorA(SwipeDetector detector, int strokes, float rate = 1.25f)
         {
-            // A real shake: full deflections flipping side to side, one frame apart.
-            for (int i = 0; i < reversals; i++)
+            float value = 0f;
+            int direction = 1;
+            for (int s = 0; s < strokes; s++)
             {
-                detector.Tick(new Vector2(i % 2 == 0 ? 1f : -1f, 0f), Dt);
+                float travelled = 0f;
+                while (travelled < 1f)
+                {
+                    float step = Mathf.Min(rate * Dt, 1f - travelled);
+                    travelled += step;
+                    value = Mathf.Clamp01(value + direction * step);
+                    detector.Tick(value, 0f, Dt);
+                }
+                direction = -direction;
             }
+
             return detector.TotalHits;
         }
 
         [Test]
-        public void SharpDeflection_CountsAsHit_AndReversalsKeepCounting()
+        public void EveryPassOverASensor_IsExactlyOneHit()
         {
-            var detector = new ShakeDetector();
-            Assert.AreEqual(6, ShakeFor(detector, 6), "Every sharp reversal is one hit.");
+            var detector = new SwipeDetector();
+            Assert.AreEqual(6, WaveOverSensorA(detector, 6),
+                "Частота движения = частота ударов: один проход руки — один удар.");
+        }
+
+        /// <summary>
+        /// The rule that replaced «holding the stick lands only the initial hit». A sensor reports a
+        /// POSITION, so a hand that keeps going one way is one long movement, not a drum roll: the
+        /// stroke lands its hit and then waits for the hand to turn around. Without this a slow steady
+        /// rise would tick off a hit every 0.2 of travel — and on the keyboard, holding Q would play
+        /// the whole отгон by itself.
+        /// </summary>
+        [Test]
+        public void OneLongMovementInOneDirection_IsOneHit()
+        {
+            var detector = new SwipeDetector();
+
+            float value = 0f;
+            while (value < 1f)
+            {
+                value = Mathf.Min(1f, value + 1.25f * Dt);
+                detector.Tick(value, 0f, Dt);
+            }
+
+            Assert.AreEqual(1, detector.TotalHits, "Одно движение — один удар, сколько бы оно ни длилось.");
+
+            // …and a hand parked above the sensor is not a gesture at all.
+            for (int i = 0; i < 60; i++) detector.Tick(1f, 0f, Dt);
+            Assert.AreEqual(1, detector.TotalHits, "Рука, замершая над датчиком, ударов не даёт.");
         }
 
         [Test]
-        public void HoldingTheStick_LandsOnlyTheInitialHit()
+        public void SlowlyLoweringTheHand_LandsNoHits()
         {
-            var detector = new ShakeDetector();
-            detector.Tick(new Vector2(1f, 0f), Dt);
-            for (int i = 0; i < 60; i++) detector.Tick(new Vector2(1f, 0f), Dt);
+            var detector = new SwipeDetector();
 
-            Assert.AreEqual(1, detector.TotalHits, "Holding a deflection is not shaking.");
-        }
-
-        [Test]
-        public void SlowGazeTilt_LandsNoHits()
-        {
-            TuningConfig.ShakeGestureSpeed = 3f;
-            var detector = new ShakeDetector();
-
-            // Ease the stick over 1.5 s — this is the gaze gesture, not a shake.
-            for (int i = 0; i < 90; i++) detector.Tick(new Vector2(i / 90f, 0f), Dt);
+            // 0.25 units/s across the whole range: far past the amplitude, far below the sharpness.
+            float value = 0f;
+            for (int i = 0; i < 240; i++)
+            {
+                value = Mathf.Clamp01(value + 0.25f * Dt);
+                detector.Tick(value, 0f, Dt);
+            }
 
             Assert.AreEqual(0, detector.TotalHits,
-                "A smooth tilt must move the gaze without knocking thoughts out (SCREENS: разводка жестов).");
+                "Медленное движение над датчиком — это не взмах, а рука на весу.");
         }
 
         [Test]
-        public void DeflectionBelowAmplitudeThreshold_LandsNoHits()
+        public void RippleBelowTheAmplitudeThreshold_LandsNoHits()
         {
-            TuningConfig.ShakeAmplitude = 0.8f;
-            var detector = new ShakeDetector();
+            var detector = new SwipeDetector();
 
-            for (int i = 0; i < 20; i++) detector.Tick(new Vector2(i % 2 == 0 ? 0.6f : -0.6f, 0f), Dt);
-            Assert.AreEqual(0, detector.TotalHits, "Small wiggles must not count as hits.");
+            // Quick, but tiny: ±0.05 of the range flipping every frame — a sensor's own jitter.
+            for (int i = 0; i < 60; i++) detector.Tick(i % 2 == 0 ? 0.5f : 0.45f, 0f, Dt);
+            Assert.AreEqual(0, detector.TotalHits, "Дрожь датчика не имеет права быть ударом.");
+        }
+
+        /// <summary>
+        /// Both sensors are the отгон, and they add up: two hands over the panel are twice the отгон,
+        /// one hand over one sensor is the game as designed. (The joystick, by contrast, cannot land a
+        /// hit at all any more — <see cref="ArcadeContractTests"/> and the PlayMode suite hold that.)
+        /// </summary>
+        [Test]
+        public void TheSecondSensor_CountsToo()
+        {
+            var onlyB = new SwipeDetector();
+            float value = 0f;
+            while (value < 1f)
+            {
+                value = Mathf.Min(1f, value + 1.25f * Dt);
+                onlyB.Tick(0f, value, Dt);
+            }
+            Assert.AreEqual(1, onlyB.TotalHits, "Датчик B обязан работать сам по себе.");
+
+            var both = new SwipeDetector();
+            value = 0f;
+            while (value < 1f)
+            {
+                value = Mathf.Min(1f, value + 1.25f * Dt);
+                both.Tick(value, value, Dt);
+            }
+            Assert.AreEqual(2, both.TotalHits, "Взмах над обоими датчиками — два удара, а не один.");
+        }
+
+        /// <summary>
+        /// The thresholds are the panel's, in the sensor's own units — a check that the two [tune]
+        /// rows really are the ones the detector reads (they replaced the joystick pair, so they could
+        /// have been left pointing at nothing).
+        /// </summary>
+        [Test]
+        public void TheThresholds_AreThePanelsOwnNumbers()
+        {
+            var detector = new SwipeDetector();
+            TuningConfig.SwipeAmplitude = 0.9f;
+
+            // A stroke that would be a hit at the shipped 0.2 and is not one at 0.9.
+            for (int i = 0; i < 30; i++) detector.Tick(i % 2 == 0 ? 0f : 0.5f, 0f, Dt);
+            Assert.AreEqual(0, detector.TotalHits, "Порог амплитуды не влияет на детект.");
+
+            TuningConfig.SwipeAmplitude = TuningConfig.Defaults.SwipeAmplitude;
+            // The strokes above move at 30 units/s (half the range in one frame), so a threshold above
+            // that is what proves the row is read at all.
+            TuningConfig.SwipeSharpness = 40f;
+            var strict = new SwipeDetector();
+            for (int i = 0; i < 30; i++) strict.Tick(i % 2 == 0 ? 0f : 0.5f, 0f, Dt);
+            Assert.AreEqual(0, strict.TotalHits, "Порог резкости не влияет на детект.");
         }
 
         [Test]
         public void ThoughtPops_AfterItsTypeDurability()
         {
             TuningConfig.DurabilityWeak = 3;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             TuningConfig.HitDecayEnabled = false;
 
             var field = new ThoughtField();
@@ -93,7 +187,7 @@ namespace Meditation.Tests
         {
             TuningConfig.DurabilityWeak = 2;
             TuningConfig.DurabilityStrong = 7;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             TuningConfig.HitDecayEnabled = false;
 
             var field = new ThoughtField();
@@ -109,7 +203,7 @@ namespace Meditation.Tests
         public void HitDecay_ResetsTheCounterAfterThePause_WhenEnabled()
         {
             TuningConfig.DurabilityMedium = 5;
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             TuningConfig.HitDecayEnabled = true;
             TuningConfig.HitDecayMs = 400f;
 
@@ -140,12 +234,12 @@ namespace Meditation.Tests
             near.Position = new Vector2(960f, 560f);
             far.Position = new Vector2(200f, 120f);
 
-            TuningConfig.Targeting = ShakeTargeting.NearestToCenter;
+            TuningConfig.Targeting = HitTargeting.NearestToCenter;
             field.ApplyHits(1, Vector2.zero);
             Assert.AreEqual(1, near.HitsTaken, "Variant B hits the thought nearest the centre…");
             Assert.AreEqual(0, far.HitsTaken, "…and only that one.");
 
-            TuningConfig.Targeting = ShakeTargeting.AllOnScreen;
+            TuningConfig.Targeting = HitTargeting.AllOnScreen;
             field.ApplyHits(1, Vector2.zero);
             Assert.AreEqual(2, near.HitsTaken, "Variant A sweeps the whole screen.");
             Assert.AreEqual(1, far.HitsTaken);
@@ -157,7 +251,7 @@ namespace Meditation.Tests
             TuningConfig.DurabilityWeak = 4;
             TuningConfig.HitDecayEnabled = false;
             TuningConfig.ThoughtDrift = false;
-            TuningConfig.Targeting = ShakeTargeting.StickDirection;
+            TuningConfig.Targeting = HitTargeting.StickDirection;
 
             var field = new ThoughtField();
             Thought left = field.Spawn(ThoughtStrength.Weak);
@@ -178,8 +272,10 @@ namespace Meditation.Tests
 
             Assert.AreEqual(0f, field.OverlapPercent, 0.01f, "An empty screen hides nothing.");
 
-            // Coverage is won by the NUMBER of thoughts (наплыв): sizes are fixed at S/M/L, so a
-            // full screen means a grid of L blobs — 5 × 4 of 420×320 tiles 1920×1080.
+            // Coverage is won by the NUMBER of thoughts (наплыв) and, since 2026-08-07, by their
+            // GROWTH. Growth is switched off here so the arithmetic below is about the classes only —
+            // 5 × 4 blobs of 420×320 tile 1920×1080.
+            TuningConfig.ThoughtGrowthPercentPerSec = 0f;
             for (int row = 0; row < 4; row++)
             for (int col = 0; col < 5; col++)
             {
@@ -189,8 +285,8 @@ namespace Meditation.Tests
 
             field.Tick(Dt, Vector2.zero, 0, false);
 
-            Assert.AreEqual(new Vector2(420f, 320f), field.Thoughts[0].Size,
-                "L thoughts must keep their spec size — nothing may inflate a blob.");
+            Assert.AreEqual(new Vector2(420f, 320f), field.Thoughts[0].SpawnSize,
+                "L thoughts must be BORN at their spec size — nothing may shrink a blob below its class.");
             Assert.Greater(field.OverlapPercent, 95f, "A wave-grid of L thoughts hides the screen.");
 
             float halfCovered = 0f;
@@ -382,6 +478,86 @@ namespace Meditation.Tests
 
             CollectionAssert.Contains(field.Thoughts, own, "Мысль, выигравшая уровень, обязана остаться.");
             Assert.IsFalse(own.Wallpaper, "Она не обои — её игрок и правда не отбил.");
+        }
+
+        // ---- рост мыслей со временем (решение founder 2026-08-07) -------------------------------------
+
+        /// <summary>
+        /// The invariant that replaced «размер жёстко зажат классом»: a thought is BORN at its class
+        /// and only ever grows from there, up to the tuned ceiling.
+        ///
+        /// Both halves matter and the first one is the founder's own words — «мысли НИКОГДА не
+        /// спавнить меньше класса». The tempting way to animate «разрастаются» is to start small and
+        /// swell into the class box, and that would make the first seconds of every wave weaker than
+        /// the composition the panel asked for. So this walks the growth from age 0 upwards and
+        /// requires it to be monotonic, to start at exactly 1 and to stop at the cap.
+        /// </summary>
+        [Test]
+        public void Thoughts_AreBornAtTheirClass_AndOnlyGrow()
+        {
+            TuningConfig.ThoughtGrowthPercentPerSec = 4f;
+            TuningConfig.ThoughtGrowthCap = 1.5f;
+
+            foreach (ThoughtStrength strength in new[]
+                     { ThoughtStrength.Weak, ThoughtStrength.Medium, ThoughtStrength.Strong })
+            {
+                var thought = new Thought { Strength = strength };
+                Vector2 born = Thought.SizeOf(strength);
+
+                Assert.AreEqual(born, thought.Size,
+                    strength + ": мысль обязана спавниться РОВНО своим классом.");
+
+                float previous = 0f;
+                for (int frame = 0; frame < 60 * 40; frame++)
+                {
+                    thought.Age += Dt;
+                    Vector2 size = thought.Size;
+
+                    Assert.GreaterOrEqual(size.x, born.x - 1e-3f,
+                        strength + ": мысль стала УЖЕ своего класса на " + thought.Age + " с.");
+                    Assert.GreaterOrEqual(size.y, born.y - 1e-3f,
+                        strength + ": мысль стала НИЖЕ своего класса на " + thought.Age + " с.");
+                    Assert.GreaterOrEqual(size.x, previous - 1e-3f, strength + ": мысль сжалась.");
+                    Assert.LessOrEqual(size.x, born.x * TuningConfig.ThoughtGrowthCap + 1e-3f,
+                        strength + ": мысль переросла потолок.");
+                    previous = size.x;
+                }
+
+                // 4 %/с reaches ×1.5 in 12.5 s, so forty seconds in it is sitting on the ceiling.
+                Assert.AreEqual(born.x * 1.5f, thought.Size.x, 0.5f,
+                    strength + ": через 40 с мысль обязана стоять на потолке роста.");
+            }
+        }
+
+        /// <summary>
+        /// A negative growth knob is not a back door to a sub-class spawn: the floor is 1, whatever
+        /// the panel says. (The slider does not go below 0, but the field is public static and the
+        /// persisted file is a text file a human can edit.)
+        /// </summary>
+        [Test]
+        public void Growth_CannotShrinkAThoughtBelowItsClass()
+        {
+            TuningConfig.ThoughtGrowthPercentPerSec = -50f;
+            TuningConfig.ThoughtGrowthCap = 2f;
+
+            var thought = new Thought { Strength = ThoughtStrength.Medium, Age = 10f };
+            Assert.AreEqual(Thought.SizeOf(ThoughtStrength.Medium), thought.Size,
+                "Отрицательный рост обязан упираться в класс, а не уводить мысль под него.");
+        }
+
+        /// <summary>
+        /// The defeat wallpaper is exempt. Those blobs are sized to CLOSE their cell, and growing them
+        /// would push the picture the retry rubs off out of the frame while the handle is on it.
+        /// </summary>
+        [Test]
+        public void TheDefeatWallpaper_DoesNotGrow()
+        {
+            TuningConfig.ThoughtGrowthPercentPerSec = 10f;
+            TuningConfig.ThoughtGrowthCap = 3f;
+
+            var blob = new Thought { Strength = ThoughtStrength.Strong, Wallpaper = true, Age = 30f };
+            Assert.AreEqual(1f, blob.GrowthScale, 1e-4f);
+            Assert.AreEqual(blob.SpawnSize, blob.Size);
         }
 
         // ---- pips belong to a thought you can see (SCREENS «Мысли») -----------------------------------

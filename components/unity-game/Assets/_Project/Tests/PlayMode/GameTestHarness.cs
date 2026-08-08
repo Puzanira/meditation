@@ -108,21 +108,22 @@ namespace Meditation.Tests
             Assert.IsTrue(condition(), "Не дождались (крутили): " + what);
         }
 
-        public static IEnumerator ShakeUntil(FakeBackend fake, Func<bool> condition, string what,
+        /// <summary>Wave over the height sensors until something happens — the отгон, since 2026-08-07.</summary>
+        public static IEnumerator SwipeUntil(FakeBackend fake, Func<bool> condition, string what,
             float patienceSeconds = DefaultPatienceSeconds)
         {
             float deadline = Time.realtimeSinceStartup + patienceSeconds;
             while (!condition() && Time.realtimeSinceStartup < deadline)
             {
-                fake.Next = new BackendSnapshot { Joystick = Alternating() };
+                fake.Next = new BackendSnapshot { HeightA = Waving() };
                 yield return null;
             }
 
             fake.Next = new BackendSnapshot();
-            Assert.IsTrue(condition(), "Не дождались (трясли): " + what);
+            Assert.IsTrue(condition(), "Не дождались (махали над датчиком): " + what);
         }
 
-        /// <summary>Both hands at once — the game as it is meant to be played.</summary>
+        /// <summary>All three controllers at once — the game as it is meant to be played.</summary>
         public static IEnumerator PlayUntil(FakeBackend fake, Func<bool> condition, string what,
             float patienceSeconds = DefaultPatienceSeconds)
         {
@@ -132,18 +133,22 @@ namespace Meditation.Tests
                 fake.Next = new BackendSnapshot
                 {
                     CrankDeltaDegrees = CrankPerFrame,
-                    Joystick = Alternating()
+                    HeightA = Waving()
                 };
                 yield return null;
             }
 
             fake.Next = new BackendSnapshot();
-            Assert.IsTrue(condition(), "Не дождались (двумя руками): " + what);
+            Assert.IsTrue(condition(), "Не дождались (тремя контролами): " + what);
         }
 
-        /// <summary>A sharp reversal every frame — what the shake detector is looking for.</summary>
-        private static Vector2 Alternating() =>
-            new Vector2(Time.frameCount % 2 == 0 ? 1f : -1f, 0f);
+        /// <summary>
+        /// A hand crossing the whole sensor every frame — one pass, one hit, which is the fastest a
+        /// wave can possibly be. A test cannot wave at human speed and still fit in its patience
+        /// window; what it must not do is fake a signal the sensor cannot produce, and 0 → 1 → 0 is
+        /// exactly the range the package guarantees (<c>HeightControl</c> clamps to 0..1).
+        /// </summary>
+        private static float Waving() => Time.frameCount % 2 == 0 ? 1f : 0f;
 
         // ---- getting somewhere ------------------------------------------------------------------------
 
@@ -201,16 +206,80 @@ namespace Meditation.Tests
             yield return Until(() => screen.Runtime.NoticedIndex >= 0, "деталь замечена");
         }
 
-        // ---- situations that would otherwise take real minutes ------------------------------------------
+        /// <summary>
+        /// Notice a detail the way the SHIPPED game does: park the aim on it and let the dwell run out.
+        ///
+        /// The frames of the design gate have to be shot in this mode, because it is the one that ships
+        /// (<c>TuningConfig.Defaults.Notice</c>) — and the round of 2026-08-08 found forty-nine of fifty
+        /// frames staged in <see cref="NoticeMode.FixedOrder"/>, which is the variant that switches the
+        /// aim OFF. The circle was therefore absent from almost every picture the founder was shown of a
+        /// feature she had ordered made bigger and brighter.
+        ///
+        /// The circle is PARKED rather than steered: the joystick moves it at a speed in px/s and a test
+        /// that flies it across the plate lands where the frame rate leaves it. Parking is the same call
+        /// the player's hand makes — <see cref="GazeSelector.Position"/> is where the aim is — and
+        /// everything that follows (dwell, the hit test, the drawn circle) is the game's own.
+        /// </summary>
+        public static IEnumerator NoticeByLooking(FakeBackend fake, LevelScreen screen, int detailIndex,
+            float patienceSeconds = DefaultPatienceSeconds)
+        {
+            TuningConfig.Notice = NoticeMode.GazeJoystick;
+            ParkTheAim(screen, LevelCatalog.AnchorOf(screen.Level.Details[detailIndex]));
+
+            fake.Next = new BackendSnapshot();
+            yield return Until(() => screen.Runtime.NoticedIndex >= 0,
+                "взгляд заметил деталь «" + screen.Level.Details[detailIndex].Name + "»", patienceSeconds);
+        }
 
         /// <summary>
-        /// Run the clock out through the real rule, in one big step. The spec's own slider does not go
-        /// below 60 s, and what is under test is what happens AT zero — not how long a minute lasts.
+        /// Put the aim down at <paramref name="spot"/> and leave it there — the stick is at rest, so
+        /// nothing moves it afterwards.
         /// </summary>
-        public static void DrainTheClock(LevelScreen screen)
+        public static void ParkTheAim(LevelScreen screen, Vector2 spot)
         {
-            screen.Rules.Tick(TuningConfig.LevelSeconds + 1f, 0f);
+            TuningConfig.Notice = NoticeMode.GazeJoystick;
+            screen.Runtime.GazeInPlay = true;
+            screen.Runtime.Gaze.Position = spot;
         }
+
+        // ---- how much of the frame the thoughts actually PAINT -------------------------------------
+
+        /// <summary>
+        /// The share of the frame the thoughts cover with their own ink, 0…1 — their visible rectangles
+        /// weighted by how much of a rectangle each sprite paints.
+        ///
+        /// Waiting on <c>Thoughts.Count</c> is what gave the gate two «кадра волн» with no waves on them
+        /// (06 and 09, 2026-08-08): thoughts enter from the edges, so three of them can be three slivers
+        /// hanging off the frame — 0.67 % of ink against 0.66 % on an empty intro. This is the wait; the
+        /// claim itself is made on the pixels of the written frame.
+        /// </summary>
+        public static float PaintedShare(LevelScreen screen)
+        {
+            System.Collections.Generic.IReadOnlyList<Thought> live = screen.Runtime.Field.Thoughts;
+            float painted = 0f;
+            for (int i = 0; i < live.Count; i++)
+            {
+                Vector2 size = live[i].Size;
+                painted += size.x * size.y *
+                           View.ArtThoughtView.VisibleShare(live[i].Position, size) * live[i].Ink;
+            }
+
+            return painted / (ThoughtField.ScreenWidth * ThoughtField.ScreenHeight);
+        }
+
+        /// <summary>
+        /// Let the level's OWN band run until its thoughts paint <paramref name="share"/> of the frame.
+        /// Hands off the sensors: an отгон would pop the waves as fast as they roll in.
+        /// </summary>
+        public static IEnumerator WaitForInkOnScreen(FakeBackend fake, LevelScreen screen, float share,
+            float patienceSeconds = 90f)
+        {
+            fake.Next = new BackendSnapshot();
+            yield return Until(() => PaintedShare(screen) >= share,
+                "мысли закрасили " + (share * 100f).ToString("0.0") + " % кадра", patienceSeconds);
+        }
+
+        // ---- situations that would otherwise take real minutes ------------------------------------------
 
         /// <summary>
         /// Reach a coverage percentage by PLAYING the level: real waves, of the level's own thoughts,
@@ -236,7 +305,7 @@ namespace Meditation.Tests
             TuningConfig.PressureRamp = false;
             screen.Runtime.Field.ResetWaveTimer(0f);
 
-            // Hands off the joystick: shaking would pop the waves as fast as they roll in.
+            // Hands off the sensors: the отгон would pop the waves as fast as they roll in.
             fake.Next = new BackendSnapshot();
 
             yield return Until(

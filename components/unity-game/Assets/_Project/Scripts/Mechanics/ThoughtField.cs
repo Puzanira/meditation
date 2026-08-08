@@ -64,11 +64,16 @@ namespace Meditation.Mechanics
         public string[] Labels = LevelOneData.ThoughtLabels;
 
         /// <summary>
-        /// Optional: the size a freshly spawned thought is drawn at. The game sets it so a blob takes
-        /// its silhouette's aspect (fitted inside the S/M/L class), which keeps the coverage maths and
-        /// the picture talking about the same rectangle. Null on the stand — plain class sizes.
+        /// Optional: hand a freshly spawned thought the metrics of the sprite it will be drawn as —
+        /// the rectangle (its silhouette's aspect, scaled to cover the S/M/L class) and how much of
+        /// that rectangle the sprite paints. Null on the stand: greybox blobs are solid class boxes.
+        ///
+        /// One hook for both numbers rather than a sizer and an inker, because a thought sized off the
+        /// drop but still counted as a solid rectangle is exactly the wrong half of the pair — see
+        /// <see cref="Thought.Ink"/>. The game wires it to
+        /// <see cref="Meditation.View.ArtLibrary.FitThought(Thought)"/>.
         /// </summary>
-        public Func<Thought, Vector2> ArtSizer;
+        public Action<Thought> ArtFitter;
 
         public void Clear()
         {
@@ -86,7 +91,7 @@ namespace Meditation.Mechanics
 
         /// <param name="deltaTime">Frame time.</param>
         /// <param name="stick">Current joystick vector (needed by targeting variant C).</param>
-        /// <param name="hits">Shake hits registered this frame.</param>
+        /// <param name="hits">Hits of the отгон registered this frame (swipes over the height sensors).</param>
         /// <param name="spawningAllowed">False during a breather / tutorial beat / finished level.</param>
         public void Tick(float deltaTime, Vector2 stick, int hits, bool spawningAllowed)
         {
@@ -124,7 +129,7 @@ namespace Meditation.Mechanics
             OverlapPercent = ComputeOverlapPercent();
         }
 
-        /// <summary>Land <paramref name="hits"/> shake hits according to the targeting [toggle].</summary>
+        /// <summary>Land <paramref name="hits"/> hits according to the targeting [toggle].</summary>
         public void ApplyHits(int hits, Vector2 stick)
         {
             if (hits <= 0 || _thoughts.Count == 0) return;
@@ -133,11 +138,11 @@ namespace Meditation.Mechanics
             {
                 switch (TuningConfig.Targeting)
                 {
-                    case ShakeTargeting.AllOnScreen:
+                    case HitTargeting.AllOnScreen:
                         for (int i = _thoughts.Count - 1; i >= 0; i--) Damage(_thoughts[i]);
                         break;
 
-                    case ShakeTargeting.StickDirection:
+                    case HitTargeting.StickDirection:
                         Thought aimed = PickByStick(stick);
                         if (aimed != null) Damage(aimed);
                         break;
@@ -195,13 +200,15 @@ namespace Meditation.Mechanics
                 if (_thoughts.Count >= cap) break;
 
                 var spot = new Vector2(originX + (col + 0.5f) * cellW, originY + (row + 0.5f) * cellH);
-                if (IsCovered(spot)) continue;
+                if (IsClosed(spot)) continue;
 
                 Thought blob = Spawn(ThoughtStrength.Strong);
                 blob.Position = spot;
 
-                // A silhouette fitted inside its class box leaves a gap around itself; the wallpaper
-                // needs the cell CLOSED, so a defeat blob is sized to its cell, not to its class.
+                // The wallpaper needs the cell CLOSED, so a defeat blob is sized to its cell rather
+                // than to its class (and <see cref="Thought.SpawnSize"/> lets it: the class floor is
+                // about thoughts the player fights). Its ink counts as solid for the same reason —
+                // this IS the «экран целиком закрыт мыслями» picture, not a thing to measure.
                 blob.ArtSize = new Vector2(cellW, cellH) * CoverCellOversize;
                 blob.Wallpaper = true;
                 added++;
@@ -235,6 +242,32 @@ namespace Meditation.Mechanics
         }
 
         /// <summary>
+        /// A stronger question than <see cref="IsCovered"/>, and the one the defeat wallpaper asks: is
+        /// this point CLOSED — not merely inside somebody's rectangle, but hidden by enough ink that
+        /// laying another blob over it would add nothing.
+        ///
+        /// A detail «под мыслью» is a detail you cannot pick, which is a statement about rectangles and
+        /// is what <see cref="IsCovered"/> stays. A screen «целиком закрыт мыслями» is a statement about
+        /// pixels, and one 36 %-hatched bottle laid across a cell does not make that cell closed — with
+        /// the rectangle test the wallpaper skipped exactly the cells the real thoughts had left most
+        /// see-through (Codex review, 2026-08-08).
+        /// </summary>
+        public bool IsClosed(Vector2 point)
+        {
+            float open = 1f;
+            for (int i = 0; i < _thoughts.Count; i++)
+            {
+                if (!_thoughts[i].Rect.Contains(point)) continue;
+                open *= 1f - _thoughts[i].Ink;
+                if (open <= 1f - ClosedEnough) return true;
+            }
+            return false;
+        }
+
+        /// <summary>How much of a point has to be hidden before the wallpaper leaves it alone.</summary>
+        private const float ClosedEnough = 0.9f;
+
+        /// <summary>
         /// One wave, composed the way the panel says: N weak + N medium + N strong
         /// (MECHANICS §4 "состав волны: сколько и каких мыслей"). An all-zero composition still
         /// sends one weak thought, so a mis-set panel cannot silently stop the game.
@@ -263,7 +296,7 @@ namespace Meditation.Mechanics
             // The art size is decided before the spawn point, because where a blob enters the screen
             // is measured off its own edge — a silhouette narrower than its class must not start with
             // a gap between it and the frame.
-            if (ArtSizer != null) thought.ArtSize = ArtSizer(thought);
+            ArtFitter?.Invoke(thought);
 
             Vector2 size = thought.Size;
             Vector2 position;
@@ -303,7 +336,7 @@ namespace Meditation.Mechanics
         public Thought SpawnAt(ThoughtStrength strength, string label, Vector2 position)
         {
             var thought = new Thought { Strength = strength, Label = label, Position = position };
-            if (ArtSizer != null) thought.ArtSize = ArtSizer(thought);
+            ArtFitter?.Invoke(thought);
 
             Vector2 centre = new Vector2(ScreenWidth * 0.5f, ScreenHeight * 0.5f);
             Vector2 toCentre = centre - position;
@@ -362,30 +395,67 @@ namespace Meditation.Mechanics
             return best ?? PickNearestToCentre();
         }
 
+        /// <summary>
+        /// Per-cell «still open» factors, kept between calls — this runs every tick and a fresh
+        /// 2304-float array per frame is garbage the cabinet does not need to collect.
+        /// </summary>
+        private readonly float[] _open = new float[GridCols * GridRows];
+
+        /// <summary>
+        /// How much of the screen the thoughts actually HIDE — counted off the ink they paint, not off
+        /// the rectangles they are drawn in (Codex review, 2026-08-08).
+        ///
+        /// The thoughts of the drop are marker hatching: measured over the 25 canvases they paint
+        /// 15–64 % of their own rectangle (<see cref="Meditation.View.ArtLibrary.InkShareOf"/>), and
+        /// counting a rectangle as closed screen made the defeat threshold a statement about how much
+        /// screen the blobs were LAID OVER rather than how much of it the player can still see —
+        /// «мысли заполнили экран» is about the second one. Since 2026-08-08 the fit is cover rather
+        /// than contain, so those rectangles are half a screen tall on a narrow silhouette and the
+        /// difference stopped being cosmetic.
+        ///
+        /// Layers multiply: a cell under k thoughts is open with probability Π(1 − ink), so it counts
+        /// as 1 − Π(1 − ink) hidden. That is the same arithmetic the HUD slots use to harden a soft
+        /// alpha by stacking copies (<c>SlotSilhouette</c>, 1 − (1 − a)^k) — hatching over hatching
+        /// really does close a gap, and a screen buried five deep still reads as full. A solid blob
+        /// (ink 1, i.e. the greybox stand and the defeat wallpaper) closes its cell outright, so the
+        /// number this returns is unchanged everywhere art is not involved.
+        /// </summary>
         private float ComputeOverlapPercent()
         {
             if (_thoughts.Count == 0) return 0f;
 
+            for (int i = 0; i < _open.Length; i++) _open[i] = 1f;
+
             float cellW = ScreenWidth / GridCols;
             float cellH = ScreenHeight / GridRows;
-            int covered = 0;
 
-            for (int row = 0; row < GridRows; row++)
+            // Walked thought by thought rather than cell by cell: a thought touches a handful of cells
+            // and the field can hold hundreds of them by the time the screen closes.
+            for (int i = 0; i < _thoughts.Count; i++)
             {
-                float y = (row + 0.5f) * cellH;
-                for (int col = 0; col < GridCols; col++)
+                Thought thought = _thoughts[i];
+                float ink = thought.Ink;
+                if (ink <= 0f) continue;
+
+                Rect rect = thought.Rect;
+                int firstCol = Mathf.Max(0, Mathf.CeilToInt(rect.xMin / cellW - 0.5f));
+                int lastCol = Mathf.Min(GridCols - 1, Mathf.CeilToInt(rect.xMax / cellW - 0.5f) - 1);
+                int firstRow = Mathf.Max(0, Mathf.CeilToInt(rect.yMin / cellH - 0.5f));
+                int lastRow = Mathf.Min(GridRows - 1, Mathf.CeilToInt(rect.yMax / cellH - 0.5f) - 1);
+                if (lastCol < firstCol || lastRow < firstRow) continue;
+
+                float stillOpen = 1f - ink;
+                for (int row = firstRow; row <= lastRow; row++)
                 {
-                    float x = (col + 0.5f) * cellW;
-                    for (int i = 0; i < _thoughts.Count; i++)
-                    {
-                        if (!_thoughts[i].Rect.Contains(new Vector2(x, y))) continue;
-                        covered++;
-                        break;
-                    }
+                    int line = row * GridCols;
+                    for (int col = firstCol; col <= lastCol; col++) _open[line + col] *= stillOpen;
                 }
             }
 
-            return covered * 100f / (GridCols * GridRows);
+            float hidden = 0f;
+            for (int i = 0; i < _open.Length; i++) hidden += 1f - _open[i];
+
+            return hidden * 100f / (GridCols * GridRows);
         }
 
         /// <summary>

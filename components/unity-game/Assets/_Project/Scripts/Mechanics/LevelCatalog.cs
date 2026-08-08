@@ -107,14 +107,6 @@ namespace Meditation.Mechanics
 
         public ArtDetail[] Details;
 
-        /// <summary>
-        /// HUD timer «солнце», centre in design px. Part of the per-level composition for the same
-        /// reason the vessel is: SCREENS fixes a base (1800, 100), but the art drop owns the picture,
-        /// and where a detail was painted under the widget the HUD is what moves — founder's decision
-        /// of 2026-07-31 («подвинуть HUD — арт не трогаем»).
-        /// </summary>
-        public Vector2 SunCentre;
-
         /// <summary>HUD crank indicator, centre in design px. Base (140, 950); per level, see above.</summary>
         public Vector2 CrankIndicatorCentre;
 
@@ -209,16 +201,16 @@ namespace Meditation.Mechanics
                     Detail("ракушка на асфальте", "L1/objects/seashell", 1285f, 1021f, 189f, 60f,
                         0.6433f, 0.6399f)
                 },
-                // Nothing on this plate wants the HUD's corners: the gull stops at x 1601 (the sun's
-                // dial starts at 1740), the shark fin is 100 px above the indicator's halo, and the
-                // slot row's 424 px end well left of the plane. All three widgets stay on the SCREENS
-                // base — «HUD переехал» must not quietly become «HUD переезжает на каждом уровне».
-                SunCentre = new Vector2(1800f, 100f),
+                // Nothing on this plate wants the HUD's corners: the shark fin is 100 px above the
+                // indicator's halo and the slot row's 424 px end well left of the plane. Both widgets
+                // stay on the SCREENS base — «HUD переехал» must not quietly become «HUD переезжает
+                // на каждом уровне». (The sun that used to stand in the third corner left with the
+                // timer, 2026-08-07.)
                 CrankIndicatorCentre = new Vector2(140f, 950f),
                 SlotsOrigin = new Vector2(60f, 40f),
                 ThoughtSprites = new[]
                 {
-                    // Order matters: the tutorial's shake beat spawns [0] — «первая мысль (кот)»
+                    // Order matters: the tutorial's отгон beat spawns [0] — «первая мысль (кот)»
                     // (SCREENS §Обучение, walkthrough А1).
                     "L1/thoughts/cat", "L1/thoughts/guitar", "L1/thoughts/wine-bottle",
                     "L1/thoughts/butterfly", "L1/thoughts/umbrella"
@@ -257,7 +249,6 @@ namespace Meditation.Mechanics
                         0.5263f, 0.5209f),
                     Detail("тапки", "L2/objects/slippers", 215f, 975f, 129f, 51f, 0.5007f, 0.5620f)
                 },
-                SunCentre = new Vector2(1800f, 100f),
                 // The slippers (150…279 × 950…1001) lie exactly where the indicator's halo does, so the
                 // indicator slides right along the floor. 375 is the first position that clears them
                 // (279 + halo 86 + 10 px of air) and it stops well short of the mug at x 948.
@@ -305,7 +296,6 @@ namespace Meditation.Mechanics
                     // its sprite away and painted the floor clean, so it is neither a detail nor decor.
                     Detail("рыба на полу", "L3/objects/fish", 1775f, 991f, 199f, 85f, 0.5288f, 0.5063f)
                 },
-                SunCentre = new Vector2(1800f, 100f),
                 // Back on the SCREENS base: the shift to (420, 950) existed only to clear the puddle
                 // (260 px of floor at (172, 942)), and the puddle left with the drop.
                 CrankIndicatorCentre = new Vector2(140f, 950f),
@@ -352,7 +342,6 @@ namespace Meditation.Mechanics
                     Detail("мышь с книжкой", "L4/objects/mouse-book", 52f, 1029f, 163f, 55f,
                         0.6503f, 0.5132f)
                 },
-                SunCentre = new Vector2(1800f, 100f),
                 // The base corner is taken twice over: the valentine (167…214 × 856…892) and the mouse
                 // with the book (…133 × 1001…1056) leave a gap only 110 px tall between them, and the
                 // dial needs 172. Sliding right along the same floor line keeps the indicator in its
@@ -413,11 +402,6 @@ namespace Meditation.Mechanics
                     Detail("лоза на стене", "L5/objects/vine", 1591f, 608f, 54f, 658f,
                         new Rect(0f, 0.1709f, 1f, 0.0692f), 4f, 0.4632f, 0.4757f)
                 },
-                // The moon is 176 px and sits at (1680, 112): the base sun overlapped it by ~28 px and
-                // read as a second moon beside it. The only free lane in the top-right corner is BELOW
-                // the moon (the vine's column ends at x 1619), so the sun drops to y 270 — 10 px clear
-                // of the moon's lower edge, still the right-top corner, and its caption clears the vine.
-                SunCentre = new Vector2(1800f, 270f),
                 CrankIndicatorCentre = new Vector2(140f, 950f),
                 // The sparrow (156…218 × 52…114) sat UNDER the slot row — a collectable detail the
                 // player could not see, let alone aim at. The sky below it is empty down to the
@@ -502,16 +486,43 @@ namespace Meditation.Mechanics
         /// <summary>The rectangle the vessel occupies, design px.</summary>
         public static Rect VesselRectOf(LevelDefinition level) => Centred(level.VesselCentre, level.VesselSize);
 
-        /// <summary>Timer sun, the dial itself (r = 60).</summary>
-        public static Rect SunRectOf(LevelDefinition level) =>
-            Centred(level.SunCentre, new Vector2(LevelOneData.SunRadius * 2f, LevelOneData.SunRadius * 2f));
+        /// <summary>Height of the progress bar that stands under every vessel, design px.</summary>
+        public const float VesselBarHeight = 16f;
 
-        /// <summary>The caption under the sun — its box, which is wider than the «0:42» inside it.</summary>
-        public static Rect TimerLabelRectOf(LevelDefinition level) =>
-            Centred(
-                new Vector2(level.SunCentre.x,
-                    level.SunCentre.y + LevelOneData.SunRadius + LevelOneData.TimerLabelGap),
-                new Vector2(LevelOneData.TimerLabelWidth, LevelOneData.TimerLabelHeight));
+        /// <summary>Air between the vessel's lower edge and its bar — the bar never touches the vessel.</summary>
+        public const float VesselBarGap = 22f;
+
+        /// <summary>How wide the bar is, as a share of the vessel's own rectangle.</summary>
+        public const float VesselBarWidthShare = 0.72f;
+
+        /// <summary>…and how much clear frame is left below it.</summary>
+        public const float VesselBarBottomMargin = 12f;
+
+        /// <summary>
+        /// The progress bar under the vessel — on all five levels since 2026-08-07 (founder).
+        ///
+        /// «Под сосудом», with one clamp: the library's backpack is 230 px tall centred at y 974, so
+        /// its own lower edge is at 1089 — nine pixels PAST the frame. An unclamped bar would be drawn
+        /// off screen on exactly the level with the most details to track. So the bar drops as far as
+        /// the vessel lets it and no further than the frame allows, which puts it across the foot of
+        /// the backpack on level 4 and in clear floor on the other four.
+        ///
+        /// Arithmetic here rather than in the view, like every other rectangle in this file: the
+        /// clearance claim («бар не накрывает деталь, не уезжает за кадр») has to be decidable without
+        /// a scene, so an EditMode test can hold it.
+        /// </summary>
+        public static Rect VesselBarRectOf(LevelDefinition level)
+        {
+            Rect vessel = VesselRectOf(level);
+            float y = Mathf.Min(
+                vessel.yMax + VesselBarGap + VesselBarHeight * 0.5f,
+                ScreenHeight - VesselBarBottomMargin - VesselBarHeight * 0.5f);
+            return Centred(new Vector2(level.VesselCentre.x, y),
+                new Vector2(level.VesselSize.x * VesselBarWidthShare, VesselBarHeight));
+        }
+
+        /// <summary>Frame height in design px — the bar's clamp needs it, and so do the layout tests.</summary>
+        public const float ScreenHeight = 1080f;
 
         /// <summary>Crank indicator, the widest ring drawn around it (halo r = 86, not the dial's 70).</summary>
         public static Rect CrankRectOf(LevelDefinition level) =>
@@ -530,22 +541,25 @@ namespace Meditation.Mechanics
                 LevelOneData.SlotSize, LevelOneData.SlotSize);
 
         /// <summary>
-        /// Everything a teaching plate is not allowed to cover: every detail, the vessel, and each HUD
-        /// widget (the sun and its caption, the crank indicator, the slot row).
+        /// Everything a teaching plate is not allowed to cover: every detail, the vessel with its
+        /// progress bar, and each HUD widget (the crank indicator, the slot row).
         ///
         /// Приёмка п.3 of the drop names the HUD; the design gate of 2026-08-07 extended it to the
         /// tutorial's own plates, and it is the same list either way — the point is that the level stays
         /// readable while it is being explained. Composed here rather than in the view for the same
         /// reason the HUD clearance is: it has to be decidable without a scene, so a test can hold it.
+        ///
+        /// The sun and its caption left this list with the timer (founder, 2026-08-07). The bar under
+        /// the vessel took their place — it is the widget that replaced them as the level's live
+        /// readout, and a hint standing on it hides the only thing on screen that counts.
         /// </summary>
         public static Rect[] HintObstaclesOf(LevelDefinition level)
         {
-            var rects = new Rect[level.DetailCount + 5];
+            var rects = new Rect[level.DetailCount + 4];
             int at = 0;
             for (int i = 0; i < level.DetailCount; i++) rects[at++] = RectOf(level.Details[i]);
             rects[at++] = VesselRectOf(level);
-            rects[at++] = SunRectOf(level);
-            rects[at++] = TimerLabelRectOf(level);
+            rects[at++] = VesselBarRectOf(level);
             rects[at++] = CrankRectOf(level);
             rects[at] = SlotsRectOf(level);
             return rects;

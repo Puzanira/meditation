@@ -32,7 +32,7 @@ namespace Meditation.Scenes
 
         protected override StageOptions Options => new StageOptions
         {
-            ShowDetails = true, ShowThoughts = false, TimerRunning = false
+            ShowDetails = true, ShowThoughts = false
         };
 
         /// <summary>

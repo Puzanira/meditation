@@ -9,9 +9,12 @@ using UnityEngine;
 namespace Meditation.Scenes
 {
     /// <summary>
-    /// Scenette 4 «Уровень целиком» (MECHANICS §7.4): the whole level loop — timer, victory with all
-    /// five details in the vessel, defeat on an expired timer OR a covered screen, breathers between
+    /// Scenette 4 «Уровень целиком» (MECHANICS §7.4): the whole level loop — victory with all five
+    /// details in the vessel, defeat when the thoughts close over the screen, breathers between
     /// details, and a restart that never leaves the build (walkthrough frames 17–18).
+    ///
+    /// The clock left this loop on 2026-08-07 with the rest of the timer (see <see cref="LevelRules"/>),
+    /// so the scenette is now what the game is: collect them all, or lose the screen.
     ///
     /// The defeat screen keeps the walkthrough's meditative retry: every turn of the crank wipes some
     /// of the thoughts away; clear them (or wait out the auto-retry [toggle]) and the level starts over.
@@ -65,7 +68,6 @@ namespace Meditation.Scenes
 
             _runtime.Tick(deltaTime, Stick, Hits, CrankSpeed, _rules.SpawningAllowed);
             _rules.Tick(deltaTime, _runtime.Field.OverlapPercent);
-            Composition.SetTimer(_rules.TimeLeft01, _rules.TimeLeft);
 
             if (_rules.Outcome == LevelOutcome.Win)
             {
@@ -114,8 +116,8 @@ namespace Meditation.Scenes
         /// <summary>
         /// Walkthrough frame 18, in three beats: the thoughts dissolve (0.5 s), one second of clean
         /// scene — «тишина» — and then the vessel lifts to the centre at ×2 with all five details in
-        /// it, the line «Собрано: …» underneath at (960, 800). The timer is already stopped and the
-        /// HUD is gone, exactly as the mock draws the outcome screens.
+        /// it, the line «Собрано: …» underneath at (960, 800). The HUD is gone, exactly as the mock
+        /// draws the outcome screens.
         /// </summary>
         private void TickVictory()
         {
@@ -144,7 +146,6 @@ namespace Meditation.Scenes
             Composition.SetHudVisible(true);
             Composition.SetDesaturated(false);
             Composition.SetThoughtsAlpha(1f);
-            Composition.SetTimer(1f, TuningConfig.LevelSeconds);
         }
 
         protected override string Readout()
@@ -158,7 +159,8 @@ namespace Meditation.Scenes
             }
 
             return HandsReadout() + _runtime.Readout() +
-                   "таймер: " + _rules.TimeLeft.ToString("0") + " с\n" +
+                   "перекрытие: " + _runtime.Field.OverlapPercent.ToString("0") + " % / " +
+                   TuningConfig.LossOverlapPercent.ToString("0") + " %\n" +
                    "передышка: " + _rules.BreatherLeft.ToString("0.0") + " с\n" +
                    "статус: " + outcome;
         }

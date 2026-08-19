@@ -140,8 +140,11 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        // Renamed 2026-08-08: the HUD's row of detail slots is gone (founder: «убрать ряд совсем»),
+        // so this test's own name should not still promise one — what it actually pins, the detail
+        // showing up inside the vessel, is unchanged.
         [UnityTest]
-        public IEnumerator Scenette1_DetailReachesTheVessel_AndTheHudSlotFills()
+        public IEnumerator Scenette1_DetailReachesTheVessel_AndIsShownInsideIt()
         {
             TuningConfig.CollectSeconds = TestOnlyOneSecondCollect;
             TuningConfig.GraceMs = 800f;

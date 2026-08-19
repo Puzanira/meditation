@@ -1,6 +1,8 @@
 using System.Collections;
 using System.IO;
 using AiGameStudio.ArcadeControls;
+using Meditation.Game;
+using Meditation.Mechanics;
 using Meditation.Stand;
 using Meditation.Tuning;
 using Meditation.View;
@@ -73,9 +75,12 @@ namespace Meditation.Tests
             // SCREENS.md §S3 "Зоны": the numbers below are the spec's, verbatim.
             StandTestHarness.AssertDesignRect(stage, "Ground", new Rect(0f, 810f, 1920f, 270f));
             StandTestHarness.AssertDesignRect(stage, "Vessel", new Rect(840f, 855f, 240f, 150f));
-            StandTestHarness.AssertDesignRect(stage, "Slot1", new Rect(60f, 40f, 72f, 72f));
-            StandTestHarness.AssertDesignRect(stage, "Slot5", new Rect(412f, 40f, 72f, 72f));
             StandTestHarness.AssertDesignRect(stage, "CrankDial", new Rect(70f, 880f, 140f, 140f));
+
+            // The HUD's row of detail slots left the stand on 2026-08-08 (founder: «убрать ряд
+            // совсем»), same as the game — it must not quietly come back.
+            Assert.IsNull(StandTestHarness.FindOrNull(stage, "Slot1"),
+                "Ряд слотов вернулся на стенд — его вывели решением founder 2026-08-08.");
             StandTestHarness.AssertDesignRect(stage, "Building1", new Rect(100f, 250f, 230f, 560f));
 
             // Details sit on their authored positions (they breathe, so only the centre is pinned).

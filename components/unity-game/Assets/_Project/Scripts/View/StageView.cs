@@ -6,8 +6,8 @@ using UnityEngine.UI;
 namespace Meditation.View
 {
     /// <summary>
-    /// Which parts of the level-1 composition a scenette needs. The HUD is NOT part of this: the slot
-    /// row is on every screen of the mock.
+    /// Which parts of the level-1 composition a scenette needs. The HUD is NOT part of this: the
+    /// crank indicator is on every screen of the mock.
     ///
     /// «TimerRunning» lived here until 2026-08-07 and went out with the timer itself (see LevelRules):
     /// a stand whose scenettes could still say «мой таймер идёт» would be a stand teaching a rule the
@@ -26,8 +26,12 @@ namespace Meditation.View
 
     /// <summary>
     /// The level-1 screen from SCREENS.md / gameplay-walkthrough.html, in greybox: sky, five towers,
-    /// foreground strip, briefcase-vessel, HUD slots, crank indicator, details on their
-    /// authored positions, the collection thread, the gaze circle and the thought layer.
+    /// foreground strip, briefcase-vessel, the crank indicator, details on their authored positions,
+    /// the collection thread, the gaze circle and the thought layer.
+    ///
+    /// The HUD's row of detail slots stood here until 2026-08-08 — founder, live session, «убрать ряд
+    /// совсем» — leaving the crank indicator as the HUD's only widget; «сколько собрано» now reads off
+    /// the vessel alone (the details shown inside it, same as <see cref="LevelView"/>).
     ///
     /// Z-order (SCREENS.md's list, with the foreground split in two so the walkthrough's frames are
     /// reproducible): scene + ground strip → details → thread → thoughts → vessel → HUD. The strip is
@@ -44,7 +48,6 @@ namespace Meditation.View
         private readonly List<ThoughtView> _thoughtPool = new List<ThoughtView>();
         private readonly List<Image> _detailImages = new List<Image>();
         private readonly List<Image> _detailRings = new List<Image>();
-        private readonly List<Image> _slots = new List<Image>();
         private readonly List<Image> _buildings = new List<Image>();
         private readonly List<Image> _vesselContents = new List<Image>();
 
@@ -89,7 +92,6 @@ namespace Meditation.View
         public Text BigMessage { get; private set; }
         public Text SmallMessage { get; private set; }
 
-        public IReadOnlyList<Image> Slots => _slots;
         public IReadOnlyList<Image> DetailImages => _detailImages;
         public IReadOnlyList<ThoughtView> ThoughtViews => _thoughtPool;
 
@@ -178,19 +180,10 @@ namespace Meditation.View
             }
 
             // --- HUD ------------------------------------------------------------------------
-            for (int i = 0; i < 5; i++)
-            {
-                float x = LevelOneData.SlotsOrigin.x + i * LevelOneData.SlotStep;
-                Image slot = Ui.Rounded(HudLayer, "Slot" + (i + 1),
-                    x + LevelOneData.SlotSize * 0.5f,
-                    LevelOneData.SlotsOrigin.y + LevelOneData.SlotSize * 0.5f,
-                    LevelOneData.SlotSize, LevelOneData.SlotSize,
-                    Color.white, new Color(0.6f, 0.6f, 0.6f), 3f, 10);
-                _slots.Add(slot);
-            }
-
-            // The sun-dial and its caption stood in the top-right corner until 2026-08-07. They went
-            // out with the timer — the stand judges the rules, and there is no clock in them.
+            // The row of detail slots stood here (5 of 72 px, step 88, from LevelOneData.SlotsOrigin)
+            // until 2026-08-08 — founder, live session, «убрать ряд совсем». The sun-dial and its
+            // caption went the same way in the top-right corner on 2026-08-07, with the timer. The
+            // crank indicator below is what is left of the HUD.
 
             // Halo behind the dial: green while the hand is in the zone, pink the moment a stall
             // starts costing a detail (walkthrough #dyn-on / frame 14).
@@ -380,7 +373,7 @@ namespace Meditation.View
             _detailImages[index].gameObject.SetActive(visible);
         }
 
-        /// <summary>Detail landed: vessel bounces, the HUD slot fills, a copy shows inside the vessel.</summary>
+        /// <summary>Detail landed: vessel bounces, a copy shows inside the vessel.</summary>
         public void CollectDetail(int index)
         {
             if (index < 0 || index >= _detailImages.Count) return;
@@ -390,14 +383,6 @@ namespace Meditation.View
             _detailImages[index].gameObject.SetActive(false);
             _detailRings[index].gameObject.SetActive(false);
             _vesselBounce = 0.3f;
-
-            if (index < _slots.Count)
-            {
-                Image innerSlot = _slots[index].transform.childCount > 0
-                    ? _slots[index].transform.GetChild(0).GetComponent<Image>()
-                    : null;
-                if (innerSlot != null) innerSlot.color = spec.Fill;
-            }
 
             // Full-size copy (50 px, mock 6) parented to the vessel so it rides along when the
             // victory screen lifts and doubles it.
@@ -436,14 +421,6 @@ namespace Meditation.View
             for (int i = 0; i < _vesselContents.Count; i++)
                 if (_vesselContents[i] != null) Object.Destroy(_vesselContents[i].gameObject);
             _vesselContents.Clear();
-
-            for (int i = 0; i < _slots.Count; i++)
-            {
-                Image innerSlot = _slots[i].transform.childCount > 0
-                    ? _slots[i].transform.GetChild(0).GetComponent<Image>()
-                    : null;
-                if (innerSlot != null) innerSlot.color = Color.white;
-            }
 
             for (int i = 0; i < _detailImages.Count; i++)
             {
@@ -536,7 +513,7 @@ namespace Meditation.View
             PeakVignette.rectTransform.SetAsLastSibling();
         }
 
-        /// <summary>HUD is off on the outcome screens — mocks 17–18 have no slots, sun or dial.</summary>
+        /// <summary>HUD is off on the outcome screens — mocks 17–18 show none of it.</summary>
         public void SetHudVisible(bool visible) => HudLayer.gameObject.SetActive(visible);
 
         /// <summary>Defeat: «цвета гаснут» — the blobs lose their colour, the scene stays readable.</summary>

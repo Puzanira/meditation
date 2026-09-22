@@ -27,9 +27,11 @@ namespace Meditation.View
     ///     «в тоне медитации». The слab, the white ink and the 2 px rule — the three things Б1 was
     ///     actually about — are unchanged.
     ///
-    /// …plus the PC bracket underneath, smaller and dimmer, which is the same device the title uses
-    /// (<c>GameTexts.TitleStartOnDesk</c>): a line that is false on the machine this game ships to has
-    /// to look like a footnote, not like half the instruction.
+    /// …plus an optional second line underneath, smaller and dimmer. It carried the PC bracket until
+    /// 2026-09-22, when every keyboard hint left the game («она играется на автомате» — founder); the
+    /// plate kept the form, because a quiet second line under an instruction is a typographic device
+    /// and the day a screen needs one again it should not be re-invented. Nothing passes one now, and
+    /// the plate is one line tall when nothing does.
     ///
     /// <see cref="HintCard"/> stays exactly as it is and stays in use — on the stand, whose whole
     /// composition is greybox and where a white paper card is the right paper.
@@ -250,7 +252,11 @@ namespace Meditation.View
         /// this plate served drew their own; since 2026-09-22 there are no arrows on a teaching screen
         /// at all, so the method name is now simply what a hint is.
         /// </summary>
-        /// <param name="bracket">The «на компьютере — …» footnote, or null on a line that has none.</param>
+        /// <param name="bracket">
+        /// An optional footnote line under the sentence, or null — which is what every caller passes
+        /// since the PC brackets were withdrawn on 2026-09-22. A null bracket is not a special case:
+        /// the plate is sized for one line and the second row is simply not built.
+        /// </param>
         public void ShowCardOnly(string text, HintTone tone, Vector2 centre, string bracket = null)
         {
             _plate.gameObject.SetActive(true);

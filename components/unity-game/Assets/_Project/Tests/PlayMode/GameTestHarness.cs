@@ -37,6 +37,36 @@ namespace Meditation.Tests
             yield return StandTestHarness.LoadScene(PreviewScenes.Game);
         }
 
+        /// <summary>
+        /// The SHIPPED boot of the game scene: nothing pending, so the flow opens on the title.
+        ///
+        /// Explicit rather than implied by <see cref="LoadGame"/>, because since 2026-09-22 the two
+        /// boots of this one scene are genuinely different products — the cabinet's has no tuning
+        /// panel in it at all (<c>GameFlow.Panel</c>), the stand's does.
+        /// </summary>
+        public static IEnumerator LoadGameAsTheCabinetDoes()
+        {
+            StandLevelLaunch.Clear();
+            yield return LoadGame();
+        }
+
+        /// <summary>
+        /// …and the DEV boot: the game scene opened the way the stand's «Уровень N» opens it.
+        ///
+        /// Through <see cref="StandLevelLaunch.Open"/> itself rather than by poking the scene, so a
+        /// test proves the founder's own path — the right-hand column of the preview menu — and not a
+        /// state only a test can produce.
+        /// </summary>
+        public static IEnumerator LoadGameFromTheStand(int levelIndex)
+        {
+            StandLevelLaunch.Open(levelIndex);
+            for (int i = 0; i < 4; i++) yield return null;
+
+            Assert.AreEqual(PreviewScenes.Game,
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name,
+                "Запрос стенда не открыл сцену игры.");
+        }
+
         public static GameFlow Flow()
         {
             var flow = UnityEngine.Object.FindAnyObjectByType<GameFlow>();

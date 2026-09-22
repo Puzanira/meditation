@@ -26,7 +26,7 @@ namespace Meditation.View
         public static Sprite Get(string key)
         {
             if (string.IsNullOrEmpty(key)) return null;
-            if (Cache.TryGetValue(key, out Sprite cached)) return cached;
+            if (Alive(Cache, key, out Sprite cached)) return cached;
 
             Sprite sprite = Resources.Load<Sprite>(LevelCatalog.ArtRoot + key);
             if (sprite == null && Reported.Add(key))
@@ -52,7 +52,7 @@ namespace Meditation.View
             if (whole == null || !detail.HasIconCrop) return whole;
 
             string key = detail.Sprite + "#icon";
-            if (Cache.TryGetValue(key, out Sprite cached)) return cached;
+            if (Alive(Cache, key, out Sprite cached)) return cached;
 
             Rect full = whole.rect;
             Rect crop = detail.IconCrop;
@@ -84,7 +84,7 @@ namespace Meditation.View
         public static AudioClip Clip(string key)
         {
             if (string.IsNullOrEmpty(key)) return null;
-            if (Clips.TryGetValue(key, out AudioClip cached)) return cached;
+            if (Alive(Clips, key, out AudioClip cached)) return cached;
 
             AudioClip clip = Resources.Load<AudioClip>(LevelCatalog.ArtRoot + key);
             if (clip == null && Reported.Add(key))
@@ -95,6 +95,60 @@ namespace Meditation.View
         }
 
         private static readonly Dictionary<string, AudioClip> Clips = new Dictionary<string, AudioClip>();
+
+        /// <summary>
+        /// A cache hit that is still a LIVE Unity object — the difference between «the dictionary has
+        /// this key» and «the dictionary has a usable asset under this key».
+        ///
+        /// <c>Dictionary.TryGetValue</c> answers the first question, and until 2026-09-22 that was the
+        /// only question asked. A <c>UnityEngine.Object</c> that has been destroyed is not a null
+        /// managed reference: it is a live C# wrapper round a dead native pointer, so the dictionary
+        /// hands it back as a hit and the CALLER — which does compare against null, and gets the
+        /// overloaded Unity comparison — sees null. <c>LevelView.CollectDetail</c> is where that surfaces:
+        ///
+        ///     copy.sprite = ArtLibrary.IconOf(spec);
+        ///     copy.color  = copy.sprite != null ? Color.white : Color.magenta;
+        ///
+        /// …so a dead cache entry is drawn as a MAGENTA SQUARE in the vessel, which is what the founder
+        /// reported seeing in the bucket on 2026-09-22 («розовый квадрат в ведре»). It cannot happen on
+        /// the contract frames — a batchmode run loads the drop once and shoots — and that is exactly why
+        /// the magenta scan over those frames was clean while the live session was not.
+        ///
+        /// Two things kill an entry in a long live session, and this cache is never cleared
+        /// (<see cref="Clear"/> has no callers outside the tests): a single-mode
+        /// <c>SceneManager.LoadScene</c>, which the stand's level launcher does on every run and which
+        /// pulls <c>Resources.UnloadUnusedAssets</c> behind it, and the editor reimporting the texture
+        /// under a playing editor. Both hit the <c>Sprite.Create</c> entries hardest — the icon crops and
+        /// level 3's baked vessel are runtime objects belonging to no scene and no asset file.
+        ///
+        /// So a dead entry is treated as a miss and the key is loaded again. <see cref="Reported"/> is
+        /// deliberately NOT part of this: the retry is silent, and a key that is genuinely missing is
+        /// still logged exactly once instead of once per frame.
+        ///
+        /// The cast on the comparison is deliberate and should stay, though not because the code is wrong
+        /// without it — it was measured both ways on 2026-09-22 and the EditMode guard is green either
+        /// way. <c>where T : Object</c> makes UnityEngine's <c>operator ==</c> a candidate through T's
+        /// effective base class, so the overload is found. What the cast buys is that the reader does not
+        /// have to know that rule to trust the line, and that widening the constraint later cannot
+        /// quietly turn this into plain reference equality — which a destroyed object passes, its managed
+        /// wrapper being very much not null. That silent version would be an expensive no-op.
+        /// </summary>
+        private static bool Alive<T>(Dictionary<string, T> cache, string key, out T value)
+            where T : Object
+        {
+            value = null;
+            if (!cache.TryGetValue(key, out T cached)) return false;
+            if ((Object)cached == null)
+            {
+                // Includes the entry that was cached AS null after a failed load: dropping it lets the
+                // next call retry rather than serve the failure for the rest of the session.
+                cache.Remove(key);
+                return false;
+            }
+
+            value = cached;
+            return true;
+        }
 
         /// <summary>Drop every cached sprite (used between test scenes).</summary>
         public static void Clear()
@@ -119,7 +173,7 @@ namespace Meditation.View
             if (!level.VesselIsBaked) return Get(level.VesselSprite);
 
             string key = level.BackgroundSprite + "#vessel";
-            if (Cache.TryGetValue(key, out Sprite cached)) return cached;
+            if (Alive(Cache, key, out Sprite cached)) return cached;
 
             Sprite crop = CropOfPlate(level);
             Cache[key] = crop;

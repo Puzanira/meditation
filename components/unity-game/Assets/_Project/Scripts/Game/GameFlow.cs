@@ -27,6 +27,7 @@ namespace Meditation.Game
     ///
     /// The tuning panel lives here rather than in a screen: the founder tunes across a whole run, and
     /// the values she moves are per level (TuningCatalog.Game), so the panel must outlive the levels.
+    /// It is built only on the DEV path — see <see cref="Panel"/>.
     /// </summary>
     [AddComponentMenu("Meditation/Game Flow")]
     [DisallowMultipleComponent]
@@ -50,6 +51,27 @@ namespace Meditation.Game
 
         public DesignStage Stage { get; private set; }
 
+        /// <summary>
+        /// The founder's tuning panel — and <c>null</c> on the shipped path, since 2026-09-22.
+        ///
+        /// «Убрать кнопку параметры! это же прод билд под автомат» (founder). The panel shipped
+        /// collapsed, which put exactly one thing on the cabinet's screen: a «параметры» button in the
+        /// corner of the game, wired to a mouse the cabinet does not have and to a scroll list nobody
+        /// standing in front of the machine can use. ARCADE_INTEGRATION_CONTRACT §4 is about the three
+        /// controllers being the whole input surface; a dev affordance that cannot be operated by any
+        /// of them is not «harmless because it is small», it is a thing the player tries to press.
+        ///
+        /// Hidden was not enough and neither was transparent: the entry is GONE from the game path —
+        /// the object is never built, so there is nothing to toggle back, nothing to reserve a strip
+        /// of the frame, and nothing for a stray <c>PanelVisible</c> in a saved tuning file to bring
+        /// back on the cabinet.
+        ///
+        /// It is NOT deleted, and that is the other half of the order («панель остаётся, founder
+        /// тюнит»): this scene is also what the stand's right-hand column opens
+        /// (<see cref="StandLevelLaunch"/>), and on THAT boot the panel is built exactly as before —
+        /// same catalogue, same live values, same file. The founder tunes a real level from the
+        /// stand's menu, which is where every other dev instrument of this project already lives.
+        /// </summary>
         public TuningPanel Panel { get; private set; }
 
         /// <summary>
@@ -100,7 +122,6 @@ namespace Meditation.Game
             _ripple = new RippleWipe(Stage.Frame);
 
             Audio = new GameAudio(transform);
-            Panel = TuningPanel.Create(Stage, "Медитация в спешке", TuningCatalog.Game(), Readout);
 
             var exit = GetComponent<MenuButtonExit>();
             if (exit == null) exit = gameObject.AddComponent<MenuButtonExit>();
@@ -111,10 +132,14 @@ namespace Meditation.Game
             // …unless the stand asked for one level (founder 2026-08-19, «запускать уровни по
             // отдельности»). Then this boot of the game is a debug launch: it opens ON the level, and
             // its «в меню» goes back to the stand that opened it.
+            //
+            // Read BEFORE the panel is built, because since 2026-09-22 it is what decides whether
+            // there is a panel at all (see Panel).
             int standLevel = StandLevelLaunch.Take();
             if (standLevel >= 0)
             {
                 LaunchedFromStand = true;
+                Panel = TuningPanel.Create(Stage, "Медитация в спешке", TuningCatalog.Game(), Readout);
                 StandLevelIndex = Mathf.Clamp(standLevel, 0, LevelCatalog.Count - 1);
                 exit.ExitScene = PreviewScenes.Menu;
                 exit.ExitAction = ExitToStand;

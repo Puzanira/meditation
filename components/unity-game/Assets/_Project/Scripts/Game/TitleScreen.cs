@@ -23,9 +23,13 @@ namespace Meditation.Game
     /// …and, since 2026-08-08, the words that say WHICH two turns. The founder sat down in front of
     /// this screen and could not start the game: a drawn НАЧАТЬ over a bar that has not moved yet says
     /// «press me», and there is nothing here to press. The rule «поверх ничего не писать» was about not
-    /// re-lettering a finished render, not about leaving a player stuck, so the two lines
-    /// (<see cref="GameTexts.TitleStart"/> and the desk bracket) go where the render is empty — the
-    /// road under the bar — and go through the registry like any other string.
+    /// re-lettering a finished render, not about leaving a player stuck, so the line
+    /// (<see cref="GameTexts.TitleStart"/>) goes where the render is empty — the road under the bar —
+    /// and goes through the registry like any other string.
+    ///
+    /// ONE line, since 2026-09-22: a second, smaller one under it said «(на компьютере — колесо
+    /// мыши)». «Из медитации срочно убрать все подсказки про клавиатуру — она играется на автомате»
+    /// (founder). The bracket was a footnote for a desk, and this screen is never read at a desk.
     /// </summary>
     public sealed class TitleScreen : GameScreen
     {
@@ -91,28 +95,27 @@ namespace Meditation.Game
             SetProgress(0f);
 
             StartLabel = Shadowed("StartLabel", GameTexts.TitleStart, StartLabelY, StartLabelPt);
-            DeskLabel = Shadowed("StartLabelDesk", GameTexts.TitleStartOnDesk, DeskLabelY, DeskLabelPt);
         }
 
         /// <summary>
-        /// Where the two lines stand, design px: under the fill bar, in the strip of road the render
+        /// Where the line stands, design px: under the fill bar, in the strip of road the render
         /// leaves empty between the bar (y ≈ 927) and the bottom edge.
         ///
         /// Not above the anchor, where the render's own horizon is: the sunset there runs from cream to
         /// orange and there is no ink colour that reads on both halves of it. The road below is the one
         /// large dark area of the picture — and even there the type is drawn twice (see
         /// <see cref="Shadowed"/>), because the founder's apples and her mug are down there too.
+        ///
+        /// The band used to hold two lines (983 and 1032); with the PC bracket withdrawn the
+        /// instruction keeps its own line and the strip under it is road again.
         /// </summary>
         private const float StartLabelY = 983f;
-        private const float DeskLabelY = 1032f;
 
         /// <summary>
-        /// Two sizes, and the difference is the message. The first line is the instruction for the
-        /// person standing at the cabinet; the second is a bracket for whoever is at a desk, and a
-        /// bracket that shouts is not a bracket.
+        /// The instruction for the person standing at the cabinet, at the size it is read across a
+        /// room from.
         /// </summary>
         private const int StartLabelPt = 40;
-        private const int DeskLabelPt = 26;
 
         /// <summary>The ink of both lines — the off-white the designer draws her own type in.</summary>
         private static readonly Color LabelInk = new Color(242f / 255f, 240f / 255f, 234f / 255f);
@@ -136,11 +139,8 @@ namespace Meditation.Game
             return Ui.Label(Root, name, text, 960f, y, 1600f, fontSize * 1.6f, fontSize, LabelInk);
         }
 
-        /// <summary>«Крути ручку, чтобы начать» — the founder's own question, answered on screen.</summary>
+        /// <summary>«Крути крутилку, чтобы начать» — the founder's own question, answered on screen.</summary>
         public Text StartLabel { get; }
-
-        /// <summary>…and the PC bracket under it.</summary>
-        public Text DeskLabel { get; }
 
         private readonly RectTransform _progressRect;
 

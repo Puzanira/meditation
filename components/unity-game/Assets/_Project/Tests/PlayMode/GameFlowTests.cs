@@ -202,6 +202,125 @@ namespace Meditation.Tests
             }
         }
 
+        /// <summary>
+        /// Words the GAME is not allowed to say, whatever sentence they turn up in.
+        ///
+        /// «Из медитации срочно убрать все подсказки про клавиатуру — она играется на автомате»
+        /// (founder, 2026-09-22). The five withdrawn brackets are in
+        /// <see cref="GameTexts.Withdrawn"/> verbatim, and a verbatim list guards the five sentences
+        /// that existed; it does not guard the NEXT one. This does: a caption that names a keyboard,
+        /// a mouse or a PC at all is wrong on this cabinet no matter how it is worded, because none
+        /// of those things is in the room.
+        ///
+        /// Stems rather than whole words, so «клавишу», «клавиатуре», «мышью» and «на компьютере»
+        /// are all caught. «Esc» is matched case-insensitively for the same reason.
+        /// </summary>
+        private static readonly string[] KeyboardWords =
+        {
+            "компьютер", "клавиш", "клавиатур", "мыши", "мышь", "мышк", "колесо", "esc", "enter"
+        };
+
+        /// <summary>
+        /// Nothing on this screen names a keyboard, a mouse or a PC.
+        ///
+        /// Checked over every <c>Text</c> of the stage rather than over the registry, because the
+        /// registry only knows the lines somebody remembered to put in it — and the thing that has to
+        /// be true is about the pixels the player is standing in front of.
+        /// </summary>
+        private static void AssertNoKeyboardHintOnScreen(string where)
+        {
+            DesignStage stage = StandTestHarness.Stage();
+            foreach (UnityEngine.UI.Text label in
+                     stage.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+            {
+                string text = label.text;
+                if (string.IsNullOrWhiteSpace(text)) continue;
+
+                string lowered = text.ToLowerInvariant();
+                foreach (string word in KeyboardWords)
+                    Assert.IsFalse(lowered.Contains(word),
+                        where + ": на экране игры слово «" + word + "» — строка «" + text.Trim() +
+                        "». Игра идёт на автомате: клавиатуры, мыши и компьютера в комнате нет " +
+                        "(founder, 2026-09-22).");
+            }
+        }
+
+        /// <summary>
+        /// …and no screen of the flow says any of it — the same walk the withdrawn-lines guard makes,
+        /// because this is the same kind of regression: a bracket does not come back on the screen it
+        /// was deleted from, it comes back on the next screen that needs «a line about the controls».
+        ///
+        /// The greybox stand is deliberately NOT walked here. It is a dev instrument that is only ever
+        /// opened at a desk, its own legend («на ПК: стрелки = джойстик…») is the truth there, and the
+        /// founder's order was about the game.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator NoKeyboardHint_IsOnAnyScreenOfTheGame()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            GameFlow flow = GameTestHarness.Flow();
+
+            yield return GameTestHarness.SettleScreen(fake);
+            AssertNoKeyboardHintOnScreen("титул");
+
+            GameTestHarness.JumpTo(flow, GamePhase.LevelCard, 0);
+            yield return GameTestHarness.Until(() => flow.Phase == GamePhase.LevelCard, "карточка");
+            yield return GameTestHarness.SettleScreen(fake);
+            AssertNoKeyboardHintOnScreen("карточка уровня");
+
+            // Every beat of the lesson, because every one of them carried a bracket of its own.
+            yield return GameTestHarness.EnterLevel(fake, 0);
+            var screen = (LevelScreen)flow.Screen;
+            AssertNoKeyboardHintOnScreen("уровень 1, бит наведения");
+
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            AssertNoKeyboardHintOnScreen("уровень 1, бит сбора");
+
+            yield return GameTestHarness.Idle(fake, 4);
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "Бит отгона не начался.");
+            AssertNoKeyboardHintOnScreen("уровень 1, бит отгона");
+
+            yield return GameTestHarness.SwipeUntil(fake,
+                () => screen.Runtime.Field.Thoughts.Count == 0, "мысль отбита");
+            yield return GameTestHarness.Frames(3);
+            AssertNoKeyboardHintOnScreen("уровень 1, финальный бит обучения");
+
+            GameTestHarness.JumpTo(flow, GamePhase.Finale, LevelCatalog.Count - 1);
+            yield return GameTestHarness.Until(() => flow.Phase == GamePhase.Finale, "финал");
+            yield return GameTestHarness.SettleScreen(fake);
+            AssertNoKeyboardHintOnScreen("финал");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// The negative control for the guard above: it really does catch a bracket.
+        ///
+        /// Without this the whole claim could be «the game says nothing» — a scan that matches nothing
+        /// because it is broken looks exactly like a clean screen. So one of the withdrawn brackets is
+        /// put back on the title by hand and the guard is required to fail on it.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheKeyboardGuard_CatchesABracketPutBackByHand()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.SettleScreen(fake);
+
+            var title = (TitleScreen)GameTestHarness.Flow().Screen;
+            string was = title.StartLabel.text;
+            title.StartLabel.text = "(на компьютере — колесо мыши)";
+
+            Assert.Throws<AssertionException>(() => AssertNoKeyboardHintOnScreen("титул"),
+                "Сторож клавиатурных подсказок не заметил скобку, возвращённую руками.");
+
+            title.StartLabel.text = was;
+            AssertNoKeyboardHintOnScreen("титул");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
         // ---- the two turns that start the run (done contract §2) -------------------------------------
 
         [UnityTest]
@@ -244,14 +363,14 @@ namespace Meditation.Tests
 
             Assert.AreEqual(GameTexts.TitleStart, title.StartLabel.text,
                 "Подпись титула пишется мимо реестра GameTexts.");
-            Assert.AreEqual(GameTexts.TitleStartOnDesk, title.DeskLabel.text,
-                "ПК-скобка пишется мимо реестра GameTexts.");
 
             StandTestHarness.AssertVisible(title.StartLabel.rectTransform, "Подпись «как начать»");
-            StandTestHarness.AssertVisible(title.DeskLabel.rectTransform, "ПК-скобка титула");
 
-            Assert.Greater(title.StartLabel.fontSize, title.DeskLabel.fontSize,
-                "Скобка для ПК набрана не мельче основной строки — на автомате она вводит в заблуждение.");
+            // …and it is the ONLY строка на титуле (founder, 2026-09-22: «убрать все подсказки про
+            // клавиатуру — она играется на автомате»). Под ней стояла вторая, мельче: «(на
+            // компьютере — колесо мыши)». Проверяется по всем текстам экрана, а не по имени поля:
+            // поле можно вернуть под другим именем, а запрет — про то, что видит игрок у автомата.
+            AssertNoKeyboardHintOnScreen("титул");
 
             // It names the dynamo, because the dynamo is what the code actually waits for.
             Assert.AreEqual(720f, TitleScreen.StartDegrees, 1e-3f,
@@ -941,8 +1060,10 @@ namespace Meditation.Tests
             Assert.IsTrue(card.IsShown, "На бите отгона нет подписи — игрок снова видит одну стрелку.");
             Assert.AreEqual(GameTexts.SwipeHint, card.Label.text,
                 "Подпись бита отгона пишется мимо реестра GameTexts.");
-            Assert.AreEqual(GameTexts.SwipeHintOnDesk, card.Bracket.text,
-                "ПК-скобка бита отгона пишется мимо реестра GameTexts.");
+            // Одна строка, без второй: «(на компьютере — Q и A)» выведена 2026-09-22. Плашка умеет
+            // две — вторая просто не строится (HintPlate.ShowCardOnly), и её объект обязан быть выключен.
+            Assert.IsFalse(card.Bracket.gameObject.activeSelf,
+                "Под подписью отгона снова стоит вторая строка — ПК-скобка вернулась на автомат.");
             StandTestHarness.AssertVisible(card.Rect, "Плашка «" + GameTexts.SwipeHint + "»");
 
             Rect plate = StandTestHarness.Stage().DesignRectOf(card.Rect);
@@ -1031,19 +1152,24 @@ namespace Meditation.Tests
                 "На плашке не та строка реестра.");
             Assert.AreEqual(plate.Label.text, plate.Label.text.TrimEnd(),
                 "Строка на плашке набрана с висящим пробелом.");
-            Assert.Greater(plate.Bracket.color.a, 0.3f, "ПК-скобка невидима.");
-            Assert.Less(plate.Bracket.color.a, plate.Label.color.a,
-                "ПК-скобка не приглушена — она обязана читаться как сноска.");
-            Assert.Less(plate.Bracket.fontSize, plate.Label.fontSize,
-                "ПК-скобка набрана не мельче основной строки.");
+
+            // …и это ВСЯ плашка: второй строки под ней нет. До 2026-09-22 здесь стояла ПК-скобка
+            // «(на компьютере — Q и A)», приглушённая и мельче; founder: «убрать все подсказки про
+            // клавиатуру — она играется на автомате».
+            Assert.IsFalse(plate.Bracket.gameObject.activeSelf,
+                "На плашке снова две строки — вторая была ПК-скобкой.");
+            Assert.IsEmpty(plate.Bracket.text, "Вторая строка плашки не пуста.");
 
             // …and the line fits the plate the placement search was handed, so the rectangle the
             // overlap checks reason about is the rectangle on screen — in BOTH directions now that the
-            // text wraps.
-            Assert.AreEqual(HintPlate.SizeFor(GameTexts.SwipeHint, true).x, plate.Rect.sizeDelta.x, 0.5f,
+            // text wraps. Одна строка — значит и мерка на одну строку (SizeFor без скобки).
+            Assert.AreEqual(HintPlate.SizeFor(GameTexts.SwipeHint).x, plate.Rect.sizeDelta.x, 0.5f,
                 "Плашку нарисовали не той ширины, под которую искали место.");
-            Assert.AreEqual(HintPlate.SizeFor(GameTexts.SwipeHint, true).y, plate.Rect.sizeDelta.y, 0.5f,
+            Assert.AreEqual(HintPlate.SizeFor(GameTexts.SwipeHint).y, plate.Rect.sizeDelta.y, 0.5f,
                 "Плашку нарисовали не той высоты, под которую искали место.");
+            Assert.Less(HintPlate.SizeFor(GameTexts.SwipeHint).y,
+                HintPlate.SizeFor(GameTexts.SwipeHint, true).y,
+                "Плашка без скобки обязана быть ниже плашки со скобкой — иначе строку сняли только с глаз.");
             Assert.LessOrEqual(plate.Label.preferredHeight, plate.Label.rectTransform.rect.height + 1f,
                 "Набранная строка не помещается по высоте — оценка числа строк разошлась с набором.");
 
@@ -1734,6 +1860,52 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        /// <summary>
+        /// …and the panorama's one line names the button that actually leaves.
+        ///
+        /// The founder asked for «подпись про выход в основное меню» (2026-09-22, п.9) and the screen
+        /// first got «Красная кнопка — выход в главное меню». That was wrong about the cabinet: the
+        /// panel has a separate «Меню» button, <c>MenuButtonExit</c> listens to that one and only that
+        /// one, and the red button does something else. She corrected the wording the same day —
+        /// «Жми кнопку Меню для выхода в главное меню» — and the old line is withdrawn.
+        ///
+        /// So the claim is made in three parts, and the negative half is the point: the caption comes
+        /// from the registry, it names the МЕНЮ button, and it does NOT name the red one. A line that
+        /// drifts back to «красная» is a screen telling the player to press something that will not
+        /// move it — which is how a working machine comes to look broken.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheFinale_NamesTheButtonThatActuallyLeaves()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            GameFlow flow = GameTestHarness.Flow();
+
+            GameTestHarness.JumpTo(flow, GamePhase.Finale, LevelCatalog.Count - 1);
+            yield return GameTestHarness.Until(() => flow.Phase == GamePhase.Finale, "финал");
+            yield return GameTestHarness.SettleScreen(fake);
+
+            var finale = (FinaleScreen)flow.Screen;
+            Assert.AreEqual(GameTexts.FinaleExit, finale.ExitLabel.text,
+                "Подпись финала пишется мимо реестра GameTexts.");
+            StandTestHarness.AssertVisible(finale.ExitLabel.rectTransform, "Подпись выхода на финале");
+
+            StringAssert.Contains("Меню", finale.ExitLabel.text,
+                "Подпись финала не называет кнопку «Меню» — а выход делает именно она.");
+            StringAssert.DoesNotContain("расн", finale.ExitLabel.text,
+                "Финал снова зовёт красную кнопку: выход слушает MenuButton, красная его не делает.");
+
+            // …and it is not one of the lines that have been taken off this game.
+            foreach (string withdrawn in GameTexts.Withdrawn)
+                Assert.AreNotEqual(withdrawn, finale.ExitLabel.text,
+                    "Подпись финала — выведенная из игры строка «" + withdrawn + "».");
+
+            // …и второй строки под ней нет: ПК-скобка «(на компьютере — Esc)» выведена.
+            AssertNoKeyboardHintOnScreen("финал");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
         [UnityTest]
         public IEnumerator TheFinale_LeavesOnAnyInput()
         {
@@ -2024,19 +2196,26 @@ namespace Meditation.Tests
 
         // ---- the tuning panel across a run (done contract §7) -----------------------------------------
 
+        /// <summary>
+        /// The panel's VALUES cross a whole run — on the cabinet's own boot, where there is no panel.
+        ///
+        /// The two halves parted on 2026-09-22. The panel is a dev instrument and its entry is gone
+        /// from the game path (<see cref="GameFlow.Panel"/>); the numbers it writes are the game's
+        /// balance and they have to be applied on the machine exactly as before, out of the same file.
+        /// So this case keeps the harder half and drops the widget: no panel in the scene, and the
+        /// level still picks up the band it was tuned to.
+        /// </summary>
         [UnityTest]
-        public IEnumerator ThePanelIsOnEveryLevel_AndItsValuesSurviveTheWholeRun()
+        public IEnumerator TheTunedValuesSurviveTheWholeRun_WithNoPanelInTheGame()
         {
-            TuningConfig.PanelVisible = true;
-
-            yield return GameTestHarness.LoadGame();
+            yield return GameTestHarness.LoadGameAsTheCabinetDoes();
             FakeBackend fake = StandTestHarness.TakeOverInput();
             GameFlow flow = GameTestHarness.Flow();
 
-            Assert.IsNotNull(flow.Panel, "Панель обязана существовать на титуле.");
+            Assert.IsNull(flow.Panel, "На прод-пути панели тюнинга быть не должно.");
 
             yield return GameTestHarness.EnterLevel(fake, 0);
-            Assert.IsNotNull(flow.Panel, "Панель обязана пережить вход в уровень.");
+            Assert.IsNull(flow.Panel, "Панель появилась при входе в уровень.");
 
             // A value moved on level 3's section while level 1 is being played must still be there
             // when level 3 comes up — that is what «автосохраняется» has to mean across a run.
@@ -2052,60 +2231,83 @@ namespace Meditation.Tests
         }
 
         /// <summary>
-        /// The cabinet's first impression: the game opens as a GAME.
+        /// The cabinet's first impression: the game opens as a GAME, and there is nothing else on it.
         ///
-        /// The tuning panel is the founder's instrument, and since her playtest it ships COLLAPSED
-        /// (<c>TuningConfig.Defaults.PanelVisible</c>, финал 2026-08-01). Every other case in this
-        /// suite sees a collapsed panel only because <c>SetUp</c> puts it there by hand, so the shipped
-        /// default needs the one case that overrides nothing — a fresh cabinet start, no saved file.
+        /// «Убрать кнопку параметры! это же прод билд под автомат» (founder, 2026-09-22). The panel
+        /// used to ship collapsed, which left exactly one dev affordance in the corner of the shipped
+        /// frame — a «параметры» button that only a mouse can press, on a cabinet that has no mouse.
+        ///
+        /// The claim is ABSENCE, and it is made three ways on purpose, because «hidden» is what this
+        /// was before: no <c>TuningPanel</c> component anywhere in the scene, no object named after
+        /// it, and no strip of the frame reserved for it. A panel that merely had its alpha taken away
+        /// would pass none of the three.
+        ///
+        /// It is also made against a SAVED state that says otherwise — <c>PanelVisible = true</c>, the
+        /// way the founder's own tuning file would come off a session at the stand. The cabinet must
+        /// not be one line of JSON away from showing a tuner.
         /// </summary>
         [UnityTest]
-        public IEnumerator TheShippedGame_OpensWithThePanelCollapsed()
+        public IEnumerator TheShippedGame_HasNoTuningPanelAtAll()
         {
-            TuningConfig.ResetToDefaults();   // and nothing after it: this IS the shipped state
+            TuningConfig.ResetToDefaults();
+            TuningConfig.PanelVisible = true;   // a file left open by a tuning session at the stand
 
-            yield return GameTestHarness.LoadGame();
+            yield return GameTestHarness.LoadGameAsTheCabinetDoes();
             GameFlow flow = GameTestHarness.Flow();
 
-            Assert.IsNotNull(flow.Panel, "Панель обязана существовать — свёрнутая, но живая.");
-            Assert.IsFalse(TuningConfig.PanelVisible,
-                "Игра обязана открываться со свёрнутой панелью тюнинга.");
-            Assert.IsFalse(FindInPanel(flow.Panel, "Body").gameObject.activeInHierarchy,
-                "Панель тюнинга не должна занимать кадр на старте игры.");
+            Assert.IsNull(flow.Panel, "В прод-пути игры не должно быть панели тюнинга.");
+            Assert.IsNull(
+                UnityEngine.Object.FindAnyObjectByType<TuningPanel>(FindObjectsInactive.Include),
+                "Панель тюнинга построена в сцене игры, хотя игру открыл не стенд.");
+            Assert.IsNull(StandTestHarness.FindOrNull(StandTestHarness.Stage(), "TuningPanel"),
+                "В кадре игры остался объект панели тюнинга.");
+            Assert.IsNull(StandTestHarness.FindOrNull(StandTestHarness.Stage(), "Collapse"),
+                "В кадре игры осталась кнопка «параметры».");
 
-            // …and the way back to it is still in the frame, or the founder cannot tune at all.
-            StandTestHarness.AssertVisible(FindInPanel(flow.Panel, "Collapse"), "Кнопка «параметры»");
+            // …и кадр не отдаёт полосу справа никому: панель не просто невидима, её нет.
+            Assert.AreEqual(0f, StandTestHarness.Stage().ReservedRight, 1e-3f,
+                "Кадр игры всё ещё резервирует полосу под панель тюнинга.");
 
             LogAssert.NoUnexpectedReceived();
         }
 
         /// <summary>
-        /// A collapsed panel gave the frame the whole window, but its «параметры» button stayed in the
-        /// corner — stand chrome inside every frame the design gate judges the composition by. In the
-        /// screenshot mode the button goes too; in the live game it stays, because without it there is
-        /// no way back to the panel while playing.
+        /// …and the negative control: the SAME scene, opened by the stand, still has the panel.
+        ///
+        /// Without this the change above is indistinguishable from deleting the founder's instrument.
+        /// Her path is the right-hand column of the preview menu («Уровень N», 2026-08-19), and on
+        /// that boot everything is as it was: the panel exists, its «параметры» button is in the
+        /// frame, and the body opens when it is asked to.
         /// </summary>
         [UnityTest]
-        public IEnumerator TheParametersButton_StaysInTheLiveGame_AndLeavesTheScreenshot()
+        public IEnumerator ThePanel_IsStillThere_WhenTheStandOpensTheGame()
         {
-            TuningConfig.PanelVisible = false;
+            TuningConfig.ResetToDefaults();
             TuningPanel.ScreenshotMode = false;
 
-            yield return GameTestHarness.LoadGame();
+            yield return GameTestHarness.LoadGameFromTheStand(0);
             GameFlow flow = GameTestHarness.Flow();
 
-            RectTransform button = FindInPanel(flow.Panel, "Collapse");
-            StandTestHarness.AssertVisible(button, "Кнопка «параметры» в живой игре");
+            Assert.IsTrue(flow.LaunchedFromStand, "Игра не знает, что её открыл стенд.");
+            Assert.IsNotNull(flow.Panel, "Со стенда панель тюнинга обязана быть — founder тюнит там.");
 
+            RectTransform button = FindInPanel(flow.Panel, "Collapse");
+            StandTestHarness.AssertVisible(button, "Кнопка «параметры» на дев-пути");
+
+            // …и она разворачивается в настоящую панель, а не в пустую рамку.
+            flow.Panel.SetVisible(true);
+            yield return GameTestHarness.Frames(2);
+            StandTestHarness.AssertVisible(FindInPanel(flow.Panel, "Body"), "Тело панели тюнинга");
+            Assert.Greater(flow.Panel.RowWidgets.Count, 0, "В панели со стенда нет ни одной ручки.");
+
+            // …and the screenshot mode still takes the chrome out of the frame (design gate).
             TuningPanel.ScreenshotMode = true;
+            flow.Panel.SetVisible(false);
             yield return GameTestHarness.Frames(2);
             Assert.IsFalse(button.gameObject.activeInHierarchy,
                 "В скриншот-режиме кнопки «параметры» в кадре быть не должно.");
 
-            TuningPanel.ScreenshotMode = false;
-            yield return GameTestHarness.Frames(2);
-            StandTestHarness.AssertVisible(button, "Кнопка «параметры» после скриншот-режима");
-
+            StandLevelLaunch.Clear();
             LogAssert.NoUnexpectedReceived();
         }
 

@@ -60,16 +60,6 @@ namespace Meditation.Game
         /// </summary>
         public const string TitleStart = "Крути крутилку, чтобы начать";
 
-        /// <summary>
-        /// …and the second, smaller line: the same instruction for whoever is playing at a desk.
-        ///
-        /// The cabinet's crank is a mouse wheel on a PC (arcade-controls, <c>crankDegreesPerScrollUnit</c>),
-        /// and there is no way to guess that from a picture of a handle. It is a bracket in every sense:
-        /// smaller type, in brackets, and false on the machine this game ships to — which is why it is
-        /// its own line and not a clause of the one above.
-        /// </summary>
-        public const string TitleStartOnDesk = "(на компьютере — колесо мыши)";
-
         // ---- Обучение, уровень 1 (SCREENS §Обучение) ------------------------------------------------
         //
         // Four sentences, dictated by the founder at the playtest of 2026-09-22. They are not captions
@@ -78,23 +68,17 @@ namespace Meditation.Game
         // could not work out from them is what the game is ASKING FOR: «наводи» on what, and why.
         //
         // The tone is hers too: «в тоне медитации, без клавиатурного жаргона». Nothing here names a
-        // key; the PC bracket under each line is a separate, smaller string for exactly that reason
-        // (see TitleStartOnDesk — false on the machine this ships to).
+        // key, and since 2026-09-22 nothing anywhere in the game does — see the PC brackets in
+        // <see cref="Withdrawn"/>.
 
         /// <summary>Бит 1, «наведение»: the gaze, and what it is for.</summary>
         public const string BeatAim = "Наводи джойстиком на объект";
-
-        /// <summary>…its PC bracket. The joystick is the arrow keys at a desk.</summary>
-        public const string BeatAimOnDesk = "(на компьютере — стрелки)";
 
         /// <summary>
         /// Бит 2, «сбор» — one sentence for both hands, because the beat is both hands at once
         /// (SCREENS §Обучение п.2 shows two buttons: КРУТИ РУЧКУ and ТАЩИ).
         /// </summary>
         public const string BeatCollect = "Замечай детали вокруг. Крути крутилку и тащи объект";
-
-        /// <summary>…its PC bracket.</summary>
-        public const string BeatCollectOnDesk = "(на компьютере — колесо мыши)";
 
         /// <summary>
         /// Бит 3, «отгон» — the beat with no drawn button at all (the drop ships no «ТРЯСИ», and it
@@ -107,9 +91,6 @@ namespace Meditation.Game
         /// its frame has no room for a sentence.
         /// </summary>
         public const string SwipeHint = "Это навязчивые мысли. Маши рукой над датчиком, чтобы отогнать их";
-
-        /// <summary>…its PC bracket — the two height sensors are two keys at a desk.</summary>
-        public const string SwipeHintOnDesk = "(на компьютере — Q и A)";
 
         /// <summary>
         /// Бит 4, «весь уровень» — new on 2026-09-22, and the only beat that is not about one hand.
@@ -127,16 +108,20 @@ namespace Meditation.Game
         /// <summary>
         /// «Подпись про выход в основное меню» (founder, 2026-09-22, п.9).
         ///
-        /// The finale leaves on any input or after twenty seconds, and until now it said so nowhere:
-        /// the player stood in front of a panorama with no idea whether the game was over or stuck.
-        /// The wording names the BUTTON on the panel — the founder's own framing, «формулировка под
-        /// красную кнопку пульта» — rather than the action, because on the cabinet the red «в меню»
-        /// button is a thing you can see from where you stand.
+        /// The finale leaves on any input or after twenty seconds, and until that day it said so
+        /// nowhere: the player stood in front of a panorama with no idea whether the game was over or
+        /// stuck. The wording names the BUTTON on the panel rather than the action, because on the
+        /// cabinet the button is a thing you can see from where you stand.
+        ///
+        /// WHICH button is the correction of the same day, and it is not a wording change. The line
+        /// shipped as «Красная кнопка — выход в главное меню» (withdrawn), and the exit is not the red
+        /// button: the cabinet has a separate «Меню» button, it is the one this game has always
+        /// listened to (<c>ArcadeInput.MenuButton</c> → <c>MenuButtonExit</c>), and the red one does
+        /// something else. A caption naming a control the code ignores is worse than no caption —
+        /// the player presses it, nothing happens, and the machine now looks broken. The founder
+        /// named the button herself; the code was already right.
         /// </summary>
-        public const string FinaleExit = "Красная кнопка — выход в главное меню";
-
-        /// <summary>…and its PC bracket, the only place a key is named anywhere in the registry.</summary>
-        public const string FinaleExitOnDesk = "(на компьютере — Esc)";
+        public const string FinaleExit = "Жми кнопку Меню для выхода в главное меню";
 
         /// <summary>
         /// The lines the game itself renders, in one array — what «сначала добавляется сюда» means in
@@ -150,16 +135,11 @@ namespace Meditation.Game
         public static readonly string[] Live =
         {
             TitleStart,
-            TitleStartOnDesk,
             BeatAim,
-            BeatAimOnDesk,
             BeatCollect,
-            BeatCollectOnDesk,
             SwipeHint,
-            SwipeHintOnDesk,
             BeatWhole,
-            FinaleExit,
-            FinaleExitOnDesk
+            FinaleExit
         };
 
         /// <summary>
@@ -194,7 +174,33 @@ namespace Meditation.Game
             // this list exists for — the one that comes back the next time somebody needs «a caption
             // about the handle». See TitleStart.
             "Крути ручку, чтобы начать",
-            "Замечай детали вокруг. Крути ручку и тащи объект"
+            "Замечай детали вокруг. Крути ручку и тащи объект",
+
+            // ---- ПК-скобки, выведены 2026-09-22 ---------------------------------------------------
+            //
+            // «Из медитации срочно убрать все подсказки про клавиатуру — она играется на автомате»
+            // (founder, 2026-09-22). Five brackets over four distinct lines (the title and the сбор
+            // beat both named the mouse wheel), one under each instruction the game gives, every one
+            // of them naming a control the cabinet does not have: a wheel, four arrow keys, two
+            // letters and Esc. They were written as a footnote for whoever was playing at a desk, and
+            // that reading survived exactly as long as the game was played at a desk — on the machine
+            // it ships to a bracket is not a footnote, it is a second instruction that is false.
+            //
+            // They belong HERE rather than merely deleted from five screens for the reason this whole
+            // list exists: the next person who needs «a line about the controls» will write one, and
+            // the first wording that comes to mind is the keyboard fallback's. The stand keeps its own
+            // PC legend (PreviewMenuController) and is untouched — it is a dev tool that is only ever
+            // played at a desk.
+            "(на компьютере — колесо мыши)",
+            "(на компьютере — стрелки)",
+            "(на компьютере — Q и A)",
+            "(на компьютере — Esc)",
+
+            // Withdrawn 2026-09-22 (later the same day), and this one is a factual correction rather
+            // than a matter of tone: it pointed the player at the WRONG control. The cabinet's exit is
+            // its «Меню» button — the only one the game has ever listened to — and the red button is
+            // not it. See FinaleExit for the line that replaced it.
+            "Красная кнопка — выход в главное меню"
         };
 
         /// <summary>

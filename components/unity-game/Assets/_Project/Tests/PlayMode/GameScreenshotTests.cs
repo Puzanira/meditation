@@ -1590,6 +1590,21 @@ namespace Meditation.Tests
         /// <item>36 · the circle standing ON a detail, in the library — the state the aim EXISTS for,
         ///       and the one case where the ring has to be told apart from the drawing under it.</item>
         /// </list>
+        ///
+        /// Frame 35 got HARDER to stage on 2026-09-22, and the staging is worth reading twice because of
+        /// it. The gaze now catches a detail anywhere on its drawn RECTANGLE rather than within r of its
+        /// anchor (founder: «самолётик надо чтобы ловился во всей площади»), so «место, где прицел стоит
+        /// ни на чём» is a smaller set than it was — on the metro plate the details' boxes now sit inside
+        /// a circle's reach over noticeably more of the frame.
+        ///
+        /// Nothing had to be loosened to keep the frame honest, because <see cref="BrightestOpenSpot"/>
+        /// was already asking the stricter question: it rejects a spot whose 2r SQUARE overlaps any
+        /// detail's rectangle, and a square that misses a box means the circle inside it misses the box
+        /// too. That is a conservative test of the new rule, not an approximation of the old one. The
+        /// assertion under the shot is the part that would have caught a stale staging either way —
+        /// <c>NoticedIndex &lt; 0</c> is read off the RUNNING selector, so if the wider catch had eaten
+        /// the last open spot on this plate the frame would go red rather than quietly become a picture
+        /// of the circle closing on something.
         /// </summary>
         [UnityTest]
         public IEnumerator TheNeonAim_OnTheNoisiestPlates()

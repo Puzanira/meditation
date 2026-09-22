@@ -521,7 +521,12 @@ namespace Meditation.View
         /// </summary>
         public HintPlate BeatPlate { get; private set; }
 
-        /// <param name="bracket">«на компьютере — …», smaller and dimmer, or null.</param>
+        /// <param name="bracket">
+        /// An optional second line, smaller and dimmer. Nothing in the game passes one since
+        /// 2026-09-22 — the PC brackets are withdrawn (<c>GameTexts.Withdrawn</c>) — and the plate
+        /// simply draws one line when it is null. The parameter stays because the plate's two-line
+        /// form is the plate's, not the bracket's.
+        /// </param>
         public void ShowBeatPlate(string text, HintTone tone, Vector2 centre, string bracket = null) =>
             BeatPlate.ShowCardOnly(text, tone, centre, bracket);
 

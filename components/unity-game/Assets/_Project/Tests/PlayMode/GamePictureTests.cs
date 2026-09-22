@@ -131,6 +131,100 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        // ---- «розовый квадрат в ведре» (founder, живая сессия 2026-09-22) ------------------------------
+
+        /// <summary>
+        /// The haul is the DETAIL, never a magenta placeholder — including after the drop's sprites have
+        /// been unloaded under a running game.
+        ///
+        /// The founder played the build on 2026-09-22 and found a pink square sitting in the bucket among
+        /// the things she had collected. Nothing in the contract frames showed it: the magenta scan over
+        /// the whole shot set was clean, because a batchmode run loads the art once, shoots, and exits.
+        ///
+        /// The square is drawn on purpose — <c>LevelView.CollectDetail</c> paints a cell
+        /// <see cref="Color.magenta"/> when its icon comes back null, so a missing asset is loud instead
+        /// of invisible. The question was therefore never «why is it magenta» but «why did the icon come
+        /// back null for a sprite that is plainly on disk», and the answer is in the CACHE rather than in
+        /// the asset: <c>ArtLibrary</c> kept its entries in a dictionary that was never cleared and asked
+        /// it only whether the key was present. A destroyed <c>UnityEngine.Object</c> is a present key
+        /// and a null value at the same time — so once an entry died, every later collection of that
+        /// detail was a pink square for the rest of the session.
+        ///
+        /// The entries that die are the <c>Sprite.Create</c> ones (icon crops, level 3's baked vessel):
+        /// they belong to no scene and no asset file, and the stand's level launcher does a single-mode
+        /// <c>SceneManager.LoadScene</c> on every run with <c>Resources.UnloadUnusedAssets</c> behind it.
+        ///
+        /// The mechanism itself is pinned in EditMode, where it can be provoked without a game running
+        /// (<c>LevelCatalogTests.TheArtCache_HandsBackALiveSprite_AfterACachedOneIsUnloaded</c>). What is
+        /// checked here is the picture the founder was looking at: the beat played the ordinary way, the
+        /// haul built out of it, and the close frame of the vessel her report asked for.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheHaul_IsTheDetailItself_AndNeverAMagentaSquare()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+
+            // Level 1 opens in the lesson, and the lesson gates the loop: the first detail is the сбор
+            // beat, and the NEXT one cannot start until the отгон beat has been answered. So the
+            // tutorial is played out rather than skipped — the same staging Game06_L1_play uses — and
+            // only then does the ordinary loop run. Collecting in a bare loop hangs on the second
+            // detail, which is how this test first went red.
+            //
+            // The wave interval is left alone until the lesson is done, for the same reason: the отгон
+            // beat needs a thought to be there before it can be answered.
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            yield return GameTestHarness.SwipeUntil(fake, () => screen.Beat == TutorialBeat.Done,
+                "обучение пройдено");
+
+            // Now nothing more may spawn: this frame is about the vessel.
+            TuningConfig.WaveIntervalSeconds = 300f;
+
+            for (int i = 0; i < 2; i++)
+                yield return GameTestHarness.CollectOneDetail(fake, screen);
+
+            Assert.AreEqual(3, screen.View.VesselContents.Count,
+                "Три детали собраны, а в сосуде лежит другое число.");
+            AssertNoMagentaInTheHaul(screen, "три детали в ведре");
+
+            yield return GameTestHarness.SettleScreen(fake);
+
+            // The founder's own view: the vessel up close, with the haul in it.
+            Rect vessel = LevelCatalog.VesselRectOf(screen.Level);
+            StandTestHarness.ShootCloseUp("Game41_L1_haul_in_the_vessel", Letterbox, vessel, 2);
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// Every cell of the haul carries a live sprite and is tinted white — the two halves of «это
+        /// деталь, а не заглушка», checked on the object rather than on the pixel so the message can
+        /// name the detail that failed.
+        /// </summary>
+        private static void AssertNoMagentaInTheHaul(LevelScreen screen, string when)
+        {
+            IReadOnlyList<Image> haul = screen.View.VesselContents;
+            for (int i = 0; i < haul.Count; i++)
+            {
+                string what = screen.Level.Details[i].Name + " (" + when + ")";
+
+                // Unity's own null, not NUnit's: a destroyed Image is a live C# reference.
+                Assert.IsTrue(haul[i] != null, what + ": ячейка добычи исчезла из сосуда.");
+                Assert.IsTrue(haul[i].sprite != null,
+                    what + ": в сосуде лежит ячейка без спрайта — это и есть розовый квадрат.");
+                Assert.IsTrue(haul[i].sprite.texture != null,
+                    what + ": спрайт ячейки есть, а его текстура выгружена.");
+                Assert.AreNotEqual(Color.magenta, haul[i].color,
+                    what + ": ячейка добычи покрашена в мадженту (заглушка отсутствующего ассета).");
+            }
+        }
+
+        /// <summary>The letterbox the game's own frames are shot on — black, as everywhere else.</summary>
+        private static readonly Color Letterbox = Color.black;
+
         // ---- S5: the defeat screen IS the drawn screen, and the crank wipes it ------------------------
 
         /// <summary>

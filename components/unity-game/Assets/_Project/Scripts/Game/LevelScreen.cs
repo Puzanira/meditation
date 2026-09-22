@@ -405,7 +405,7 @@ namespace Meditation.Game
             // is left in their place.
             Vector2 first = LevelCatalog.AnchorOf(_level.Details[0]);
             _view.MoveBeatAnchor(first);
-            ShowBeatSentence(GameTexts.BeatAim, GameTexts.BeatAimOnDesk, HintTone.Gaze, first);
+            ShowBeatSentence(GameTexts.BeatAim, HintTone.Gaze, first);
         }
 
         private void BeginCrankBeat()
@@ -424,8 +424,7 @@ namespace Meditation.Game
 
             // Placed once and never moved — so what it has to be clear of is not where the detail IS
             // but everywhere it will BE for the length of the beat (see AddDetailTrack).
-            ShowBeatSentence(GameTexts.BeatCollect, GameTexts.BeatCollectOnDesk, HintTone.Crank, detail,
-                _runtime.NoticedIndex);
+            ShowBeatSentence(GameTexts.BeatCollect, HintTone.Crank, detail, _runtime.NoticedIndex);
         }
 
         /// <summary>
@@ -484,9 +483,9 @@ namespace Meditation.Game
             if (_tutorialThought != null)
                 _blockedForSwipeCard.Add(PaintedRectOf(_tutorialThought));
 
-            Vector2 size = HintPlate.SizeFor(GameTexts.SwipeHint, true);
+            Vector2 size = HintPlate.SizeFor(GameTexts.SwipeHint);
             Vector2 spot = HintPlacement.Beside(size, thought, _blockedForSwipeCard);
-            _view.ShowBeatPlate(GameTexts.SwipeHint, HintTone.Swipe, spot, GameTexts.SwipeHintOnDesk);
+            _view.ShowBeatPlate(GameTexts.SwipeHint, HintTone.Swipe, spot);
         }
 
         /// <summary>
@@ -515,7 +514,7 @@ namespace Meditation.Game
         /// The detail that will be MOVING under this plate for the length of the beat, or −1 when the
         /// beat is about something that stands still.
         /// </param>
-        private void ShowBeatSentence(string line, string bracket, HintTone tone, Vector2 about,
+        private void ShowBeatSentence(string line, HintTone tone, Vector2 about,
             int travellingDetail = -1)
         {
             _blockedForSwipeCard.Clear();
@@ -526,9 +525,9 @@ namespace Meditation.Game
             if (travellingDetail >= 0) AddDetailTrack(_blockedForSwipeCard, travellingDetail, about);
             else _blockedForSwipeCard.Add(HintPlacement.Centred(about, new Vector2(160f, 160f)));
 
-            Vector2 size = HintPlate.SizeFor(line, !string.IsNullOrEmpty(bracket));
+            Vector2 size = HintPlate.SizeFor(line);
             Vector2 spot = HintPlacement.Beside(size, about, _blockedForSwipeCard);
-            _view.ShowBeatPlate(line, tone, spot, bracket);
+            _view.ShowBeatPlate(line, tone, spot);
         }
 
         /// <summary>
@@ -595,7 +594,7 @@ namespace Meditation.Game
             Beat = TutorialBeat.Whole;
             _wholeBeatSeconds = 0f;
             _view.MoveBeatAnchor(_level.VesselCentre);
-            ShowBeatSentence(GameTexts.BeatWhole, null, HintTone.Gaze, _level.VesselCentre);
+            ShowBeatSentence(GameTexts.BeatWhole, HintTone.Gaze, _level.VesselCentre);
         }
 
         /// <summary>

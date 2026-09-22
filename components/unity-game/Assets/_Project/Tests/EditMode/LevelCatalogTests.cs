@@ -512,16 +512,67 @@ namespace Meditation.Tests
         /// one of the five plates is a rule that happens to work. It is also the guard that catches a
         /// level whose art leaves no clear 560 px anywhere.
         /// </summary>
+        /// <remarks>
+        /// All four are single-line plates since 2026-09-22: the PC bracket that used to add a row to
+        /// the first three is withdrawn («убрать все подсказки про клавиатуру — она играется на
+        /// автомате», founder). The flag stays on the struct because the PLATE still has a two-line
+        /// form, and this list is what says the game does not use it.
+        /// </remarks>
         private static IEnumerable<TeachingPlate> TeachingPlates(LevelDefinition level)
         {
-            yield return new TeachingPlate("наводи", GameTexts.BeatAim, true,
+            yield return new TeachingPlate("наводи", GameTexts.BeatAim, false,
                 LevelCatalog.AnchorOf(level.Details[0]));
-            yield return new TeachingPlate("крути крутилку и тащи", GameTexts.BeatCollect, true,
+            yield return new TeachingPlate("крути крутилку и тащи", GameTexts.BeatCollect, false,
                 LevelCatalog.AnchorOf(level.Details[0]));
-            yield return new TeachingPlate("отгон", GameTexts.SwipeHint, true,
+            yield return new TeachingPlate("отгон", GameTexts.SwipeHint, false,
                 LevelCatalog.AnchorOf(level.Details[level.DetailCount > 1 ? 1 : 0]));
             yield return new TeachingPlate("весь уровень", GameTexts.BeatWhole, false,
                 level.VesselCentre);
+        }
+
+        /// <summary>
+        /// …and none of the four teaching lines names a keyboard, a mouse or a PC.
+        ///
+        /// The EditMode half of the founder's order of 2026-09-22, made on the REGISTRY rather than on
+        /// a screen: <c>GameFlowTests.NoKeyboardHint_IsOnAnyScreenOfTheGame</c> watches the pixels, and
+        /// this watches the source they are set from — so a bracket added back to
+        /// <see cref="GameTexts.Live"/> is red before anybody builds a scene.
+        /// </summary>
+        [Test]
+        public void NoLiveLine_NamesAKeyboardAMouseOrAPc()
+        {
+            string[] words = { "компьютер", "клавиш", "клавиатур", "мыши", "мышь", "колесо", "esc" };
+
+            foreach (string line in GameTexts.Live)
+            {
+                string lowered = line.ToLowerInvariant();
+                foreach (string word in words)
+                    Assert.IsFalse(lowered.Contains(word),
+                        "Живая строка «" + line + "» называет «" + word +
+                        "» — игра идёт на автомате, клавиатуры и мыши в комнате нет.");
+            }
+        }
+
+        /// <summary>
+        /// …and the five brackets that were taken out really are in the withdrawn list, so the guard
+        /// that walks the screens has something to recognise them BY. Deleting a line from a screen and
+        /// forgetting to register it is exactly how «Крути ручку» came back twice.
+        /// </summary>
+        [Test]
+        public void TheWithdrawnList_KnowsThePcBrackets()
+        {
+            string[] brackets =
+            {
+                "(на компьютере — колесо мыши)",
+                "(на компьютере — стрелки)",
+                "(на компьютере — Q и A)",
+                "(на компьютере — Esc)"
+            };
+
+            foreach (string bracket in brackets)
+                Assert.Contains(bracket, GameTexts.Withdrawn,
+                    "ПК-скобка «" + bracket + "» снята с экрана, но не занесена в реестр выведенных — " +
+                    "значит сторож её не узнает, когда она вернётся.");
         }
 
         /// <summary>How far a hint may stand from what it points at, design px — a third of the frame.</summary>
@@ -929,6 +980,63 @@ namespace Meditation.Tests
                     rim.ToString("0.0") + " px на штрихе шириной " + stroke.ToString("0.0") +
                     " px — ободок смыкается в заливку.");
             }
+        }
+
+        /// <summary>
+        /// A cached sprite that has been unloaded is RELOADED, not handed back as a corpse — the bug
+        /// behind the founder's «розовый квадрат в ведре» (живая сессия 2026-09-22).
+        ///
+        /// <c>ArtLibrary</c> caches for the whole session and is never cleared in the shipped game. Until
+        /// this round the cache was asked only whether a key was PRESENT, and a destroyed
+        /// <c>UnityEngine.Object</c> is present and null at the same time — a live C# wrapper round a
+        /// dead native pointer. So the library returned it, <c>LevelView.CollectDetail</c> compared it to
+        /// null with Unity's overloaded operator, got true, and painted the haul cell
+        /// <see cref="Color.magenta"/> — the pink square she found in the bucket.
+        ///
+        /// The ICON crops are the entries that die: <see cref="ArtLibrary.IconOf"/> builds them with
+        /// <c>Sprite.Create</c>, so they belong to no scene and no asset file and nothing outside this
+        /// dictionary keeps them. A single-mode <c>SceneManager.LoadScene</c> — which the stand's level
+        /// launcher does on every run — drags <c>Resources.UnloadUnusedAssets</c> behind it, and the
+        /// editor reimporting a texture under a playing editor does the same thing by another road.
+        /// Neither can happen inside one batchmode shot, which is why every contract frame scanned clean
+        /// while the live session did not.
+        ///
+        /// The crop is destroyed here rather than the loaded asset on purpose: it is a runtime object, so
+        /// killing it needs no <c>allowDestroyingAssets</c> and cannot touch anything on disk.
+        /// </summary>
+        [Test]
+        public void TheArtCache_HandsBackALiveSprite_AfterACachedOneIsUnloaded()
+        {
+            ArtDetail cropped = default;
+            bool found = false;
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            {
+                foreach (ArtDetail detail in level.Details)
+                {
+                    if (!detail.HasIconCrop) continue;
+                    cropped = detail;
+                    found = true;
+                    break;
+                }
+
+                if (found) break;
+            }
+
+            Assert.IsTrue(found, "Ни у одной детали нет IconCrop — проверять нечего.");
+
+            Sprite first = ArtLibrary.IconOf(cropped);
+            Assert.IsNotNull(first, cropped.Name + ": иконка не собралась с первого раза.");
+            Assert.AreNotSame(ArtLibrary.Get(cropped.Sprite), first,
+                cropped.Name + ": иконка — сам ассет, а не вырезка; тест бьёт не туда.");
+
+            UnityEngine.Object.DestroyImmediate(first);
+            Assert.IsTrue(first == null, "Вырезку не удалось выгрузить — дальше проверять нечего.");
+
+            Sprite again = ArtLibrary.IconOf(cropped);
+            Assert.IsTrue(again != null,
+                cropped.Name + ": кэш вернул выгруженный спрайт — в сосуде будет розовый квадрат.");
+            Assert.IsTrue(again.texture != null,
+                cropped.Name + ": спрайт живой, а его текстура выгружена.");
         }
 
         /// <summary>

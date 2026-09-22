@@ -32,8 +32,12 @@ namespace Meditation.Game
             // «Подпись про выход в основное меню» (founder, 2026-09-22, п.9). The finale leaves on any
             // input or after twenty seconds and said so nowhere: the player stood in front of a
             // panorama with no way to tell whether the game was over or stuck.
+            //
+            // One line: the «(на компьютере — Esc)» bracket under it is withdrawn (founder,
+            // 2026-09-22 — «убрать все подсказки про клавиатуру, она играется на автомате»). The
+            // sentence names the cabinet's «Меню» button, which is both the thing the player can see
+            // and the only control this screen's exit has ever listened to (MenuButtonExit).
             ExitLabel = Shadowed("FinaleExitLabel", GameTexts.FinaleExit, ExitLabelY, ExitLabelPt);
-            DeskLabel = Shadowed("FinaleExitDesk", GameTexts.FinaleExitOnDesk, DeskLabelY, DeskLabelPt);
 
             // …and the three mounts for the designer's animations on this screen (гусь с бубликами,
             // мышь, птички — бриф Кате 2026-09-22). Empty RectTransforms: the panorama is finished art
@@ -47,11 +51,8 @@ namespace Meditation.Game
         /// <summary>The render — the suite checks that the picture is really on screen.</summary>
         public Image Panorama { get; }
 
-        /// <summary>«Красная кнопка — выход в главное меню».</summary>
+        /// <summary>«Красная кнопка — выход в главное меню» — the only line on this screen.</summary>
         public Text ExitLabel { get; }
-
-        /// <summary>…and its PC bracket, «(на компьютере — Esc)».</summary>
-        public Text DeskLabel { get; }
 
         /// <summary>Mount for Катя's goose-with-bagels animation. Empty by design.</summary>
         public RectTransform GooseAnchor { get; }
@@ -64,9 +65,7 @@ namespace Meditation.Game
 
         /// <summary>The caption's band, design px — the darkest strip the panorama leaves free.</summary>
         private const float ExitLabelY = 990f;
-        private const float DeskLabelY = 1040f;
         private const int ExitLabelPt = 36;
-        private const int DeskLabelPt = 24;
 
         private static readonly Color LabelInk = new Color(242f / 255f, 240f / 255f, 234f / 255f);
         private static readonly Color LabelShadow = new Color(0f, 0f, 0f, 0.78f);

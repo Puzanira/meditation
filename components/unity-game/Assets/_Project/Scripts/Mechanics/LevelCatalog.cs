@@ -57,6 +57,30 @@ namespace Meditation.Mechanics
         /// </summary>
         public Vector2 AlphaCentroid;
 
+        /// <summary>
+        /// Fade this sprite's own alpha to zero over the outermost fraction of its UV, 0 = off.
+        ///
+        /// One detail needs it and it is the founder's «квадрат вокруг луны» (плейтест 2026-09-22).
+        /// Nothing draws a square: the moon's PNG is a disc inside a wide radial GLOW, and the glow is
+        /// still at alpha 5/255 when the canvas ends. Measured on `L5/objects/moon.png` (352×352): the
+        /// four corners are alpha 0, but the edge MIDPOINTS are 5, the iso-alpha contours are circular,
+        /// and at α≥1 their radius is 175 along the axes (= exactly half the width, i.e. cut by the
+        /// canvas) against 223 on the diagonals, where there is still room. A circle truncated by its
+        /// own box.
+        ///
+        /// Five units of alpha is invisible over most things and a hard step over a night sky, because
+        /// the UI composites in LINEAR space: plate sRGB 25 → linear 0.0103, the glow's cream 212 →
+        /// 0.657, blended at α = 0.0196 → 0.0255 → sRGB ≈ 44. Differencing `Game15_L5_play` against
+        /// `Game22_L5_victory` (moon already collected) returns a hard-edged 188×188 rectangle centred
+        /// exactly on (1680, 112), which is this detail's own quad at its pulse scale.
+        ///
+        /// The real fix is the ASSET — re-export with the glow dying inside its canvas, and that line
+        /// is in Катя's brief. This is the stopgap, and it is deliberately per-detail rather than a
+        /// rule: most sprites here are trimmed to their own alpha box, so their ink DOES reach the
+        /// border, and a blanket edge fade would eat the gull's wingtips and the paperclip's wire.
+        /// </summary>
+        public float EdgeFadeUv;
+
         // «SilhouetteRadius» stood here until 2026-08-08: a per-detail dilation for the HUD slot's
         // flat-ink silhouette, needed because a square fragment of line art (the vine's leaf window)
         // read as 6.4 % ink at a metre against a guard that wanted 8. The row of slots is gone with the
@@ -359,7 +383,8 @@ namespace Meditation.Mechanics
                     Detail("одуванчик", "L5/objects/dandelion", 500f, 958f, 59f, 75f, 0.4626f, 0.4258f),
                     Detail("шторы в окне", "L5/objects/curtains", 824f, 390f, 70f, 100f, 0.5000f, 0.4476f),
                     Detail("воробей", "L5/objects/bird", 187f, 83f, 62f, 62f, 0.4830f, 0.4435f),
-                    Detail("луна", "L5/objects/moon", 1680f, 112f, 176f, 176f, 0.5001f, 0.5000f),
+                    EdgeFaded(Detail("луна", "L5/objects/moon", 1680f, 112f, 176f, 176f, 0.5001f, 0.5000f),
+                        MoonHaloFade),
                     Detail("облако у столба", "L5/objects/cloud-middle", 728f, 53f, 180f, 46f,
                         0.4968f, 0.5600f),
                     // The cloud «у провода» is NOT here on purpose. The drop ships it twice: once
@@ -614,6 +639,22 @@ namespace Meditation.Mechanics
                 Size = new Vector2(w, h),
                 AlphaCentroid = new Vector2(cxAlpha, cyAlpha)
             };
+        }
+
+        /// <summary>
+        /// How much of the moon's own UV is faded out, per side — see <see cref="ArtDetail.EdgeFadeUv"/>.
+        ///
+        /// 8 %. The disc itself ends at radius 110 of 176 (0.625 of the half-width), and the glow is
+        /// still worth removing out to the border, so the fade has to start well outside the drawing
+        /// and reach zero at the edge: 0.08 begins at 0.92 of the half-width, i.e. at radius 162 —
+        /// fifty pixels of clear glow past the disc, and nothing of the moon itself is touched.
+        /// </summary>
+        public const float MoonHaloFade = 0.08f;
+
+        private static ArtDetail EdgeFaded(ArtDetail detail, float uv)
+        {
+            detail.EdgeFadeUv = uv;
+            return detail;
         }
 
         /// <summary>…and the same detail whose ICON is a fragment (<see cref="ArtDetail.IconCrop"/>).</summary>

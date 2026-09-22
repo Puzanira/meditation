@@ -61,7 +61,6 @@ namespace Meditation.View
         private CanvasGroup _vesselGroup;
         private Image _outcome;
         private Image _outcomePlate;
-        private Image _crankHalo;
         private RectTransform _vesselWindow;
         private Material _gazeMaterial;
 
@@ -105,9 +104,13 @@ namespace Meditation.View
         public RectTransform VesselRect => _vesselWindow != null ? _vesselWindow : _vessel.rectTransform;
         public Image Background => _background;
 
-        public Image CrankDial { get; private set; }
-        public Image CrankArc { get; private set; }
-        public RectTransform CrankNeedle { get; private set; }
+        /// <summary>
+        /// The dynamo dial — <c>null</c> in the game since 2026-09-22 (founder: «спидометр убрать из
+        /// HUD игры», see <see cref="BuildHud"/>). Kept as a property so the suite can ASSERT it is
+        /// gone rather than fail to compile, which is a test that says nothing.
+        /// </summary>
+        public Image CrankDial => null;
+
         public Image Thread { get; private set; }
 
         /// <summary>
@@ -127,15 +130,27 @@ namespace Meditation.View
         /// <summary>The peak's darkened edges — the half of it that is visible on a photograph.</summary>
         public Image PeakEdges { get; private set; }
 
-        /// <summary>The beat's own button — НАВОДИ, КРУТИ РУЧКУ — with its arrow.</summary>
-        public ButtonHint Hint { get; private set; }
-
         /// <summary>
-        /// The second button of a beat. Beat 2 shows two at once (SCREENS §Обучение п.2): «КРУТИ
-        /// РУЧКУ» at the dynamo indicator and «ТАЩИ» beside the detail on its thread — one names the
-        /// hand, the other names what the hand is doing to.
+        /// The empty mount the beat's future ANIMATION stands on — moved to whatever the beat is
+        /// about, drawing nothing.
+        ///
+        /// What stood here until 2026-09-22 were two <c>ButtonHint</c>s: the drop's caps buttons
+        /// (НАВОДИ · КРУТИ РУЧКУ · ТАЩИ) each with a turquoise arrow to their subject, plus the
+        /// arrow-only отгон stroke down to the sensor panel. The founder took all of it off the
+        /// teaching screens in one sentence — «убрать стрелки все с экранов обучений, оставить только
+        /// плашки с нашим текстом» — and the reason is the round that put the sentences there in the
+        /// first place: a beat was saying the same thing three times (a drawn word, an arrow, and a
+        /// sentence), in three different visual languages, on top of a photographic plate. The
+        /// sentence is the one of the three that answers «что от меня хотят», so the sentence is what
+        /// is left.
+        ///
+        /// The MOUNT survives the pictures, exactly as the title's НАЧАТЬ button did (see
+        /// <c>TitleScreen.StartAnchor</c>): the beats still have a thing they are about, Катя's brief
+        /// asks for animations to stand there, and an anchor that is already placed and already
+        /// asserted is the difference between hanging an animation on it and re-deriving where the
+        /// beat pointed. It draws nothing, and the suite asserts it draws nothing.
         /// </summary>
-        public ButtonHint SecondHint { get; private set; }
+        public RectTransform BeatAnchor { get; private set; }
 
         /// <summary>
         /// The drawn outcome screen on top of everything — <c>screens/level-complete</c> after a win,
@@ -238,7 +253,7 @@ namespace Meditation.View
                 image.preserveAspect = true;
                 image.color = image.sprite != null ? Color.white : Color.magenta;
                 Ui.Place(image.rectTransform, spec.Home.x, spec.Home.y, spec.Size.x, spec.Size.y);
-                GiveItsOwnSweepMaterial(image);
+                GiveItsOwnSweepMaterial(image, spec);
                 _detailImages.Add(image);
                 GiveItsOwnNeonOutline(image, spec);
 
@@ -395,11 +410,19 @@ namespace Meditation.View
             // above the vessel, so the bar disappeared under the blobs at exactly the moment it is the
             // only thing telling the player how much of the level is left. Where it STANDS is still the
             // vessel's business (LevelCatalog.VesselBarRectOf); what may cover it is the HUD's.
+            //
+            // …and it is drawn OPAQUE, which is the fix for blocker Б2 of the design gate (2026-08-08).
+            // Being above the thoughts by Z was never the problem — the bar has been on the HUD layer
+            // since that same gate — but the track was a 22 %-black wash with a 32 %-white rule, so the
+            // marker hatching and the light discs under the pips came straight THROUGH it: 23.2 % of
+            // the bar's own pixels on frame Game23 were the thoughts behind it, 10.4 % on Game15.
+            // «Мысли HUD не закрывают» (SCREENS §S3) is a claim about the picture, and a translucent
+            // widget breaks it without ever losing an argument about layer order.
             Rect track = LevelCatalog.VesselBarRectOf(_level);
 
             _vesselFillTrack = Ui.Rounded(HudLayer, "VesselFillTrack",
                 track.center.x, track.center.y, track.width, track.height,
-                new Color(0f, 0f, 0f, 0.22f), new Color(1f, 1f, 1f, 0.32f), 2f, 7);
+                BarTrack, BarRule, 2f, 7);
 
             _vesselFillLevel = Ui.NewImage(_vesselFillTrack.transform, "VesselFillLevel");
             _vesselFillLevel.color = MetroFill;
@@ -412,8 +435,18 @@ namespace Meditation.View
             fill.sizeDelta = new Vector2(0f, -6f);
         }
 
-        /// <summary>The warm orange the metro's indicator was painted in, now the bar's colour on all five.</summary>
-        private static readonly Color MetroFill = new Color(0.89f, 0.45f, 0.28f, 0.92f);
+        /// <summary>
+        /// The warm orange the metro's indicator was painted in, now the bar's colour on all five —
+        /// and opaque since 2026-08-19 (Б2): a 92 % fill still let the white pip discs read through the
+        /// part of the bar that is supposed to say «столько уже собрано».
+        /// </summary>
+        private static readonly Color MetroFill = new Color(0.89f, 0.45f, 0.28f, 1f);
+
+        /// <summary>The empty part of the bar: near-black, opaque, so nothing behind it is the bar.</summary>
+        private static readonly Color BarTrack = new Color(0.07f, 0.08f, 0.10f, 1f);
+
+        /// <summary>…and its 2 px rule, which has to be opaque for the same reason the track does.</summary>
+        private static readonly Color BarRule = new Color(0.85f, 0.85f, 0.85f, 1f);
 
         /// <summary>
         /// The HUD's only widgets: the crank indicator with its halo, and (built next door) the bar
@@ -429,60 +462,70 @@ namespace Meditation.View
         /// the tiles used to be, which is the top of the frame, which is where the mock always wanted
         /// its cards.
         /// </summary>
+        /// <summary>
+        /// **The dynamo indicator is gone too** — founder, playtest 2026-09-22: «спидометр (круглый
+        /// индикатор динамо со стрелкой) убрать из HUD игры».
+        ///
+        /// It was the last widget in <see cref="BuildHud"/> and it had outlived its question. A dial
+        /// with a needle on a photographic plate reads as an INSTRUMENT — a speedometer, which is what
+        /// the founder called it — and the game it is bolted to has no speed in it: the crank's only
+        /// job is «крутится или нет», and the answer to that is drawn twice already, by the detail
+        /// travelling its thread and by the progress ring around it. «Наблюдаемость кручения остаётся
+        /// жестом самой детали (нить/захват)» is her own wording for why one of the three can go.
+        ///
+        /// What it leaves behind on purpose: <see cref="LevelDefinition.CrankIndicatorCentre"/> stays
+        /// in the catalogue and stays in <see cref="LevelCatalog.HintObstaclesOf"/>. It is the corner
+        /// of each plate the art drop kept clear for a widget, and a teaching plate standing there is
+        /// standing in the one place each composition was designed to leave empty. The greybox stand
+        /// keeps its own dial (<see cref="StageView"/>): a scenette about the crank with no crank on
+        /// screen would be a rig that judges a rule it cannot show.
+        ///
+        /// The HUD is therefore ONE widget now — the vessel's fill bar, built in
+        /// <see cref="BuildVessel"/> because it belongs to the vessel's own place on the plate.
+        /// </summary>
         private void BuildHud()
         {
-            // Positions come from the level, not from LevelOneData: the stand keeps the SCREENS base,
-            // a real level moves the widget off whatever the art drop painted there (founder 2026-07-31).
-            //
-            // The sun-dial and its caption stood here until 2026-08-07. They are gone with the timer:
-            // there is no clock to draw, and a dial that reports nothing is worse than an empty corner
-            // because it still claims a corner of every plate (see LevelRules).
-            Vector2 crank = _level.CrankIndicatorCentre;
-
-            _crankHalo = Ui.Circle(HudLayer, "CrankHalo", crank.x, crank.y,
-                LevelOneData.CrankHaloRadius, LevelOneData.CrankHaloOk, Color.clear);
-            _crankHalo.gameObject.SetActive(false);
-
-            CrankDial = Ui.Circle(HudLayer, "CrankDial", crank.x, crank.y,
-                LevelOneData.CrankIndicatorRadius,
-                Color.white, new Color(0.4f, 0.4f, 0.4f), 4f);
-
-            CrankArc = Ui.Ring(HudLayer, "CrankArc", crank.x, crank.y,
-                LevelOneData.CrankIndicatorRadius + 14f,
-                LevelOneData.VesselStroke);
-            CrankArc.fillAmount = 0.35f;
-
-            var needle = Ui.BoxCentred(CrankDial.transform, "CrankNeedle", 0f, 0f, 8f,
-                LevelOneData.CrankIndicatorRadius, new Color(0.33f, 0.33f, 0.33f));
-            CrankNeedle = needle.rectTransform;
-            CrankNeedle.anchorMin = new Vector2(0.5f, 0.5f);
-            CrankNeedle.anchorMax = new Vector2(0.5f, 0.5f);
-            CrankNeedle.pivot = new Vector2(0.5f, 0f);
-            CrankNeedle.anchoredPosition = Vector2.zero;
+            // Nothing. Kept as a named seam rather than deleted: the HUD is a place in the Z-order
+            // (SCREENS «Зоны»), and the bar that lives on it is built next door.
         }
 
         private void BuildHint()
         {
-            Hint = new ButtonHint(MessageLayer);
-            SecondHint = new ButtonHint(MessageLayer, "SecondHint");
-            SwipeCard = new HintCard(MessageLayer);
+            // An empty RectTransform: no Image, no Text, nothing to draw. See BeatAnchor.
+            var anchor = new GameObject("BeatAnchor", typeof(RectTransform));
+            anchor.transform.SetParent(MessageLayer, false);
+            BeatAnchor = (RectTransform)anchor.transform;
+            Ui.Place(BeatAnchor, 960f, 540f, 1f, 1f);
+
+            BeatPlate = new HintPlate(MessageLayer, "BeatPlate");
         }
 
+        /// <summary>Park the beat's mount on the thing the beat is about, design px.</summary>
+        public void MoveBeatAnchor(Vector2 target) => Ui.MoveTo(BeatAnchor, target);
+
         /// <summary>
-        /// The written half of the отгон beat: «Маши над датчиком!» on a teaching card, beside the
-        /// thought, with no arrow of its own (the beat's stroke is the arrow).
+        /// The WORDS of the tutorial — one sentence per beat, on the drop's own dark slab.
         ///
-        /// A card and not a drawn button because there IS no drawn button for this beat — «ТРЯСИ» is
-        /// still with the designer and would be the wrong verb anyway now that the отгон is on the
-        /// height sensors. The card is the mock's own plate, which is what the four drawn buttons were
-        /// made from, so the beat looks like the other three until the fourth PNG arrives.
+        /// It was the отгон beat's plate alone («Маши над датчиком!», blocker Б1 of the design gate on
+        /// 2026-08-08: that one beat was painted in the greybox stand's white paper while the three
+        /// around it carried the drop's dark slab). Since the founder's playtest of 2026-09-22 every
+        /// beat has a sentence — the drawn buttons named the hand and never said what for — so the
+        /// plate serves all four and is named for the job rather than for the beat it started on.
+        ///
+        /// Since later that same day it is the ONLY thing a beat draws: the buttons and the arrows are
+        /// off the teaching screens by the founder's word (see <see cref="BeatAnchor"/>).
+        ///
+        /// One plate and not four: the beats are strictly sequential, only one of them is ever up, and
+        /// four objects that are mutually exclusive by construction are four ways to leave one of them
+        /// on screen.
         /// </summary>
-        public HintCard SwipeCard { get; private set; }
+        public HintPlate BeatPlate { get; private set; }
 
-        public void ShowSwipeCard(string text, HintTone tone, Vector2 centre) =>
-            SwipeCard.ShowCardOnly(text, tone, centre);
+        /// <param name="bracket">«на компьютере — …», smaller and dimmer, or null.</param>
+        public void ShowBeatPlate(string text, HintTone tone, Vector2 centre, string bracket = null) =>
+            BeatPlate.ShowCardOnly(text, tone, centre, bracket);
 
-        public void HideSwipeCard() => SwipeCard.Hide();
+        public void HideBeatPlate() => BeatPlate.Hide();
 
         /// <summary>
         /// The finished outcome screens of the drop (S4 «level-complete», S5 «game-over»), full frame,
@@ -590,19 +633,29 @@ namespace Meditation.View
 
         // ---- state -------------------------------------------------------------------------------
 
+        /// <summary>
+        /// What the handle is doing — and, since the dial went (2026-09-22), nothing to draw it on.
+        ///
+        /// The call stays because <c>LevelScreen</c> makes it every frame and because the STATE is
+        /// still read (<see cref="Spinning"/> / <see cref="Alarm"/> are what the readout and the suite
+        /// ask about). Turning it into a no-op rather than deleting the call is what keeps the removal
+        /// of a widget from becoming the removal of a fact.
+        /// </summary>
         public void SetCrank(float totalDegrees, bool spinning, bool alarm = false)
         {
-            CrankNeedle.localRotation = Quaternion.Euler(0f, 0f, -totalDegrees);
-            CrankNeedle.GetComponent<Image>().color = spinning
-                ? LevelOneData.VesselStroke
-                : new Color(0.33f, 0.33f, 0.33f);
-
-            if (alarm) CrankDial.color = LevelOneData.Alarm;
-            else CrankDial.color = spinning ? LevelOneData.VesselStroke : new Color(0.4f, 0.4f, 0.4f);
-
-            _crankHalo.gameObject.SetActive(alarm || spinning);
-            _crankHalo.color = alarm ? LevelOneData.CrankHaloAlarm : LevelOneData.CrankHaloOk;
+            CrankDegrees = totalDegrees;
+            Spinning = spinning;
+            Alarm = alarm;
         }
+
+        /// <summary>Degrees the handle has turned this level — the readout's number, drawn nowhere.</summary>
+        public float CrankDegrees { get; private set; }
+
+        /// <summary>Is the handle above the threshold right now?</summary>
+        public bool Spinning { get; private set; }
+
+        /// <summary>…and is it stopped with a collection in progress (the old red dial)?</summary>
+        public bool Alarm { get; private set; }
 
         public void SetHudVisible(bool visible) => HudLayer.gameObject.SetActive(visible);
 
@@ -749,9 +802,16 @@ namespace Meditation.View
         {
             _pulse += deltaTime;
 
-            // SCREENS: масштаб 1.0 → 1.12, цикл 1.6 с. During the intro every detail pulses together;
-            // afterwards the one being dragged holds still so the ring around it stays readable.
-            float k = 1f + 0.12f * 0.5f * (1f + Mathf.Sin(_pulse * Mathf.PI * 2f / 1.6f));
+            // SCREENS: масштаб 1.0 → 1.12, цикл 1.6 с — both numbers are [tune] since the founder's
+            // playtest of 2026-09-22 («мерцание деталей активнее»), and both ship at roughly twice the
+            // spec's setting. The spec was written for a greybox frame of flat rectangles, where 12 %
+            // is a lot; on a photographic plate at dusk it is a rounding error, and the founder's
+            // complaint the whole round has been that she cannot find the objects.
+            // During the intro every detail pulses together; afterwards the one being dragged holds
+            // still so the ring around it stays readable.
+            float amplitude = Mathf.Max(0f, Tuning.TuningConfig.DetailPulseAmplitude);
+            float period = Mathf.Max(0.1f, Tuning.TuningConfig.DetailPulseSeconds);
+            float k = 1f + amplitude * 0.5f * (1f + Mathf.Sin(_pulse * Mathf.PI * 2f / period));
             for (int i = 0; i < _detailImages.Count; i++)
             {
                 bool isCollected = collected != null && i < collected.Count && collected[i];
@@ -1059,37 +1119,6 @@ namespace Meditation.View
             }
         }
 
-        /// <summary>Put a drawn button of the tutorial beside <paramref name="target"/> and aim at it.</summary>
-        public void ShowHint(string buttonKey, HintTone tone, Vector2 centre, Vector2 target,
-            float standoff = 50f)
-        {
-            Hint.Show(ArtLibrary.Get(buttonKey), tone, centre, target, standoff);
-        }
-
-        /// <summary>The second button of the beat (ТАЩИ), beside the detail that is moving.</summary>
-        public void ShowSecondHint(string buttonKey, HintTone tone, Vector2 centre, Vector2 target,
-            float standoff = 50f)
-        {
-            SecondHint.Show(ArtLibrary.Get(buttonKey), tone, centre, target, standoff);
-        }
-
-        /// <summary>Walk the second button to a new spot and re-aim it — «рядом с едущей деталью».</summary>
-        public void MoveSecondHint(Vector2 centre, Vector2 target)
-        {
-            SecondHint.MoveTo(centre);
-            SecondHint.PointAt(target);
-        }
-
-        public void HideSecondHint() => SecondHint.Hide();
-
-        /// <summary>The beat the drop has no button for: an arrow and nothing else.</summary>
-        public void ShowArrowHint(HintTone tone, Vector2 from, Vector2 target)
-        {
-            Hint.ShowArrowOnly(tone, from, target);
-        }
-
-        public void HideHint() => Hint.Hide();
-
         /// <summary>
         /// The reward beat of S4 (kept by the founder's own note on the drop): the vessel slides to the
         /// centre with the whole haul inside it — «единственный момент, где игрок видит добычу» — and
@@ -1123,8 +1152,47 @@ namespace Meditation.View
             VesselRect.localScale = Vector3.one;
             SetThoughtsAlpha(1f);
             SetBackgroundAlpha(1f);
+            SetVictoryZoom(0f);
             if (_vesselFillTrack != null) _vesselFillTrack.gameObject.SetActive(true);
         }
+
+        /// <summary>
+        /// «Наезд камеры на ведёрко» (founder, 2026-09-22, п.8) — the first half of the victory's new
+        /// transition, before the ripple leaves the bucket.
+        ///
+        /// A scale on the level's own layers rather than a camera move, because this game has no camera
+        /// to move: it is a UGUI canvas in design space. The layers are full-frame rectangles anchored
+        /// on all four sides, so scaling them happens about the middle of the FRAME — and the vessel is
+        /// standing in the middle of the frame by then (<see cref="StageVictory"/>), which is what makes
+        /// a scale about the centre a push-in on the bucket.
+        ///
+        /// The HUD, the hints and the outcome layer are left out on purpose: a zoom is a statement
+        /// about the PICTURE, and a drawn «Отлично!» screen growing past the edges of the frame with it
+        /// would be the render being cropped.
+        /// </summary>
+        /// <param name="amount">0 = no push-in, 1 = all of <see cref="VictoryZoom"/>.</param>
+        public void SetVictoryZoom(float amount)
+        {
+            float k = 1f + (VictoryZoom - 1f) * Mathf.Clamp01(amount);
+            var scale = new Vector3(k, k, 1f);
+
+            SceneLayer.localScale = scale;
+            DetailsLayer.localScale = scale;
+            ThreadLayer.localScale = scale;
+            ThoughtsLayer.localScale = scale;
+            VesselLayer.localScale = scale;
+            ZoomedIn = Mathf.Clamp01(amount);
+        }
+
+        /// <summary>How far in the push-in has gone, 0…1 — the readout's and the suite's handle on it.</summary>
+        public float ZoomedIn { get; private set; }
+
+        /// <summary>
+        /// How far the push-in goes. A sixth: enough that the tableau is visibly coming towards the
+        /// player, little enough that the plate's own edges never leave the frame (a full-frame layer
+        /// at ×1.17 still covers a 1920×1080 window from its centre).
+        /// </summary>
+        public const float VictoryZoom = 1.17f;
 
         private void SetBackgroundAlpha(float alpha)
         {
@@ -1153,7 +1221,7 @@ namespace Meditation.View
         /// contrail — one shared number would be half of the first and a twentieth of the second).
         /// The instances are destroyed with the level.
         /// </summary>
-        private void GiveItsOwnSweepMaterial(Image image)
+        private void GiveItsOwnSweepMaterial(Image image, ArtDetail spec)
         {
             // Resources, not Shader.Find: the shader ships inside the game's own Resources folder
             // (like the thought shaders), and Shader.Find only sees what a build decided to include.
@@ -1163,6 +1231,13 @@ namespace Meditation.View
             var material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
             material.SetFloat(SweepStrengthId, 0f);
             material.SetFloat(SweepSlantId, SweepSlant);
+
+            // …and the edge fade, which is not about the light band at all: one detail (the moon of
+            // level 5) is a disc inside a glow its own canvas cuts off at alpha 5/255, and over a
+            // night sky that composites into the hard box the founder reported on 2026-09-22. The
+            // material is per instance anyway, so this rides along for free — see ArtDetail.EdgeFadeUv.
+            material.SetFloat(EdgeFadeId, Mathf.Max(0f, spec.EdgeFadeUv));
+
             image.material = material;
             _sweepMaterials.Add(material);
         }
@@ -1331,6 +1406,7 @@ namespace Meditation.View
         private static readonly int SweepWidthId = Shader.PropertyToID("_SweepWidthU");
         private static readonly int SweepStrengthId = Shader.PropertyToID("_SweepStrength");
         private static readonly int SweepSlantId = Shader.PropertyToID("_SweepSlant");
+        private static readonly int EdgeFadeId = Shader.PropertyToID("_EdgeFadeUV");
 
         /// <summary>
         /// Put the light band on the details, in each one's own UV.

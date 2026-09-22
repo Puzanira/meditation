@@ -159,6 +159,196 @@ namespace Meditation.Tests
             LogAssert.NoUnexpectedReceived();
         }
 
+        // ---- «Уровни по отдельности» (заказ founder 2026-08-19) -------------------------------------
+
+        /// <summary>
+        /// The right-hand column of the stand menu: five entries, one per level, named off the
+        /// catalogue — and the stick's left/right crosses between the two columns.
+        ///
+        /// The founder's order of 2026-08-19: «надо запускать уровни сценками по отдельности, для
+        /// дебага и разработки». The four scenettes are greybox rigs that prove one RULE each; a level
+        /// is art plus rules plus three controllers, and the only way to look at one used to be to play
+        /// the run from the title down to it.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Menu_AlsoListsTheFiveLevels_AndTheStickCrossesBetweenTheColumns()
+        {
+            yield return StandTestHarness.LoadScene(PreviewScenes.Menu);
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            DesignStage stage = StandTestHarness.Stage();
+
+            var menu = Object.FindAnyObjectByType<PreviewMenuController>();
+            Assert.IsNotNull(menu, "The entry scene must be the stand menu.");
+
+            Assert.AreEqual(LevelCatalog.Count, PreviewScenes.LevelCount,
+                "Пунктов «Уровень N» не столько, сколько уровней в каталоге.");
+            Assert.AreEqual(PreviewScenes.Scenettes.Length + LevelCatalog.Count, menu.EntryCount);
+
+            for (int i = 0; i < LevelCatalog.Count; i++)
+            {
+                RectTransform card = StandTestHarness.Find(stage, "LevelCard" + (i + 1));
+                StandTestHarness.AssertVisible(card, "LevelCard" + (i + 1));
+
+                // Named off the catalogue, so a renamed or reordered level cannot leave a stale label.
+                Text title = card.GetComponentInChildren<Text>();
+                StringAssert.Contains(LevelCatalog.At(i).Title, PreviewScenes.LevelTitle(i),
+                    "Пункт уровня назван мимо каталога.");
+                Assert.IsNotNull(title, "У пункта уровня нет заголовка.");
+            }
+
+            // The stick's right hops to the levels, keeping the row; left comes back.
+            Assert.IsFalse(menu.LevelIsSelected, "Меню обязано открываться на сценках.");
+            fake.Next = new BackendSnapshot { Joystick = new Vector2(1f, 0f) };
+            yield return null;
+            yield return null;
+            Assert.IsTrue(menu.LevelIsSelected, "Джойстик вправо не переводит в колонку уровней.");
+            Assert.AreEqual(0, menu.SelectedLevelIndex, "Строку при переходе не сохранили.");
+
+            fake.Next = new BackendSnapshot();
+            yield return null;
+            fake.Next = new BackendSnapshot { Joystick = new Vector2(-1f, 0f) };
+            yield return null;
+            yield return null;
+            Assert.IsFalse(menu.LevelIsSelected, "Джойстик влево не возвращает к сценкам.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// …and the entry OPENS that level: the real one, with its art, straight into play — no title,
+        /// no card, no tutorial — and «в меню» closes the door back onto the stand.
+        ///
+        /// Done contract of 2026-08-19 §1 and §3, in one pass, because the two halves are one claim:
+        /// a debug door that opens a slightly different game is a debug door that teaches nothing, and
+        /// a door that does not close is a door that strands the founder in the game she was debugging.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Menu_OpensARealLevel_AndTheMenuButtonComesBackToTheStand(
+            [Values(0, 2, 4)] int levelIndex)
+        {
+            yield return StandTestHarness.LoadScene(PreviewScenes.Menu);
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+
+            var menu = Object.FindAnyObjectByType<PreviewMenuController>();
+            menu.SwitchColumn(true);
+            for (int i = 0; i < levelIndex; i++) menu.Move(1);
+            Assert.AreEqual(levelIndex, menu.SelectedLevelIndex, "Подсветка не на том уровне.");
+
+            menu.Open();
+            yield return null;
+            yield return null;
+            yield return null;
+            yield return null;
+
+            Assert.AreEqual(PreviewScenes.Game, SceneManager.GetActiveScene().name,
+                "Пункт «Уровень N» открыл не сцену игры.");
+
+            GameFlow flow = Object.FindAnyObjectByType<GameFlow>();
+            Assert.IsNotNull(flow, "В сцене игры нет потока.");
+            Assert.IsTrue(flow.LaunchedFromStand, "Игра не знает, что её открыли со стенда.");
+            Assert.AreEqual(GamePhase.Level, flow.Phase,
+                "Запуск со стенда обязан открываться СРАЗУ на уровне, без титула и карточки.");
+            Assert.AreEqual(levelIndex, flow.LevelIndex, "Открылся не тот уровень.");
+
+            var screen = flow.Screen as LevelScreen;
+            Assert.IsNotNull(screen, "На экране не уровень.");
+            Assert.IsFalse(screen.Teaches, "Запуск со стенда обязан идти без обучения.");
+            Assert.AreEqual(levelIndex, TuningConfig.ActiveLevelIndex,
+                "Панель тюнинга подхватила не ту полосу уровня.");
+            Assert.AreEqual(TuningConfig.WaveIntervalOf(levelIndex), TuningConfig.WaveIntervalSeconds,
+                1e-3f, "Полоса тюнинга этого уровня не применена (ApplyLevel не отработал).");
+
+            // …and the art is the level's own, not a greybox stand-in.
+            Assert.IsNotNull(screen.View.Background.sprite,
+                "Уровень со стенда открылся без своей пластины.");
+
+            // «В меню» → back to the stand's own menu, not to the game's title and not to the launcher.
+            fake = StandTestHarness.TakeOverInput();
+            fake.Next = new BackendSnapshot { MenuHeld = true };
+            yield return null;
+            yield return null;
+            yield return null;
+            yield return null;
+
+            Assert.AreEqual(PreviewScenes.Menu, SceneManager.GetActiveScene().name,
+                "«В меню» из уровня, открытого со стенда, ушло не в меню стенда.");
+            Assert.IsNotNull(Object.FindAnyObjectByType<PreviewMenuController>(),
+                "Меню стенда не ожило обратно.");
+            Assert.IsNull(Object.FindAnyObjectByType<GameFlow>(),
+                "Поток игры пережил выход на стенд.");
+
+            // …and nothing is left pending: the launcher's own boot of the game must get the title.
+            Assert.IsFalse(StandLevelLaunch.IsPending,
+                "Заявка стенда осталась висеть — следующий запуск игры откроется не с титула.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// …and the level does not follow her back onto the stand (Codex, 2026-09-22).
+        ///
+        /// The founder's own path: «Уровень 5» off the right-hand column, «в меню», then the scenette
+        /// «Отгон взмахами» to look at the отгон. Level 5's band had been copied onto the shared
+        /// values and stayed there, so the rig — whose ONE job is to send blobs for as long as she
+        /// watches it — went quiet after the twenty-fifth thought and never said why.
+        ///
+        /// Driven through the scenette's own field rather than by waiting: twenty-five thoughts at one
+        /// wave per ten seconds is four minutes of real time, and the claim is about the rule, not
+        /// about the clock.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ALevelOpenedFromTheStand_LeavesNoThoughtBudgetBehindInTheScenettes()
+        {
+            yield return StandTestHarness.LoadScene(PreviewScenes.Menu);
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+
+            // The founder's tuning of the stand, to be sure the way back is not a reset to defaults.
+            TuningConfig.WaveIntervalSeconds = 2f;
+
+            const int LastLevel = 4;
+            var menu = Object.FindAnyObjectByType<PreviewMenuController>();
+            menu.SwitchColumn(true);
+            for (int i = 0; i < LastLevel; i++) menu.Move(1);
+            Assert.AreEqual(LastLevel, menu.SelectedLevelIndex, "Подсветка не на уровне 5.");
+
+            menu.Open();
+            for (int i = 0; i < 4; i++) yield return null;
+
+            Assert.AreEqual(GamePhase.Level, Object.FindAnyObjectByType<GameFlow>().Phase);
+            Assert.AreEqual(TuningConfig.ThoughtBudgetOf(LastLevel), TuningConfig.ThoughtBudget,
+                "Уровень 5 не применил свой запас мыслей — тест ни о чём.");
+
+            fake = StandTestHarness.TakeOverInput();
+            fake.Next = new BackendSnapshot { MenuHeld = true };
+            for (int i = 0; i < 4; i++) yield return null;
+            Assert.AreEqual(PreviewScenes.Menu, SceneManager.GetActiveScene().name);
+
+            // …and on into the scenette.
+            yield return StandTestHarness.LoadScene(PreviewScenes.ShakeAway);
+            var scenette = Object.FindAnyObjectByType<Scenes.Scene2ShakeAway>();
+            Assert.IsNotNull(scenette, "Сценка «Отгон взмахами» не открылась.");
+
+            Assert.AreEqual(0, TuningConfig.ThoughtBudget,
+                "Запас мыслей уровня 5 приехал на стенд — сценка перестала быть безлимитной.");
+            Assert.AreEqual(ThoughtField.Unlimited, scenette.Field.BudgetLeft,
+                "У сценки кончается запас мыслей, хотя это грейбокс-риг без уровня.");
+            Assert.AreEqual(2f, TuningConfig.WaveIntervalSeconds, 1e-3f,
+                "Возврат на стенд сбросил настройку основательницы в дефолт.");
+
+            // Ten minutes of the rig: the waves go on well past the level's budget.
+            int budget = TuningConfig.ThoughtBudgetOf(LastLevel);
+            for (int step = 0; step < 2400; step++)
+                scenette.Field.Tick(0.25f, Vector2.zero, 0, true);
+
+            Assert.Greater(scenette.Field.SpentFromBudget, budget,
+                "Сценка остановила волны на " + budget + "-й мысли — это запас уровня 5, не правило " +
+                "сценки.");
+            Assert.IsFalse(scenette.Field.ThoughtsAreOver,
+                "Сценка объявила, что мысли кончились, — у рига они кончаться не могут.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
         [UnityTest]
         public IEnumerator MenuButton_LeavesAnyScenette_ImmediatelyAndCleanly()
         {

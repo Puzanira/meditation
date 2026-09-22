@@ -66,6 +66,14 @@ namespace Meditation.Stand
         {
             EnsureArcadeInput();
 
+            // «Здесь уровня нет.» A scenette is a rig for ONE rule, and it runs on the values its own
+            // panel shows — not on the band the last level launched off the stand menu left behind.
+            // Without this line «Уровень 5» leaves ThoughtBudget at 25 and this rig stops sending
+            // blobs after the twenty-fifth (Codex, 2026-09-22), which is not a rule the founder can
+            // tune, only a scenette that quietly dies. One call, and every value a level band carries
+            // comes back at once — including the ones added to it next time.
+            TuningConfig.LeaveLevelBand();
+
             Stage = DesignStage.Create("StandCanvas");
             Composition = new StageView(Stage, Options);
             Panel = TuningPanel.Create(Stage, Title, Parameters(), Readout);

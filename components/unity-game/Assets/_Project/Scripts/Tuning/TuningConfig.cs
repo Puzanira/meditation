@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Meditation.Tuning
@@ -163,30 +164,66 @@ namespace Meditation.Tuning
             public const float HitDecayMs = 800f;
             public const HitTargeting Targeting = HitTargeting.NearestToCenter;
 
-            public const float WaveIntervalSeconds = 5f;
-            public const int WaveWeak = 3;
+            public const float WaveIntervalSeconds = 10f;
+            public const int WaveWeak = 1;
             public const int WaveMedium = 0;
             public const int WaveStrong = 0;
-            public const bool PressureRamp = true;
-            public const float PressureRampPercent = 4f;
+            public const bool PressureRamp = false;
+            public const float PressureRampPercent = 0f;
             public const bool ThoughtDrift = true;
             public const float DriftPxPerSec = 25f;
-            public const bool ThoughtsCoverVessel = false;
-            public const float LossOverlapPercent = 92f;
-            public const float PeakOverlapPercent = 70f;
+
+            /// <summary>
+            /// «Ведёрко ПОД мыслями» (founder, 2026-09-22): a thought flying over the vessel covers it,
+            /// the way it covers everything else on the plate.
+            ///
+            /// ON since that playtest. It shipped OFF because the vessel is what the player aims the
+            /// haul at, and a bucket you cannot see is a target you cannot hit — but the founder played
+            /// the build and the opposite reading won: a thought that stops at the bucket's edge reads
+            /// as a sprite with a hole in it, and «сколько собрано» is answered by the fill bar, which
+            /// lives on the HUD and stays above the thoughts whatever this toggle says (blocker Б2).
+            /// </summary>
+            public const bool ThoughtsCoverVessel = true;
+
+            /// <summary>
+            /// «Порог проигрыша» — how much of the frame the thoughts have to hide, in per cent, before
+            /// the level is lost. MECHANICS §5, and the one failure condition the game has.
+            ///
+            /// 92 % until 2026-09-22. It came down with the wave BUDGET (founder's «волны»): a level
+            /// used to send thoughts forever, so any threshold under 100 was reached eventually and the
+            /// number only decided WHEN. With a budget — five thoughts on level 1 and nothing after
+            /// them — the threshold decides WHETHER, and 92 % of the frame is more than five weak blobs
+            /// can hide even grown to their ceiling. 85 % is what the budgets of all five levels can
+            /// actually reach with nobody beating a thought off (EveryLevel_FillsUpAndIsLost…), and it
+            /// is still a screen the player cannot see past.
+            /// </summary>
+            public const float LossOverlapPercent = 85f;
+            public const float PeakOverlapPercent = 65f;
+
+            /// <summary>
+            /// «Общий запас мыслей на уровень» (founder, 2026-09-22, «волны»): how many thoughts a level
+            /// sends in total before it has nothing left to send. 0 = no budget, which is what the
+            /// greybox stand runs on — a scenette is a rig for one rule and has to be able to go on
+            /// sending blobs for as long as the founder watches it.
+            ///
+            /// The GAME's own numbers live in the per-level bands below; this global is only the value
+            /// <see cref="ApplyLevel"/> has not overwritten yet.
+            /// </summary>
+            public const int ThoughtBudget = 0;
 
             /// <summary>
             /// «Мысли разрастаются со временем» (founder, 2026-08-07): how fast a thought grows past
             /// its class, in per cent of its spawn size per second, and how far it may go.
             ///
-            /// 2 %/с with a ×1.5 ceiling is the level-1 band, and it is a duration in disguise: a
-            /// thought reaches its ceiling in 25 s, i.e. two and a half wave intervals. That is the
-            /// point of the knob — a thought left alone stops being one blob you can ignore and
-            /// becomes two and a quarter of them in area, so ignoring the field costs the screen
-            /// rather than costing a clock.
+            /// **Both numbers went up by an order of magnitude on 2026-09-22** — «рост увеличить,
+            /// разрастаются на весь экран» — and the two orders of the same playtest are one decision:
+            /// the wave BUDGET took away the level's ability to bury a player under sheer count, so the
+            /// screen now fills because each thought grows to the size of it. At 8 %/с a blob reaches
+            /// its ×6 ceiling in a little over a minute, which is the same shape the knob always had —
+            /// a duration in disguise — just a much longer and much larger one.
             /// </summary>
-            public const float ThoughtGrowthPercentPerSec = 2f;
-            public const float ThoughtGrowthCap = 1.5f;
+            public const float ThoughtGrowthPercentPerSec = 10f;
+            public const float ThoughtGrowthCap = 12f;
 
             public const bool BreatherEnabled = true;
             public const float BreatherSeconds = 2f;
@@ -206,13 +243,39 @@ namespace Meditation.Tuning
             public const bool AudioThoughtsByOverlap = false;
             public const bool AudioSilentOffLevel = true;
 
+            /// <summary>
+            /// Crossfade between two LEVELS' background tracks, s (founder 2026-09-22, п.10).
+            ///
+            /// A different thing from the two «медитация» crossfades above, which move one layer against
+            /// another inside a level. This one is the level change itself: until now the background
+            /// source was stopped, given the next level's clip and started again — one frame of silence
+            /// and a new track at full volume, five times a run. [tune]
+            /// </summary>
+            public const float AudioBackgroundCrossfadeSeconds = 1.2f;
+
+            /// <summary>
+            /// Shape of the «мысли» layer against screen coverage (founder 2026-09-22: «кривая мягче»).
+            ///
+            /// The layer used to be LINEAR in its dial, so half a screen of thoughts was half the
+            /// ceiling and the noise was already loud while the level was still comfortable. An exponent
+            /// above 1 bends the curve down in the middle and keeps the top: at 2.0, half a screen is a
+            /// quarter of the ceiling and a full one is still the full ceiling. [tune 1–4]
+            /// </summary>
+            public const float AudioThoughtsCurve = 2f;
+
             // ---- Луч-подсветка деталей (SCREENS «Детали в сцене», заказ founder 2026-08-07) ----
-            public const float SweepPeriodSeconds = 8f;
+            //
+            // «Блики-пробеги по ВСЕМ объектам на ВСЕХ уровнях и с большей частотой» (founder
+            // 2026-09-22, п.7). Three of these six changed with that one sentence: the period halved,
+            // the band lights the detail the player is already holding too, and it stops thinning out
+            // on the late levels — «реже на поздних» was a difficulty idea, and the founder's complaint
+            // is that she cannot FIND the objects, which is not a difficulty she asked for.
+            public const float SweepPeriodSeconds = 4.5f;
             public const float SweepDurationSeconds = 1.2f;
             public const float SweepWidthPx = 320f;
-            public const float SweepStrength = 0.45f;
-            public const bool SweepOnlyUnnoticed = true;
-            public const bool SweepRarerOnLateLevels = true;
+            public const float SweepStrength = 0.7f;
+            public const bool SweepOnlyUnnoticed = false;
+            public const bool SweepRarerOnLateLevels = false;
 
             // ---- Неон-обводка деталей (заказ founder 2026-08-07) --------------------------------
             /// <summary>
@@ -270,42 +333,63 @@ namespace Meditation.Tuning
             // both statements at once (LevelCatalogTests: the ladder on real sizes, and defeat reached
             // from a standing start inside three minutes on every level — ~124 s here, ~89 s on L2).
             //
-            // Levels 3–5 keep the compositions of the 2026-08-01 playtest untouched: nothing in this
-            // round's feedback is about them, and re-balancing a level nobody complained about is how
-            // a tuning session turns into a regression.
-            public const float L1WaveIntervalSeconds = 5f;
-            public const int L1WaveWeak = 3;
+            // ---- ВОЛНЫ ПО ЗАПАСУ (founder, плейтест 2026-09-22) -------------------------------
+            //
+            // Everything above this line about wave compositions is superseded, and by the same person
+            // who set it. Her word was «волны», and what she dictated under it is a different shape of
+            // level: «у уровня есть общий запас мыслей — на первом 5, на втором 10, на третьем 15 — и
+            // приходят они раз в 10 секунд». A level is no longer a tap that runs until somebody turns
+            // it off; it is a finite amount of interference with a beginning and an end, and «мысли
+            // кончились» is a state the player can reach by playing well.
+            //
+            // The ladder that produced it is one line: the budget is FIVE waves on every level, and the
+            // wave is what climbs.
+            //
+            //   У1  5 = 5×1  одна слабая                      — «все слабые», её слова
+            //   У2 10 = 5×2  слабая + средняя                 — «по две за волну», её слова
+            //   У3 15 = 5×3  слабая + средняя + крепкая       — третья ступень лестницы
+            //   У4 20 = 5×4  слабая + 2 средние + крепкая     — ПРЕДЛОЖЕНО, на гейт founder
+            //   У5 25 = 5×5  2 слабые + 2 средние + крепкая   — ПРЕДЛОЖЕНО, на гейт founder
+            //
+            // L4 and L5 are the owner's proposal (the founder's list stops at 15 and says «продолжить
+            // лестницу в том же духе»): they keep the wave compositions levels 4 and 5 already had from
+            // the 2026-08-01 playtest, so the only thing that changed there is the clock and the fact
+            // that the tap now stops — and the budgets 20 and 25 fall out of the same 5-wave rule.
+            //
+            // The pressure ramp is OFF on every level, and that is not an omission: «раз в 10 секунд»
+            // is a statement about the interval, and a ramp is a machine for making that sentence false
+            // by the third wave. The knob stays on the panel at 0 so the founder can put it back.
+            //
+            // Durability, drift and the growth ceiling keep climbing level by level exactly as before —
+            // that is the part of §6 this round did not touch.
+            public const int L1ThoughtBudget = 5;
+            public const float L1WaveIntervalSeconds = 10f;
+            public const int L1WaveWeak = 1;
             public const int L1WaveMedium = 0;
             public const int L1WaveStrong = 0;
             public const int L1DurabilityWeak = 3;
             public const int L1DurabilityMedium = 4;
             public const int L1DurabilityStrong = 6;
             public const float L1DriftPxPerSec = 25f;
+            public const float L1PressureRampPercent = 0f;
+            public const float L1ThoughtGrowthPercentPerSec = 10f;
+            public const float L1ThoughtGrowthCap = 12f;
 
-            /// <summary>
-            /// The teaching level's ramp — 0 until 2026-08-08, i.e. a level whose pressure never rose.
-            /// A wave clock that never shortens plus a screen the thoughts drift straight across means
-            /// coverage settles at a plateau, and level 1's plateau was under half the frame: it was
-            /// the one level that could not be lost. 4 % is the gentlest rung that still gets there
-            /// (~124 s of doing nothing) and it stays below level 2's 8 %.
-            /// </summary>
-            public const float L1PressureRampPercent = 4f;
-            public const float L1ThoughtGrowthPercentPerSec = 2f;
-            public const float L1ThoughtGrowthCap = 1.5f;
-
-            public const float L2WaveIntervalSeconds = 4.5f;
-            public const int L2WaveWeak = 0;
-            public const int L2WaveMedium = 2;
+            public const int L2ThoughtBudget = 10;
+            public const float L2WaveIntervalSeconds = 10f;
+            public const int L2WaveWeak = 1;
+            public const int L2WaveMedium = 1;
             public const int L2WaveStrong = 0;
             public const int L2DurabilityWeak = 3;
             public const int L2DurabilityMedium = 5;
             public const int L2DurabilityStrong = 8;
             public const float L2DriftPxPerSec = 35f;
-            public const float L2PressureRampPercent = 8f;
-            public const float L2ThoughtGrowthPercentPerSec = 2.5f;
-            public const float L2ThoughtGrowthCap = 1.6f;
+            public const float L2PressureRampPercent = 0f;
+            public const float L2ThoughtGrowthPercentPerSec = 10f;
+            public const float L2ThoughtGrowthCap = 12f;
 
-            public const float L3WaveIntervalSeconds = 4.5f;
+            public const int L3ThoughtBudget = 15;
+            public const float L3WaveIntervalSeconds = 10f;
             public const int L3WaveWeak = 1;
             public const int L3WaveMedium = 1;
             public const int L3WaveStrong = 1;
@@ -313,13 +397,13 @@ namespace Meditation.Tuning
             public const int L3DurabilityMedium = 6;
             public const int L3DurabilityStrong = 9;
             public const float L3DriftPxPerSec = 45f;
-            public const float L3PressureRampPercent = 15f;
-            public const float L3ThoughtGrowthPercentPerSec = 3f;
-            public const float L3ThoughtGrowthCap = 1.7f;
+            public const float L3PressureRampPercent = 0f;
+            public const float L3ThoughtGrowthPercentPerSec = 10f;
+            public const float L3ThoughtGrowthCap = 12f;
 
-            // Levels 4 and 5 carry the same ladder on. Every number stays inside the slider range the
-            // panel declares (MECHANICS §7), so the founder can tune in both directions.
-            public const float L4WaveIntervalSeconds = 4f;
+            /// <summary>Уровень 4 — предложение владельца инкремента, ждёт «ок» основательницы.</summary>
+            public const int L4ThoughtBudget = 20;
+            public const float L4WaveIntervalSeconds = 10f;
             public const int L4WaveWeak = 1;
             public const int L4WaveMedium = 2;
             public const int L4WaveStrong = 1;
@@ -327,11 +411,13 @@ namespace Meditation.Tuning
             public const int L4DurabilityMedium = 7;
             public const int L4DurabilityStrong = 10;
             public const float L4DriftPxPerSec = 52f;
-            public const float L4PressureRampPercent = 20f;
-            public const float L4ThoughtGrowthPercentPerSec = 3.5f;
-            public const float L4ThoughtGrowthCap = 1.8f;
+            public const float L4PressureRampPercent = 0f;
+            public const float L4ThoughtGrowthPercentPerSec = 10f;
+            public const float L4ThoughtGrowthCap = 12f;
 
-            public const float L5WaveIntervalSeconds = 3.5f;
+            /// <summary>Уровень 5 — предложение владельца инкремента, ждёт «ок» основательницы.</summary>
+            public const int L5ThoughtBudget = 25;
+            public const float L5WaveIntervalSeconds = 10f;
             public const int L5WaveWeak = 2;
             public const int L5WaveMedium = 2;
             public const int L5WaveStrong = 1;
@@ -339,9 +425,43 @@ namespace Meditation.Tuning
             public const int L5DurabilityMedium = 8;
             public const int L5DurabilityStrong = 11;
             public const float L5DriftPxPerSec = 58f;
-            public const float L5PressureRampPercent = 25f;
-            public const float L5ThoughtGrowthPercentPerSec = 4f;
-            public const float L5ThoughtGrowthCap = 2f;
+            public const float L5PressureRampPercent = 0f;
+            public const float L5ThoughtGrowthPercentPerSec = 10f;
+            public const float L5ThoughtGrowthCap = 12f;
+
+            // ---- Тайминги заставок (founder 2026-09-22: «держать дольше») --------------------
+            /// <summary>
+            /// S2, карточка уровня — «экран с рыбкой» (уровень 1). Было 2.5 с: founder не успевала
+            /// прочитать, что на ней написано. [tune]
+            /// </summary>
+            public const float LevelCardSeconds = 4f;
+
+            /// <summary>S4, перебивка «Отлично!» в конце уровня. Было 2 с. [tune]</summary>
+            public const float LevelCompleteSeconds = 3.5f;
+
+            // ---- Переход «круглая рябь» (founder 2026-09-22, п.8) -----------------------------
+            /// <summary>How long the ripple takes to close over the frame (and to open again), s. [tune]</summary>
+            public const float RippleSeconds = 0.9f;
+
+            /// <summary>Width of the wet ring at the ripple's edge, in fractions of the frame. [tune]</summary>
+            public const float RippleRingWidth = 0.14f;
+
+            /// <summary>How far the ripple pushes the picture sideways at its crest, UV. [tune]</summary>
+            public const float RippleAmplitude = 0.035f;
+
+            /// <summary>How many crests the ring carries — one is a wipe, four are water. [tune]</summary>
+            public const float RippleWaves = 3f;
+
+            // ---- Мерцание деталей (founder 2026-09-22, п.7: «активнее») -----------------------
+            /// <summary>
+            /// Amplitude of the details' breathing, as a share of their size. SCREENS says «1.0 → 1.12»
+            /// and 0.12 is what that was; the founder could not see it on a photographic plate, so it is
+            /// a [tune] now and it starts at twice the spec's number.
+            /// </summary>
+            public const float DetailPulseAmplitude = 0.24f;
+
+            /// <summary>Seconds of one breath, in and out. SCREENS's own 1.6 s, faster since the same list.</summary>
+            public const float DetailPulseSeconds = 1.2f;
         }
 
         /// <summary>How many per-level bands exist — one per level of <c>LevelCatalog</c>.</summary>
@@ -414,10 +534,16 @@ namespace Meditation.Tuning
         public static bool ThoughtDrift = Defaults.ThoughtDrift;
         /// <summary>Drift speed, px/s. [tune 20–60]</summary>
         public static float DriftPxPerSec = Defaults.DriftPxPerSec;
-        /// <summary>May thoughts cover the vessel and the detail being dragged? [toggle]</summary>
+        /// <summary>May thoughts cover the vessel and the detail being dragged? [toggle] — ON since 2026-09-22.</summary>
         public static bool ThoughtsCoverVessel = Defaults.ThoughtsCoverVessel;
-        /// <summary>Screen coverage that means defeat, %. [tune 85–100]</summary>
+        /// <summary>Screen coverage that means defeat, %. [tune 50–100]</summary>
         public static float LossOverlapPercent = Defaults.LossOverlapPercent;
+
+        /// <summary>
+        /// «Общий запас мыслей на уровень» — how many the level sends in total, 0 = unlimited.
+        /// [tune per level]
+        /// </summary>
+        public static int ThoughtBudget = Defaults.ThoughtBudget;
 
         /// <summary>
         /// Screen coverage at which the picture goes into «пик хаоса», %. [tune]
@@ -470,6 +596,28 @@ namespace Meditation.Tuning
         public static bool AudioThoughtsByOverlap = Defaults.AudioThoughtsByOverlap;
         /// <summary>Silence on the screens that are not a level (S2/S4/S5/S6). [toggle]</summary>
         public static bool AudioSilentOffLevel = Defaults.AudioSilentOffLevel;
+        /// <summary>Crossfade from one level's background track to the next one's, s. [tune 0–4]</summary>
+        public static float AudioBackgroundCrossfadeSeconds = Defaults.AudioBackgroundCrossfadeSeconds;
+        /// <summary>Exponent bending the «мысли» layer's rise; 1 = the old straight line. [tune 1–4]</summary>
+        public static float AudioThoughtsCurve = Defaults.AudioThoughtsCurve;
+
+        // ---- Тайминги заставок, переход «рябь», мерцание деталей (founder 2026-09-22) ------------
+        /// <summary>How long the level card is held, s. [tune 1.5–8]</summary>
+        public static float LevelCardSeconds = Defaults.LevelCardSeconds;
+        /// <summary>How long the «Отлично!» interstitial is held, s. [tune 1–8]</summary>
+        public static float LevelCompleteSeconds = Defaults.LevelCompleteSeconds;
+        /// <summary>Length of one half of the ripple transition, s. [tune 0.3–2.5]</summary>
+        public static float RippleSeconds = Defaults.RippleSeconds;
+        /// <summary>Width of the ripple's wet ring, fractions of the frame. [tune 0.04–0.4]</summary>
+        public static float RippleRingWidth = Defaults.RippleRingWidth;
+        /// <summary>How far the ripple displaces the picture at its crest, UV. [tune 0–0.12]</summary>
+        public static float RippleAmplitude = Defaults.RippleAmplitude;
+        /// <summary>Crests inside the ring. [tune 1–6]</summary>
+        public static float RippleWaves = Defaults.RippleWaves;
+        /// <summary>Amplitude of the details' pulse, share of their size. [tune 0–0.5]</summary>
+        public static float DetailPulseAmplitude = Defaults.DetailPulseAmplitude;
+        /// <summary>Seconds of one pulse. [tune 0.4–3]</summary>
+        public static float DetailPulseSeconds = Defaults.DetailPulseSeconds;
 
         // ---- Луч-подсветка деталей (SCREENS «Детали в сцене») ------------------------------------
         /// <summary>Seconds between two passes of the light. [tune 4–20]</summary>
@@ -499,6 +647,7 @@ namespace Meditation.Tuning
         // set — so a per-level knob is saved, restored and covered the moment it is declared here.
         // An array would have needed a second serialiser and a second test to trust it.
 
+        public static int L1ThoughtBudget = Defaults.L1ThoughtBudget;
         public static float L1WaveIntervalSeconds = Defaults.L1WaveIntervalSeconds;
         public static int L1WaveWeak = Defaults.L1WaveWeak;
         public static int L1WaveMedium = Defaults.L1WaveMedium;
@@ -511,6 +660,7 @@ namespace Meditation.Tuning
         public static float L1ThoughtGrowthPercentPerSec = Defaults.L1ThoughtGrowthPercentPerSec;
         public static float L1ThoughtGrowthCap = Defaults.L1ThoughtGrowthCap;
 
+        public static int L2ThoughtBudget = Defaults.L2ThoughtBudget;
         public static float L2WaveIntervalSeconds = Defaults.L2WaveIntervalSeconds;
         public static int L2WaveWeak = Defaults.L2WaveWeak;
         public static int L2WaveMedium = Defaults.L2WaveMedium;
@@ -523,6 +673,7 @@ namespace Meditation.Tuning
         public static float L2ThoughtGrowthPercentPerSec = Defaults.L2ThoughtGrowthPercentPerSec;
         public static float L2ThoughtGrowthCap = Defaults.L2ThoughtGrowthCap;
 
+        public static int L3ThoughtBudget = Defaults.L3ThoughtBudget;
         public static float L3WaveIntervalSeconds = Defaults.L3WaveIntervalSeconds;
         public static int L3WaveWeak = Defaults.L3WaveWeak;
         public static int L3WaveMedium = Defaults.L3WaveMedium;
@@ -535,6 +686,7 @@ namespace Meditation.Tuning
         public static float L3ThoughtGrowthPercentPerSec = Defaults.L3ThoughtGrowthPercentPerSec;
         public static float L3ThoughtGrowthCap = Defaults.L3ThoughtGrowthCap;
 
+        public static int L4ThoughtBudget = Defaults.L4ThoughtBudget;
         public static float L4WaveIntervalSeconds = Defaults.L4WaveIntervalSeconds;
         public static int L4WaveWeak = Defaults.L4WaveWeak;
         public static int L4WaveMedium = Defaults.L4WaveMedium;
@@ -547,6 +699,7 @@ namespace Meditation.Tuning
         public static float L4ThoughtGrowthPercentPerSec = Defaults.L4ThoughtGrowthPercentPerSec;
         public static float L4ThoughtGrowthCap = Defaults.L4ThoughtGrowthCap;
 
+        public static int L5ThoughtBudget = Defaults.L5ThoughtBudget;
         public static float L5WaveIntervalSeconds = Defaults.L5WaveIntervalSeconds;
         public static int L5WaveWeak = Defaults.L5WaveWeak;
         public static int L5WaveMedium = Defaults.L5WaveMedium;
@@ -569,6 +722,10 @@ namespace Meditation.Tuning
         /// <summary>Back to the shipped defaults (the panel's "сброс" button).</summary>
         public static void ResetToDefaults()
         {
+            // Everything below is about to be written, so the band's way home is the defaults now —
+            // keeping the old snapshot would let a later LeaveLevelBand undo this reset in part.
+            _standBand = null;
+
             CrankThresholdDegPerSec = Defaults.CrankThresholdDegPerSec;
             GraceMs = Defaults.GraceMs;
             CollectSeconds = Defaults.CollectSeconds;
@@ -603,6 +760,7 @@ namespace Meditation.Tuning
             ThoughtDrift = Defaults.ThoughtDrift;
             DriftPxPerSec = Defaults.DriftPxPerSec;
             ThoughtsCoverVessel = Defaults.ThoughtsCoverVessel;
+            ThoughtBudget = Defaults.ThoughtBudget;
             LossOverlapPercent = Defaults.LossOverlapPercent;
             PeakOverlapPercent = Defaults.PeakOverlapPercent;
 
@@ -634,6 +792,7 @@ namespace Meditation.Tuning
             DetailOutlinePx = Defaults.DetailOutlinePx;
             DetailOutlineStrength = Defaults.DetailOutlineStrength;
 
+            L1ThoughtBudget = Defaults.L1ThoughtBudget;
             L1WaveIntervalSeconds = Defaults.L1WaveIntervalSeconds;
             L1WaveWeak = Defaults.L1WaveWeak;
             L1WaveMedium = Defaults.L1WaveMedium;
@@ -646,6 +805,7 @@ namespace Meditation.Tuning
             L1ThoughtGrowthPercentPerSec = Defaults.L1ThoughtGrowthPercentPerSec;
             L1ThoughtGrowthCap = Defaults.L1ThoughtGrowthCap;
 
+            L2ThoughtBudget = Defaults.L2ThoughtBudget;
             L2WaveIntervalSeconds = Defaults.L2WaveIntervalSeconds;
             L2WaveWeak = Defaults.L2WaveWeak;
             L2WaveMedium = Defaults.L2WaveMedium;
@@ -658,6 +818,7 @@ namespace Meditation.Tuning
             L2ThoughtGrowthPercentPerSec = Defaults.L2ThoughtGrowthPercentPerSec;
             L2ThoughtGrowthCap = Defaults.L2ThoughtGrowthCap;
 
+            L3ThoughtBudget = Defaults.L3ThoughtBudget;
             L3WaveIntervalSeconds = Defaults.L3WaveIntervalSeconds;
             L3WaveWeak = Defaults.L3WaveWeak;
             L3WaveMedium = Defaults.L3WaveMedium;
@@ -670,6 +831,7 @@ namespace Meditation.Tuning
             L3ThoughtGrowthPercentPerSec = Defaults.L3ThoughtGrowthPercentPerSec;
             L3ThoughtGrowthCap = Defaults.L3ThoughtGrowthCap;
 
+            L4ThoughtBudget = Defaults.L4ThoughtBudget;
             L4WaveIntervalSeconds = Defaults.L4WaveIntervalSeconds;
             L4WaveWeak = Defaults.L4WaveWeak;
             L4WaveMedium = Defaults.L4WaveMedium;
@@ -682,6 +844,7 @@ namespace Meditation.Tuning
             L4ThoughtGrowthPercentPerSec = Defaults.L4ThoughtGrowthPercentPerSec;
             L4ThoughtGrowthCap = Defaults.L4ThoughtGrowthCap;
 
+            L5ThoughtBudget = Defaults.L5ThoughtBudget;
             L5WaveIntervalSeconds = Defaults.L5WaveIntervalSeconds;
             L5WaveWeak = Defaults.L5WaveWeak;
             L5WaveMedium = Defaults.L5WaveMedium;
@@ -720,27 +883,115 @@ namespace Meditation.Tuning
         ///
         /// Consequence worth knowing: starting a game level overwrites the shared values the preview
         /// stand also uses. That is deliberate — after this increment the levels are where tuning
-        /// happens, and the stand keeps working because its behaviour never depended on a particular
-        /// number (its tests read <see cref="Defaults"/>).
+        /// happens — but it is only survivable because the stand can get them BACK: see
+        /// <see cref="LeaveLevelBand"/>, which every stand scene calls as it boots.
         /// </summary>
         public static void ApplyLevel(int index)
         {
-            WaveIntervalSeconds = WaveIntervalOf(index);
-            WaveWeak = WaveWeakOf(index);
-            WaveMedium = WaveMediumOf(index);
-            WaveStrong = WaveStrongOf(index);
-            DurabilityWeak = DurabilityWeakOf(index);
-            DurabilityMedium = DurabilityMediumOf(index);
-            DurabilityStrong = DurabilityStrongOf(index);
-            DriftPxPerSec = DriftOf(index);
-            PressureRampPercent = PressureRampPercentOf(index);
-            ThoughtGrowthPercentPerSec = ThoughtGrowthPercentPerSecOf(index);
-            ThoughtGrowthCap = ThoughtGrowthCapOf(index);
+            // The first level of a session puts the stand's own values aside. Only the first: the
+            // panel re-applies the active band on every slider drag (see Write), and a snapshot taken
+            // then would be a snapshot OF the level.
+            if (_standBand == null)
+            {
+                _standBand = new float[BandValues.Length];
+                for (int i = 0; i < BandValues.Length; i++) _standBand[i] = BandValues[i].Read();
+            }
 
-            // «Рост давления внутри уровня» is on exactly when this level's band asks for it —
-            // a 0 % shortening is the same statement as "no ramp", so one number says both.
-            PressureRamp = PressureRampPercent > 0.01f;
+            for (int i = 0; i < BandValues.Length; i++) BandValues[i].Write(BandValues[i].OfLevel(index));
         }
+
+        /// <summary>
+        /// Put back what the stand was running on before some level's band was copied over it —
+        /// «здесь уровня нет», said by every scene of the preview stand as it boots.
+        ///
+        /// Without it a level leaks into the greybox rigs: «Уровень 5» off the stand menu leaves
+        /// <see cref="ThoughtBudget"/> at 25, and «Отгон взмахами», which is a rig for ONE rule and
+        /// must be able to send blobs for as long as the founder watches it, stops sending them after
+        /// the twenty-fifth (Codex, 2026-09-22). The other twelve values of the band are the stand's
+        /// own panel rows, so returning them is the same statement: the stand runs on the numbers its
+        /// own sliders show, not on the ones the last level happened to leave behind.
+        ///
+        /// Restores the values the stand HAD, not <see cref="Defaults"/> — the founder tunes those
+        /// sliders in the scenettes and the panel persists them, and a reset on entry would throw her
+        /// session away every time she walked through a level.
+        ///
+        /// A no-op when no level has run: there is nothing to give back, and the live values are
+        /// whatever the tuning file loaded.
+        /// </summary>
+        public static void LeaveLevelBand()
+        {
+            if (_standBand == null) return;
+
+            for (int i = 0; i < BandValues.Length; i++) BandValues[i].Write(_standBand[i]);
+            _standBand = null;
+        }
+
+        /// <summary>True while a level's band is sitting on the shared values.</summary>
+        public static bool ALevelBandIsApplied => _standBand != null;
+
+        /// <summary>What the stand was running on before the first <see cref="ApplyLevel"/>.</summary>
+        private static float[] _standBand;
+
+        /// <summary>
+        /// One live value a level band owns: how to read it, how to write it, and what level N's band
+        /// says it should be.
+        ///
+        /// Floats for all of them — the band carries counts, seconds and one toggle, and every one of
+        /// those survives a round trip through a float exactly. The alternative (three parallel tables,
+        /// one per type) is three places to forget a value in.
+        /// </summary>
+        private readonly struct BandValue
+        {
+            public readonly Func<float> Read;
+            public readonly Action<float> Write;
+            public readonly Func<int, float> OfLevel;
+
+            public BandValue(Func<float> read, Action<float> write, Func<int, float> ofLevel)
+            {
+                Read = read;
+                Write = write;
+                OfLevel = ofLevel;
+            }
+        }
+
+        /// <summary>
+        /// THE band: every shared value a level owns while it is on screen, in one table.
+        ///
+        /// One table rather than a list of assignments in <see cref="ApplyLevel"/> plus a second list
+        /// somewhere that undoes them, because the second list is the one that falls behind. A value
+        /// added to a level band from now on is applied AND given back by construction, and
+        /// <c>LevelBand_GivesBackEveryValueItTakes</c> holds the line by reflection if anyone writes a
+        /// shared value from ApplyLevel without adding a row here.
+        /// </summary>
+        private static readonly BandValue[] BandValues =
+        {
+            new BandValue(() => ThoughtBudget, v => ThoughtBudget = Mathf.RoundToInt(v),
+                i => ThoughtBudgetOf(i)),
+            new BandValue(() => WaveIntervalSeconds, v => WaveIntervalSeconds = v,
+                i => WaveIntervalOf(i)),
+            new BandValue(() => WaveWeak, v => WaveWeak = Mathf.RoundToInt(v), i => WaveWeakOf(i)),
+            new BandValue(() => WaveMedium, v => WaveMedium = Mathf.RoundToInt(v), i => WaveMediumOf(i)),
+            new BandValue(() => WaveStrong, v => WaveStrong = Mathf.RoundToInt(v), i => WaveStrongOf(i)),
+            new BandValue(() => DurabilityWeak, v => DurabilityWeak = Mathf.RoundToInt(v),
+                i => DurabilityWeakOf(i)),
+            new BandValue(() => DurabilityMedium, v => DurabilityMedium = Mathf.RoundToInt(v),
+                i => DurabilityMediumOf(i)),
+            new BandValue(() => DurabilityStrong, v => DurabilityStrong = Mathf.RoundToInt(v),
+                i => DurabilityStrongOf(i)),
+            new BandValue(() => DriftPxPerSec, v => DriftPxPerSec = v, i => DriftOf(i)),
+            new BandValue(() => PressureRampPercent, v => PressureRampPercent = v,
+                i => PressureRampPercentOf(i)),
+            new BandValue(() => ThoughtGrowthPercentPerSec, v => ThoughtGrowthPercentPerSec = v,
+                i => ThoughtGrowthPercentPerSecOf(i)),
+            new BandValue(() => ThoughtGrowthCap, v => ThoughtGrowthCap = v, i => ThoughtGrowthCapOf(i)),
+
+            // «Рост давления внутри уровня» is on exactly when this level's band asks for it — a 0 %
+            // shortening is the same statement as "no ramp", so one number says both. On the way back
+            // the stand's own toggle returns, which is why it is a row here and not a line derived
+            // after the loop.
+            new BandValue(() => PressureRamp ? 1f : 0f, v => PressureRamp = v > 0.5f,
+                i => PressureRampPercentOf(i) > 0.01f ? 1f : 0f)
+        };
 
         /// <summary>Band index of a level, clamped: the flow never asks for one that is not there.</summary>
         private static int Band(int i) => Mathf.Clamp(i, 0, LevelBands - 1);
@@ -768,6 +1019,16 @@ namespace Meditation.Tuning
                 default: return e;
             }
         }
+
+        /// <summary>
+        /// The level's total supply of thoughts — «общий запас» (founder, 2026-09-22). 5/10/15/20/25.
+        /// </summary>
+        public static int ThoughtBudgetOf(int i) =>
+            Pick(i, L1ThoughtBudget, L2ThoughtBudget, L3ThoughtBudget, L4ThoughtBudget, L5ThoughtBudget);
+
+        /// <summary>How many waves the budget pays for on this level — five, by design.</summary>
+        public static int WavesInBudgetOf(int i) =>
+            Mathf.Max(1, Mathf.CeilToInt(ThoughtBudgetOf(i) / (float)Mathf.Max(1, ThoughtsPerWaveOf(i))));
 
         public static float WaveIntervalOf(int i) =>
             Pick(i, L1WaveIntervalSeconds, L2WaveIntervalSeconds, L3WaveIntervalSeconds,
@@ -819,6 +1080,7 @@ namespace Meditation.Tuning
         // during a level changes that level in the same frame (done contract §7 «правки действуют
         // сразу»), while editing another level's band only changes what happens when you get there.
 
+        public static void SetThoughtBudget(int i, int v) { Write(i, ref L1ThoughtBudget, ref L2ThoughtBudget, ref L3ThoughtBudget, ref L4ThoughtBudget, ref L5ThoughtBudget, v); }
         public static void SetWaveInterval(int i, float v) { Write(i, ref L1WaveIntervalSeconds, ref L2WaveIntervalSeconds, ref L3WaveIntervalSeconds, ref L4WaveIntervalSeconds, ref L5WaveIntervalSeconds, v); }
         public static void SetDrift(int i, float v) { Write(i, ref L1DriftPxPerSec, ref L2DriftPxPerSec, ref L3DriftPxPerSec, ref L4DriftPxPerSec, ref L5DriftPxPerSec, v); }
         public static void SetPressureRampPercent(int i, float v) { Write(i, ref L1PressureRampPercent, ref L2PressureRampPercent, ref L3PressureRampPercent, ref L4PressureRampPercent, ref L5PressureRampPercent, v); }

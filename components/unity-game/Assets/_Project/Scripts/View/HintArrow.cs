@@ -7,12 +7,14 @@ namespace Meditation.View
     /// The curved arrow the teaching hints point with: a quadratic bend drawn as short straight
     /// segments, with two barbs at the far end.
     ///
-    /// Its own class because there are now two things that point: the greybox stand's white
-    /// <see cref="HintCard"/> (which still writes the mock's own words, because the stand is where the
-    /// mechanics are judged without a picture) and the game's <see cref="ButtonHint"/>, whose «card» is
-    /// a drawn button from the art drop. The arrow is the part that is identical, and the beat that
-    /// has no button at all — «отгони мысль», for which the drop ships no «ТРЯСИ» — is nothing BUT an
-    /// arrow, so it had to be usable on its own.
+    /// It belongs to the greybox STAND now, and only to it — to <see cref="HintCard"/>, which still
+    /// writes the mock's own words because the stand is where the mechanics are judged without a
+    /// picture. It was shared with the game's own teaching hints until 2026-09-22, when the founder
+    /// took every arrow off the teaching screens («убрать стрелки все с экранов обучений») and the
+    /// class that drew them there (<c>ButtonHint</c>) went with them.
+    ///
+    /// Kept rather than followed out of the door: the stand is a rig, its cards point at things, and a
+    /// rig that has to be redrawn to keep working is a rig that stops being run.
     /// </summary>
     public sealed class HintArrow
     {

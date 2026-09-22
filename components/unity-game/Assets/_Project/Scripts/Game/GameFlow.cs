@@ -40,11 +40,13 @@ namespace Meditation.Game
 
         private GameScreen _screen;
         private Image _fade;
+        private RippleWipe _ripple;
 
         private GamePhase _pendingPhase;
         private int _pendingLevel;
         private bool _transitioning;
         private float _fadeSeconds;
+        private bool _rippling;
 
         public DesignStage Stage { get; private set; }
 
@@ -74,7 +76,9 @@ namespace Meditation.Game
         /// something a caller can count in frames: a batch run draws hundreds of them a second, and a
         /// screenshot taken twenty frames after a transition came out three-quarters black.
         /// </summary>
-        public float FadeAlpha => _fade != null ? _fade.color.a : 0f;
+        public float FadeAlpha => _rippling
+            ? (_ripple != null ? _ripple.Progress : 0f)
+            : (_fade != null ? _fade.color.a : 0f);
 
         /// <summary>Screens completed since boot — proves the flow really moved, not just re-rendered.</summary>
         public int ScreensShown { get; private set; }
@@ -91,6 +95,10 @@ namespace Meditation.Game
             _fade = Ui.BoxCentred(Stage.Frame, "ScreenFade", 960f, 540f, 1920f, 1080f,
                 new Color(0f, 0f, 0f, 0f));
 
+            // …and the other way a screen can be covered (founder, 2026-09-22, п.8). Built once, here,
+            // for the same reason the fade is: it outlives every screen it is used between.
+            _ripple = new RippleWipe(Stage.Frame);
+
             Audio = new GameAudio(transform);
             Panel = TuningPanel.Create(Stage, "Медитация в спешке", TuningCatalog.Game(), Readout);
 
@@ -100,8 +108,44 @@ namespace Meditation.Game
             exit.ExitScene = PreviewScenes.Game;
             exit.ExitAction = ExitToLauncher;
 
+            // …unless the stand asked for one level (founder 2026-08-19, «запускать уровни по
+            // отдельности»). Then this boot of the game is a debug launch: it opens ON the level, and
+            // its «в меню» goes back to the stand that opened it.
+            int standLevel = StandLevelLaunch.Take();
+            if (standLevel >= 0)
+            {
+                LaunchedFromStand = true;
+                StandLevelIndex = Mathf.Clamp(standLevel, 0, LevelCatalog.Count - 1);
+                exit.ExitScene = PreviewScenes.Menu;
+                exit.ExitAction = ExitToStand;
+
+                // «Без обучения»: the beats are level 1's opening for a player who has never seen the
+                // game, and this door is not for that player. Said through the flow's own flag rather
+                // than through a second rule inside LevelScreen — this is exactly the state a run is
+                // in after level 1 has been played once.
+                NoteTutorialGiven();
+
+                Enter(GamePhase.Level, StandLevelIndex);
+                return;
+            }
+
             Enter(GamePhase.Title, 0);
         }
+
+        /// <summary>
+        /// True when this scene was opened by the stand's «Уровень N», not by the cabinet's launcher.
+        ///
+        /// It changes three things and nothing else: the flow starts ON the level instead of on the
+        /// title, «в меню» lands in the stand's menu instead of handing the screen to the launcher,
+        /// and the two ways a level ends lead back to the stand rather than on through the run. The
+        /// LEVEL itself is untouched — same art, same rules, same three controllers, same tuning band
+        /// (<see cref="Tuning.TuningConfig.ApplyLevel"/> runs from LevelScreen either way), because a
+        /// debug door that opens a slightly different game is a debug door that teaches nothing.
+        /// </summary>
+        public bool LaunchedFromStand { get; private set; }
+
+        /// <summary>Which level the stand asked for, 0-based; -1 on the shipped path.</summary>
+        public int StandLevelIndex { get; private set; } = -1;
 
         private void OnDestroy()
         {
@@ -109,6 +153,8 @@ namespace Meditation.Game
             _screen = null;
             Audio?.Dispose();
             Audio = null;
+            _ripple?.Dispose();
+            _ripple = null;
         }
 
         private void Update()
@@ -149,10 +195,36 @@ namespace Meditation.Game
         {
             if (_transitioning) return;
             _transitioning = true;
+            _rippling = false;
             _fadeSeconds = 0f;
             _pendingPhase = phase;
             _pendingLevel = levelIndex;
         }
+
+        /// <summary>
+        /// The same move, made of water: «победа → наезд камеры на ведёрко → круглая рябь → заставка
+        /// следующего уровня, тем же переходом рябь входит в следующий экран» (founder, 2026-09-22).
+        ///
+        /// Only the victory uses it, and that is the point — a ripple out of the bucket is a sentence
+        /// about the thing the player has just filled. A defeat still cuts to black (it is the drawn
+        /// screen the crank rubs away, and it has its own picture), and so does every other move.
+        /// </summary>
+        /// <param name="from">Design-px point the ripple leaves from — the level's vessel.</param>
+        public void GoWithRipple(GamePhase phase, int levelIndex, Vector2 from)
+        {
+            if (_transitioning) return;
+            _ripple?.SetCentre(from);
+            _transitioning = true;
+            _rippling = true;
+            _fadeSeconds = 0f;
+            _pendingPhase = phase;
+            _pendingLevel = levelIndex;
+        }
+
+        /// <summary>Half a transition — to the covered frame, or back from it — in seconds.</summary>
+        private float HalfSeconds => _rippling
+            ? Mathf.Max(0.05f, TuningConfig.RippleSeconds)
+            : FadeSeconds * 0.5f;
 
         private void TickFade(float deltaTime)
         {
@@ -160,24 +232,45 @@ namespace Meditation.Game
             {
                 if (_fadeSeconds <= 0f) return;
 
-                // Fading back in after a swap.
+                // Uncovering after a swap — the ripple OPENS on the new screen, which is the second
+                // half of the founder's sentence and the reason the flag survives the swap.
                 _fadeSeconds = Mathf.Max(0f, _fadeSeconds - deltaTime);
-                SetFadeAlpha(_fadeSeconds / (FadeSeconds * 0.5f));
+                SetCover(_fadeSeconds / HalfSeconds);
+                if (_fadeSeconds <= 0f) _rippling = false;
                 return;
             }
 
             _fadeSeconds += deltaTime;
-            float half = FadeSeconds * 0.5f;
+            float half = HalfSeconds;
             if (_fadeSeconds < half)
             {
-                SetFadeAlpha(_fadeSeconds / half);
+                SetCover(_fadeSeconds / half);
                 return;
             }
 
-            SetFadeAlpha(1f);
+            SetCover(1f);
             _transitioning = false;
             _fadeSeconds = half;
             Enter(_pendingPhase, _pendingLevel);
+        }
+
+        /// <summary>
+        /// How covered the frame is, 0…1 — through whichever of the two covers this transition uses.
+        /// Exactly one of them is ever non-zero, so «экран закрыт» has one meaning at any moment.
+        /// </summary>
+        private void SetCover(float amount)
+        {
+            float a = Mathf.Clamp01(amount);
+
+            if (_rippling)
+            {
+                SetFadeAlpha(0f);
+                _ripple?.SetProgress(a);
+                return;
+            }
+
+            _ripple?.SetProgress(0f);
+            SetFadeAlpha(a);
         }
 
         private void SetFadeAlpha(float alpha)
@@ -187,6 +280,12 @@ namespace Meditation.Game
             _fade.color = c;
             _fade.raycastTarget = false;
         }
+
+        /// <summary>The ripple itself — the suite shoots the middle of a transition through it.</summary>
+        public RippleWipe Ripple => _ripple;
+
+        /// <summary>True while the transition on screen is the ripple rather than the black fade.</summary>
+        public bool Rippling => _rippling;
 
         private void Enter(GamePhase phase, int levelIndex)
         {
@@ -218,8 +317,10 @@ namespace Meditation.Game
 
             ScreensShown++;
 
-            // The fade sits on top of whatever the new screen just built.
+            // The cover sits on top of whatever the new screen just built — both of them, in the
+            // order they are used: the ripple opens over the fade when a level has just been won.
             _fade.rectTransform.SetAsLastSibling();
+            _ripple?.BringToFront();
         }
 
         // ---- what the screens ask for ---------------------------------------------------------------
@@ -248,13 +349,70 @@ namespace Meditation.Game
         /// <summary>The victory tableau has been held: next level's card, or the finale.</summary>
         public void LevelWon(int levelIndex)
         {
+            // A level opened from the stand is a level, not a run: it ends where it was started from.
+            // Going on to level N+1 would quietly turn «покажи мне метро» into a playthrough.
+            if (LaunchedFromStand)
+            {
+                ExitToStand();
+                return;
+            }
+
+            // «Рябь» out of the bucket the player has just filled (founder, 2026-09-22, п.8).
+            Vector2 vessel = LevelCatalog.At(levelIndex).VesselCentre;
+
             int next = levelIndex + 1;
-            if (next >= LevelCatalog.Count) Go(GamePhase.Finale, levelIndex);
-            else Go(GamePhase.LevelCard, next);
+            if (next >= LevelCatalog.Count) GoWithRipple(GamePhase.Finale, levelIndex, vessel);
+            else GoWithRipple(GamePhase.LevelCard, next, vessel);
         }
 
         /// <summary>The screen was wiped clear (or the auto-retry fired): the same level, from its card.</summary>
-        public void LevelFailed(int levelIndex) => Go(GamePhase.LevelCard, levelIndex);
+        public void LevelFailed(int levelIndex)
+        {
+            // …and from the stand, straight back into the same level: the card announces a level the
+            // player already asked for by name, and <see cref="Enter"/> builds the screen fresh, so
+            // the retry is as clean as the first entry (new LevelScreen, new CollectionRuntime,
+            // ApplyLevel run again).
+            if (LaunchedFromStand)
+            {
+                Go(GamePhase.Level, levelIndex);
+                return;
+            }
+
+            Go(GamePhase.LevelCard, levelIndex);
+        }
+
+        /// <summary>
+        /// Back to the stand's menu — the way out of a level that the stand opened, whether the player
+        /// pressed «в меню», or won it.
+        ///
+        /// Not <see cref="ExitToLauncher"/>: that one's fallback restarts the GAME at its title, and a
+        /// door opened from the stand has to close back onto the stand. What it does instead is the
+        /// stand's own «в меню», the launcher hook included — <see cref="PreviewStandNav.ExitToMenu"/>,
+        /// the same call every scenette's menu button makes, because a level opened from the stand is
+        /// a stand screen for as long as it is up.
+        ///
+        /// ARCADE_INTEGRATION_CONTRACT §5 is untouched: the launcher opens the game scene with nothing
+        /// pending (<see cref="StandLevelLaunch"/>), so on the cabinet this branch is unreachable and
+        /// the button still hands the screen back exactly as the contract says.
+        ///
+        /// The teardown is the same one either way, and it has to be: the run stops updating and its
+        /// screen is disposed with its timers before the scene load, so nothing of this level runs on
+        /// behind the stand's menu.
+        /// </summary>
+        public void ExitToStand()
+        {
+            if (Exited) return;
+            Exited = true;
+
+            Audio?.SilenceNow();
+            _screen?.Dispose();
+            _screen = null;
+            _transitioning = false;
+            _fadeSeconds = 0f;
+            enabled = false;
+
+            PreviewStandNav.ExitToMenu();
+        }
 
         /// <summary>
         /// The one way out — the finale ending, and «в меню» from any screen.
@@ -311,7 +469,9 @@ namespace Meditation.Game
         private void RestartAtTitle()
         {
             _transitioning = false;
+            _rippling = false;
             _fadeSeconds = 0f;
+            _ripple?.SetProgress(0f);
             SetFadeAlpha(0f);
             Enter(GamePhase.Title, 0);
         }
@@ -323,7 +483,8 @@ namespace Meditation.Game
         {
             string screen = _screen != null ? _screen.Readout() : "—";
             return screen + "\n" +
-                   "уровень для панели: У" + (TuningConfig.ActiveLevelIndex + 1);
+                   "уровень для панели: У" + (TuningConfig.ActiveLevelIndex + 1) +
+                   (LaunchedFromStand ? "\nзапуск со стенда: «в меню» → меню стенда" : "");
         }
 
         private static void EnsureArcadeInput()

@@ -1,4 +1,5 @@
 using Meditation.Mechanics;
+using Meditation.Tuning;
 using Meditation.View;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,8 +7,8 @@ using UnityEngine.UI;
 namespace Meditation.Game
 {
     /// <summary>
-    /// S2 «Карточка уровня» — 2.5 s, automatic: the designer's finished render for this level and
-    /// nothing else on it.
+    /// S2 «Карточка уровня» — automatic, held for <see cref="HoldSeconds"/>: the designer's finished
+    /// render for this level and nothing else on it.
     ///
     /// The card used to be assembled here — a dark plate, «Уровень 2» over the setting's name, the
     /// silhouette of the vessel scaled to a common height, and one empty slot per detail. All of it is
@@ -19,7 +20,20 @@ namespace Meditation.Game
     /// </summary>
     public sealed class LevelCardScreen : GameScreen
     {
-        public const float HoldSeconds = 2.5f;
+        /// <summary>
+        /// How long the card stays up, s — a [tune] since the founder's playtest of 2026-09-22.
+        ///
+        /// «Экран с рыбкой держать дольше» was her wording, and the fish is level 1's card
+        /// (<c>screens/level-1-card</c>): a leaping fish over the bucket, the level's name, and one
+        /// line of promise — «Собирай детали в ведёрко и отгоняй мешающие мысли», which is the only
+        /// place in the whole run the game states its own goal in writing. SCREENS fixed the hold at
+        /// 2.5 s when the card was a greybox plate with a title on it; at reading speed that is not
+        /// enough for a sentence, and the founder read none of the five.
+        ///
+        /// One number for all five cards, not one per level: they are the same screen with different
+        /// art, and a card that lingers only on level 1 would read as the game hesitating.
+        /// </summary>
+        public static float HoldSeconds => Mathf.Max(0.2f, TuningConfig.LevelCardSeconds);
 
         private readonly LevelDefinition _level;
 

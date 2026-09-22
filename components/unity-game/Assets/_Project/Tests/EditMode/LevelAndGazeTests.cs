@@ -83,6 +83,144 @@ namespace Meditation.Tests
                 "Прицел обязан отработать КАЖДЫЙ кадр наклона — замирать ему больше не от чего.");
         }
 
+        /// <summary>
+        /// The aim catches a detail ANYWHERE on its drawing, not only near its ink — founder,
+        /// 2026-09-22: «самолётик надо чтобы ловился во всей площади, а не только в центре самого
+        /// самолётика».
+        ///
+        /// Level 1's plane is the case she was holding: 484 × 84 px drawn WITH its contrail, ink centre
+        /// at 0.2497 of the rectangle, so the anchor sits at design x 760 while the drawing runs from
+        /// 639 to 1123. The tail end is 363 px from the anchor against a circle of 130 — under the old
+        /// rule the player could have the whole tail inside the aim and nothing would happen.
+        ///
+        /// Both ends are tried, and each is paired with a NEGATIVE CONTROL at exactly the same distance
+        /// from the anchor in a direction where the plane is not drawn. Without it the test would pass
+        /// just as well on «make the radius huge», which is the other way to make a tail catch and is
+        /// not what was asked for.
+        /// </summary>
+        [Test]
+        public void Gaze_NoticesADetailAnywhereOnItsSprite_AndNotBesideIt(
+            [Values(-1f, 1f)] float towards)
+        {
+            TuningConfig.ResetToDefaults();
+            TuningConfig.GazeDwellSeconds = 0.4f;
+
+            ArtDetail plane = LevelCatalog.At(0).Details[0];
+            Rect sprite = LevelCatalog.RectOf(plane);
+            Vector2 anchor = LevelCatalog.AnchorOf(plane);
+            float radius = GazeSelector.Radius;
+
+            // A point just INSIDE the aim's reach of the far end of the drawing.
+            float edgeX = towards > 0f ? sprite.xMax : sprite.xMin;
+            var onTheSprite = new Vector2(edgeX + towards * (radius - 10f), sprite.center.y);
+
+            float fromAnchor = Vector2.Distance(onTheSprite, anchor);
+            Assert.Greater(fromAnchor, radius * 1.5f,
+                "Точка на краю спрайта оказалась рядом с якорем — проверка ничего не доказывает.");
+
+            var targets = new List<Vector2> { anchor };
+            var shapes = new List<Rect> { sprite };
+            var selectable = new List<bool> { true };
+
+            Assert.IsTrue(NoticesResting(onTheSprite, targets, selectable, shapes),
+                "Прицел накрыл край самолёта (" + onTheSprite + ", до прямоугольника " +
+                Mathf.Sqrt(GazeSelector.SqrDistanceTo(sprite, onTheSprite)).ToString("0") +
+                " px) и ничего не заметил.");
+
+            // …and the negative control: the SAME distance from the anchor, straight down into the sky,
+            // where nothing is drawn.
+            var besideIt = new Vector2(anchor.x, anchor.y + fromAnchor);
+            Assert.Greater(Mathf.Sqrt(GazeSelector.SqrDistanceTo(sprite, besideIt)), radius,
+                "Контрольная точка сама попала на спрайт — контроля не получилось.");
+
+            Assert.IsFalse(NoticesResting(besideIt, targets, selectable, shapes),
+                "Прицел в пустом небе, в " + fromAnchor.ToString("0") +
+                " px от якоря, заметил самолёт — правило стало «большой круг», а не «площадь детали».");
+        }
+
+        /// <summary>
+        /// …and the dwell is untouched by any of it: touching the sprite starts the clock, it does not
+        /// stop it. Half the dwell on the tail is still nothing noticed.
+        /// </summary>
+        [Test]
+        public void Gaze_OnTheEdgeOfASprite_StillOwesTheFullDwell()
+        {
+            TuningConfig.ResetToDefaults();
+            TuningConfig.GazeDwellSeconds = 0.4f;
+
+            ArtDetail plane = LevelCatalog.At(0).Details[0];
+            Rect sprite = LevelCatalog.RectOf(plane);
+            var targets = new List<Vector2> { LevelCatalog.AnchorOf(plane) };
+            var shapes = new List<Rect> { sprite };
+            var selectable = new List<bool> { true };
+
+            var gaze = new GazeSelector { MaxY = 1080f };
+            gaze.Position = new Vector2(sprite.xMax + GazeSelector.Radius - 10f, sprite.center.y);
+
+            for (int i = 0; i < 12; i++)   // 200 ms of a 400 ms dwell
+            {
+                gaze.Tick(Vector2.zero, Dt, targets, selectable, shapes);
+                gaze.Position = new Vector2(sprite.xMax + GazeSelector.Radius - 10f, sprite.center.y);
+                Assert.IsFalse(gaze.NoticedThisTick,
+                    "Половины выдержки хватило — захват по площади не должен трогать dwell.");
+            }
+
+            Assert.AreEqual(0, gaze.HoveredIndex, "Хвост самолёта не попал под прицел вовсе.");
+        }
+
+        /// <summary>
+        /// Two drawings the circle stands on at once are both at distance zero from it, so the rule
+        /// «ближайшая» needs a second question — and the answer is the ink: of two overlapping
+        /// rectangles the one whose anchor is nearer is the one the player is looking at.
+        /// </summary>
+        [Test]
+        public void Gaze_BetweenTwoOverlappingSprites_TakesTheOneWhoseInkIsNearer()
+        {
+            TuningConfig.ResetToDefaults();
+            TuningConfig.GazeDwellSeconds = 0.4f;
+
+            // Two wide rectangles that overlap; the aim stands inside both.
+            var wide = new Rect(400f, 300f, 800f, 200f);
+            var alsoWide = new Rect(600f, 300f, 800f, 200f);
+            var aim = new Vector2(900f, 400f);
+
+            var targets = new List<Vector2> { new Vector2(500f, 400f), new Vector2(1000f, 400f) };
+            var shapes = new List<Rect> { wide, alsoWide };
+            var selectable = new List<bool> { true, true };
+
+            Assert.AreEqual(0f, GazeSelector.SqrDistanceTo(wide, aim), 1e-3f);
+            Assert.AreEqual(0f, GazeSelector.SqrDistanceTo(alsoWide, aim), 1e-3f);
+
+            var gaze = new GazeSelector { MaxY = 1080f };
+            gaze.Position = aim;
+            for (int i = 0; i < 40 && !gaze.NoticedThisTick; i++)
+            {
+                gaze.Tick(Vector2.zero, Dt, targets, selectable, shapes);
+                gaze.Position = aim;
+            }
+
+            Assert.IsTrue(gaze.NoticedThisTick, "Круг стоит на двух деталях и не выбрал ни одной.");
+            Assert.AreEqual(1, gaze.NoticedIndex,
+                "Спор двух наложенных спрайтов решён не по чернилам: прицел на x 900, якоря 500 и 1000.");
+        }
+
+        private static bool NoticesResting(Vector2 spot, IReadOnlyList<Vector2> targets,
+            IReadOnlyList<bool> selectable, IReadOnlyList<Rect> shapes)
+        {
+            var gaze = new GazeSelector { MaxY = 1080f };
+            gaze.Position = spot;
+
+            // Twice the dwell, the stick at rest and the aim parked.
+            for (int i = 0; i < 48; i++)
+            {
+                gaze.Tick(Vector2.zero, Dt, targets, selectable, shapes);
+                if (gaze.NoticedThisTick) return true;
+                gaze.Position = spot;
+            }
+
+            return false;
+        }
+
         [Test]
         public void Gaze_StaysInsideTheSceneZone()
         {

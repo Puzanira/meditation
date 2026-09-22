@@ -22,6 +22,7 @@ namespace Meditation.Mechanics
         private float _waveTimer;
         private int _labelCursor;
         private int _wavesSpawned;
+        private int _spentFromBudget;
 
         public ThoughtField(int seed = 12345)
         {
@@ -35,6 +36,43 @@ namespace Meditation.Mechanics
 
         /// <summary>Waves spawned since the last <see cref="Clear"/> (drives the pressure ramp).</summary>
         public int WavesSpawned => _wavesSpawned;
+
+        // ---- общий запас мыслей на уровень (founder, плейтест 2026-09-22) -----------------------
+
+        /// <summary>
+        /// How many thoughts this level still has to send — «общий запас», the founder's «волны».
+        /// <see cref="Unlimited"/> when the level has no budget at all, which is what the greybox
+        /// scenettes run on: a rig for one rule has to be able to go on sending blobs indefinitely.
+        ///
+        /// Counted on the WAVES only. The tutorial's own cat (<see cref="SpawnAt"/>) is a scripted
+        /// beat of the lesson and not part of the level's supply, and the defeat wallpaper
+        /// (<see cref="CoverScreen"/>) is not thoughts at all — it is the SCREENS S5 picture the crank
+        /// rubs off. Charging either to the budget would mean a level 1 that teaches with a fifth of
+        /// its own interference, or a defeat screen that could not be drawn because the level had
+        /// already spent everything it had.
+        /// </summary>
+        public int BudgetLeft
+        {
+            get
+            {
+                int budget = TuningConfig.ThoughtBudget;
+                if (budget <= 0) return Unlimited;
+                return Mathf.Max(0, budget - _spentFromBudget);
+            }
+        }
+
+        /// <summary>«Запас не ограничен» — what <see cref="BudgetLeft"/> answers on the stand.</summary>
+        public const int Unlimited = int.MaxValue;
+
+        /// <summary>Thoughts this level has already sent out of its supply.</summary>
+        public int SpentFromBudget => _spentFromBudget;
+
+        /// <summary>
+        /// True once the level has sent everything it had AND the screen is clear of it — «мысли
+        /// кончились», the state a player reaches by playing well. Always false without a budget.
+        /// </summary>
+        public bool ThoughtsAreOver =>
+            TuningConfig.ThoughtBudget > 0 && BudgetLeft <= 0 && _thoughts.Count == 0;
 
         /// <summary>
         /// Interval before the next wave. With the pressure ramp [toggle] on, every wave inside the
@@ -80,6 +118,7 @@ namespace Meditation.Mechanics
             _thoughts.Clear();
             _waveTimer = 0f;
             _wavesSpawned = 0;
+            _spentFromBudget = 0;
             OverlapPercent = 0f;
         }
 
@@ -97,7 +136,10 @@ namespace Meditation.Mechanics
         {
             if (deltaTime > 0f)
             {
-                if (spawningAllowed)
+                // …and only while the level still HAS thoughts to send. A budget that has run out is
+                // not a pause: the clock stops with it, so that turning the отгон on late in a level
+                // cannot be punished by five waves arriving at once the moment it is switched back.
+                if (spawningAllowed && BudgetLeft > 0)
                 {
                     _waveTimer -= deltaTime;
                     if (_waveTimer <= 0f)
@@ -120,13 +162,48 @@ namespace Meditation.Mechanics
                     }
 
                     if (TuningConfig.ThoughtDrift)
-                        t.Position += t.DriftDirection * (TuningConfig.DriftPxPerSec * deltaTime);
+                        t.Position = HeldInFrame(
+                            t.Position + t.DriftDirection * (TuningConfig.DriftPxPerSec * deltaTime),
+                            t.Size);
                 }
             }
 
             if (hits > 0) ApplyHits(hits, stick);
 
             OverlapPercent = ComputeOverlapPercent();
+        }
+
+        /// <summary>
+        /// Where a drifting thought is allowed to be: far enough in that its own rectangle is still on
+        /// the screen, and dead centre once it has grown bigger than the screen.
+        ///
+        /// **This is new with the wave budget (founder, 2026-09-22) and it is the rule that makes the
+        /// budget work at all.** «Дрейф к центру» was implemented as a direction and nothing else: a
+        /// thought was given a unit vector at the far edge of the frame and then moved along it for
+        /// ever, so it crossed the centre and sailed out the opposite side. That was invisible while a
+        /// level sent waves until somebody stopped it — there was always a fresh blob behind the one
+        /// leaving — and it is fatal the moment a level has five thoughts and no more: the first
+        /// simulation of the new numbers had level 1 sitting at 0 % coverage after three minutes,
+        /// because everything it owned had drifted off the right-hand edge.
+        ///
+        /// Clamped rather than stopped at the centre: five blobs piled on one point waste four of
+        /// them. Held against the frame each one parks just inside the edge it came in from, and as
+        /// growth takes it past the size of the screen the same clamp walks it to the middle — which
+        /// is «мысли разрастаются и заполняют экран», arrived at by geometry rather than by a second
+        /// rule.
+        /// </summary>
+        public static Vector2 HeldInFrame(Vector2 position, Vector2 size)
+        {
+            float halfW = size.x * 0.5f;
+            float halfH = size.y * 0.5f;
+
+            return new Vector2(
+                halfW * 2f >= ScreenWidth
+                    ? ScreenWidth * 0.5f
+                    : Mathf.Clamp(position.x, halfW, ScreenWidth - halfW),
+                halfH * 2f >= ScreenHeight
+                    ? ScreenHeight * 0.5f
+                    : Mathf.Clamp(position.y, halfH, ScreenHeight - halfH));
         }
 
         /// <summary>Land <paramref name="hits"/> hits according to the targeting [toggle].</summary>
@@ -279,11 +356,21 @@ namespace Meditation.Mechanics
             int strong = Mathf.Max(0, TuningConfig.WaveStrong);
             if (weak + medium + strong <= 0) weak = 1;
 
+            // The supply is spent in the wave's own order — weak first, then medium, then strong — so
+            // a last, partial wave is the LIGHT end of the composition rather than an arbitrary slice
+            // of it. (With the shipped budgets the division is exact and no wave is ever partial; this
+            // is what happens when the founder moves the budget slider off a multiple of the wave.)
+            int left = BudgetLeft;
+            weak = Mathf.Min(weak, left); left -= weak;
+            medium = Mathf.Min(medium, left); left -= medium;
+            strong = Mathf.Min(strong, left);
+
             Thought last = null;
             for (int i = 0; i < weak; i++) last = Spawn(ThoughtStrength.Weak);
             for (int i = 0; i < medium; i++) last = Spawn(ThoughtStrength.Medium);
             for (int i = 0; i < strong; i++) last = Spawn(ThoughtStrength.Strong);
 
+            _spentFromBudget += weak + medium + strong;
             _wavesSpawned++;
             return last;
         }

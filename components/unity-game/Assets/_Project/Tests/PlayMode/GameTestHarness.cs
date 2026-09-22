@@ -303,6 +303,13 @@ namespace Meditation.Tests
             TuningConfig.WaveStrong = 1;
             // The ramp shortens an interval that is already at its floor — one less thing in the way.
             TuningConfig.PressureRamp = false;
+
+            // …and the level's SUPPLY is lifted (founder 2026-09-22, «общий запас мыслей»). Since that
+            // playtest a level sends a fixed number of thoughts and stops — five on level 1 — so a
+            // helper that only winds the CLOCK would wait ninety seconds for a sixth blob that is
+            // never coming. 0 is «no budget», the same value the greybox scenettes run on, and it is
+            // a panel row like the other four this helper moves.
+            TuningConfig.ThoughtBudget = 0;
             screen.Runtime.Field.ResetWaveTimer(0f);
 
             // Hands off the sensors: the отгон would pop the waves as fast as they roll in.

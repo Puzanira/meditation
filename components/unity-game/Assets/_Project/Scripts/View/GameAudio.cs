@@ -30,10 +30,18 @@ namespace Meditation.View
 
         private readonly GameObject _host;
         private readonly AudioSource _background;
+
+        /// <summary>
+        /// The second background source — the track a level change is fading OUT of (founder,
+        /// 2026-09-22, п.10). Two sources rather than one, because a crossfade is by definition two
+        /// clips sounding at once and an <c>AudioSource</c> plays one.
+        /// </summary>
+        private readonly AudioSource _backgroundOut;
         private readonly AudioSource _meditation;
         private readonly AudioSource _thoughts;
 
         private int _loadedLevel = -1;
+        private int _loadedOutLevel = AudioMix.NoTrack;
 
         public GameAudio(Transform parent)
         {
@@ -43,14 +51,18 @@ namespace Meditation.View
             EnsureAListener();
 
             _background = MakeSource("Background", null);
+            _backgroundOut = MakeSource("BackgroundOut", null);
             _meditation = MakeSource("Meditation", ArtLibrary.Clip(MeditationKey));
             _thoughts = MakeSource("Thoughts", ArtLibrary.Clip(ThoughtsKey));
         }
 
         public AudioMix Mix { get; } = new AudioMix();
 
-        /// <summary>The three sources, for the suite: it checks clips and volumes, not the speakers.</summary>
+        /// <summary>The sources, for the suite: it checks clips and volumes, not the speakers.</summary>
         public AudioSource BackgroundSource => _background;
+
+        /// <summary>The outgoing track of a level change — silent and clipless outside one.</summary>
+        public AudioSource BackgroundOutSource => _backgroundOut;
         public AudioSource MeditationSource => _meditation;
         public AudioSource ThoughtsSource => _thoughts;
 
@@ -91,8 +103,21 @@ namespace Meditation.View
         {
             Mix.Tick(deltaTime, scene);
 
+            // A level change hands the CURRENT source over to the outgoing one and loads the new track
+            // next to it, so both are audible while the mix crossfades them. The source objects never
+            // swap roles — the clips move — because everything that reads this class by name
+            // (`BackgroundSource`) means «the track of the level we are on».
             if (Mix.BackgroundLevelIndex != _loadedLevel)
             {
+                if (_loadedLevel >= 0 && Mix.SwappingTracks)
+                {
+                    _loadedOutLevel = _loadedLevel;
+                    _backgroundOut.Stop();
+                    _backgroundOut.clip = _background.clip;
+                    _backgroundOut.timeSamples = SafeSamples(_background);
+                    if (_backgroundOut.clip != null) _backgroundOut.Play();
+                }
+
                 _loadedLevel = Mix.BackgroundLevelIndex;
                 AudioClip clip = ArtLibrary.Clip(BackgroundKeyOf(_loadedLevel));
                 if (clip != _background.clip)
@@ -103,9 +128,28 @@ namespace Meditation.View
                 }
             }
 
-            Apply(_background, Mix.Background);
+            if (!Mix.SwappingTracks && _loadedOutLevel != AudioMix.NoTrack)
+            {
+                _loadedOutLevel = AudioMix.NoTrack;
+                Stop(_backgroundOut);
+                _backgroundOut.clip = null;
+            }
+
+            Apply(_background, Mix.BackgroundIn);
+            Apply(_backgroundOut, Mix.BackgroundOut);
             Apply(_meditation, Mix.Meditation);
             Apply(_thoughts, Mix.Thoughts);
+        }
+
+        /// <summary>
+        /// Where the handed-over track is, in samples — so the old level's music goes on from where it
+        /// was rather than restarting under the new one. Guarded because a streamed clip that has not
+        /// started yet reports a position past its own length.
+        /// </summary>
+        private static int SafeSamples(AudioSource source)
+        {
+            if (source == null || source.clip == null) return 0;
+            return Mathf.Clamp(source.timeSamples, 0, Mathf.Max(0, source.clip.samples - 1));
         }
 
         /// <summary>
@@ -117,8 +161,10 @@ namespace Meditation.View
         {
             Mix.SilenceNow();
             Stop(_background);
+            Stop(_backgroundOut);
             Stop(_meditation);
             Stop(_thoughts);
+            _loadedOutLevel = AudioMix.NoTrack;
         }
 
         public void Dispose()

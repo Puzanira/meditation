@@ -62,18 +62,30 @@ namespace Meditation.Tests
 
             DesignStage stage = StandTestHarness.Stage();
             StandTestHarness.AssertVisible(StandTestHarness.Find(stage, "TitleBackground"), "Титул");
-            StandTestHarness.AssertVisible(StandTestHarness.Find(stage, "StartButton"), "Кнопка НАЧАТЬ");
 
             // The drop's own render, not a fallback plate: a missing sprite would leave a flat sky
             // that looks like a title and proves nothing.
             var title = (TitleScreen)flow.Screen;
             Assert.IsNotNull(title.Background.sprite, "Титул рисуется не картинкой дропа.");
-            Assert.IsNotNull(title.StartButton.sprite, "Кнопка НАЧАТЬ — не картинка дропа.");
 
-            // …and it stands where превью.png puts it: centred, in the lower third.
-            Rect button = stage.DesignRectOf(StandTestHarness.Find(stage, "StartButton"));
-            Assert.AreEqual(TitleScreen.ButtonCentre.x, button.center.x, 20f, "Кнопка не по центру.");
-            Assert.AreEqual(TitleScreen.ButtonCentre.y, button.center.y, 20f, "Кнопка не на своём месте.");
+            // …and the drawn НАЧАТЬ button is GONE (founder, playtest 2026-09-22). A button on a
+            // cabinet that has nothing to press it with is an instruction to do the wrong thing, and
+            // she stood in front of this screen looking for the mouse.
+            Assert.IsNull(StandTestHarness.FindOrNull(stage, "StartButton"),
+                "Кнопка НАЧАТЬ снова на титуле — её убрали решением founder 2026-09-22.");
+
+            // What is left in its place is an ANCHOR: the render was composed with a hole at these
+            // coordinates and the designer's handle animation is what goes into it. It must stay empty
+            // — an anchor that grew an Image again is the button back under another name.
+            Assert.IsNotNull(title.StartAnchor, "Якорь под анимацию Кати не построен.");
+            Assert.AreEqual(TitleScreen.ButtonCentre.x,
+                stage.DesignRectOf(title.StartAnchor).center.x, 2f, "Якорь не по центру.");
+            Assert.AreEqual(TitleScreen.ButtonCentre.y,
+                stage.DesignRectOf(title.StartAnchor).center.y, 2f, "Якорь не на месте кнопки.");
+            Assert.IsNull(title.StartAnchor.GetComponent<UnityEngine.UI.Graphic>(),
+                "Якорь под анимацию снова что-то рисует — это вернувшаяся кнопка.");
+            Assert.AreEqual(0, title.StartAnchor.childCount,
+                "В якоре под анимацию что-то построено — он обязан приезжать пустым.");
 
             yield return GameTestHarness.Frames(30);
             LogAssert.NoUnexpectedReceived();
@@ -149,10 +161,11 @@ namespace Meditation.Tests
         /// lists must not overlap.
         ///
         /// That is not a tautology waiting to happen. The lines the founder asked for say almost exactly
-        /// what two withdrawn ones said («Крути ручку, чтобы начать», «Тряси джойстик!»), because they
-        /// are answers to the same two questions; the difference is that those were the greybox's own
-        /// captions and the drop baked their meaning into pictures. A live line that drifts back into
-        /// being a withdrawn one is the mistake this catches, and it is a plausible one.
+        /// what withdrawn ones said («Крути ручку, чтобы начать», «Тряси джойстик!»), because they are
+        /// answers to the same questions; the difference is a word — the panel calls that control a
+        /// крутилка, and the ручка wording went back into Withdrawn on 2026-09-22 when the founder
+        /// said so. A live line that drifts back into being a withdrawn one is the mistake this
+        /// catches, and «ручка» proves how plausible it is: it has now been live twice.
         /// </summary>
         [Test]
         public void TheLiveLines_AreNotTheWithdrawnOnesComingBack()
@@ -243,8 +256,15 @@ namespace Meditation.Tests
             // It names the dynamo, because the dynamo is what the code actually waits for.
             Assert.AreEqual(720f, TitleScreen.StartDegrees, 1e-3f,
                 "Старт больше не два оборота — подпись титула стала неправдой.");
-            StringAssert.Contains("ручку", title.StartLabel.text,
-                "Подпись не называет ручку, а старт — это она.");
+
+            // …and it names it by the PANEL's word. «Крутилка», not «ручка» (founder, 2026-09-22;
+            // system/CONTROLS_BRIEF.md). The negative half is the whole point: the old wording is a
+            // withdrawn line now, and a caption that drifts back to it is naming a control the cabinet
+            // does not have.
+            StringAssert.Contains("крутилку", title.StartLabel.text,
+                "Подпись не называет крутилку, а старт — это она.");
+            StringAssert.DoesNotContain("ручку", title.StartLabel.text,
+                "Титул снова зовёт крутилку «ручкой» — на пульте такого органа нет.");
 
             // …and it is not one of the lines the drop withdrew.
             foreach (string withdrawn in GameTexts.Withdrawn)
@@ -487,51 +507,91 @@ namespace Meditation.Tests
 
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
 
-            // Beat 1 «НАВОДИ»: nothing is noticed FOR the player any more — the gaze is what the beat
-            // asks for, and until it lands the level is a still picture with a button beside a detail.
-            Assert.AreEqual(TutorialBeat.Aim, screen.Beat, "Обучение обязано начинаться с «НАВОДИ».");
+            // Beat 1 «наводи»: nothing is noticed FOR the player any more — the gaze is what the beat
+            // asks for, and until it lands the level is a still picture with one sentence on it.
+            Assert.AreEqual(TutorialBeat.Aim, screen.Beat, "Обучение обязано начинаться с наводки.");
             Assert.AreEqual(-1, screen.Runtime.NoticedIndex,
                 "Первый бит просит НАВЕСТИСЬ — замечать деталь за игрока нельзя.");
-            AssertHintIs(screen, ArtScreens.ButtonAim, "НАВОДИ");
+            AssertBeatPlateIs(screen, GameTexts.BeatAim, "наводи");
 
             yield return GameTestHarness.Idle(fake, 30);
             Assert.AreEqual(0, screen.Runtime.Field.Thoughts.Count,
                 "До отбитой мысли волны спавниться не должны.");
 
-            // Beat 2 «КРУТИ РУЧКУ» + «ТАЩИ»: two drawn buttons at once — the hand, and what it is
-            // doing it to (SCREENS §Обучение п.2).
+            // Beat 2 «крути крутилку и тащи»: one sentence for both hands. The two drawn buttons that
+            // stood here — «КРУТИ РУЧКУ» at the thread and «ТАЩИ» walking beside the travelling detail
+            // — left the teaching screens on 2026-09-22 (founder); the negative check that they stay
+            // gone is TheTutorial_DrawsNothingButItsPlates.
             yield return GameTestHarness.NoticeSomething(fake, screen);
             Assert.AreEqual(TutorialBeat.Crank, screen.Beat, "После наводки должен идти бит «крути».");
-            AssertHintIs(screen, ArtScreens.ButtonCrank, "КРУТИ РУЧКУ");
-            Assert.IsTrue(screen.View.SecondHint.IsShown, "Рядом с едущей деталью нет кнопки «ТАЩИ».");
-            Assert.AreEqual(ArtLibrary.Get(ArtScreens.ButtonDrag), screen.View.SecondHint.Button.sprite,
-                "Вторая кнопка бита — не «ТАЩИ».");
+            AssertBeatPlateIs(screen, GameTexts.BeatCollect, "крути крутилку и тащи");
 
-            // Beat 3: the first detail lands, one thought appears ON the next one, and the beat has no
-            // button at all — the drop ships no «ТРЯСИ», so it is an arrow at the sensors.
-            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            // …and the same check against the DETAIL, which is the return of the design skeptic on
+            // 2026-09-22 (blocker Б1): the plate was placed clear of a 160×160 box at the detail's
+            // STARTING position, and the detail then drove up its thread and under it — 16 px of gap
+            // on frame 04 with the nose of the aeroplane sticking out. A plate that never moves has to
+            // be placed against the whole travel, not against a point of it
+            // (<c>LevelScreen.AddDetailTrack</c>).
+            // …and it runs the WHOLE travel, not a fixed 45 frames of it. 45 frames of a batch run is
+            // three quarters of a second, i.e. the first eighth of the thread — the detail had not yet
+            // reached the plate when the loop gave up, which is how frame 04 went to the gate with the
+            // aeroplane buried under the sentence.
+            int frames = 0;
+            float deadline = Time.realtimeSinceStartup + GameTestHarness.DefaultPatienceSeconds;
+            while (screen.Beat == TutorialBeat.Crank && Time.realtimeSinceStartup < deadline)
+            {
+                fake.Next = new BackendSnapshot { CrankDeltaDegrees = GameTestHarness.CrankPerFrame };
+                yield return null;
+                frames++;
+                if (screen.Beat != TutorialBeat.Crank) break;
+
+                Rect plate = screen.View.BeatPlate.CardRect;
+                int riding = screen.Runtime.NoticedIndex;
+                Assert.GreaterOrEqual(riding, 0, "Едущая деталь потерялась посреди бита.");
+                Rect sprite = StandTestHarness.Stage().DesignRectOf(
+                    screen.View.DetailImages[riding].rectTransform);
+                Assert.IsFalse(StandTestHarness.Overlaps(plate, sprite),
+                    "Подпись бита сбора легла на едущую деталь «" +
+                    screen.Level.Details[riding].Name + "» на прогрессе " +
+                    screen.Runtime.Collector.Progress01.ToString("0.00") +
+                    ": плашка " + plate + ", деталь " + sprite +
+                    " (блокер Б1, возврат дизайн-скептика 2026-09-22).");
+            }
+            fake.Next = new BackendSnapshot();
+
+            Assert.Greater(frames, 45,
+                "Бит сбора кончился за " + frames + " кадров — путь детали толком не проверен.");
+
+            // Beat 3: the first detail lands, one thought appears ON the next one, and the beat says
+            // what the blob IS and where the hand goes. The detail that ends the beat is the one the
+            // loop above has just cranked all the way in.
             Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "После первой детали должен идти бит отгона.");
             Assert.AreEqual(1, screen.Runtime.Field.Thoughts.Count, "Должна быть ровно одна мысль.");
-            Assert.IsFalse(screen.View.Hint.Button.gameObject.activeSelf,
-                "Кнопки «ТРЯСИ» в дропе нет — на этом бите текста быть не должно.");
-            Assert.IsTrue(screen.View.Hint.IsShown, "Бит отгона обязан показывать хотя бы стрелку.");
+            AssertBeatPlateIs(screen, GameTexts.SwipeHint, "отгон");
 
             int covered = screen.SwipeBeatDetailIndex;
             Assert.GreaterOrEqual(covered, 0, "Мысль обучения села не на деталь.");
             Assert.IsTrue(screen.Runtime.Field.IsCovered(screen.Level.Details[covered].Home),
                 "Мысль обучения не накрывает деталь, сбор которой должна блокировать.");
 
-            // Beaten off — the waves start and the tutorial is over (SCREENS §Обучение п.4; the clock
-            // that used to start here went out with the timer, 2026-08-07).
+            // Beaten off — the waves start, and the FOURTH beat says what they are for (founder,
+            // 2026-09-22). It blocks nothing: the plate is up and the level is already running
+            // underneath it.
             yield return GameTestHarness.SwipeUntil(fake,
                 () => screen.Runtime.Field.Thoughts.Count == 0, "мысль отбита");
             yield return GameTestHarness.Frames(3);
 
-            Assert.AreEqual(TutorialBeat.Done, screen.Beat);
-            Assert.IsFalse(screen.View.Hint.IsShown, "Обучение кончилось — подсказок быть не должно.");
+            Assert.AreEqual(TutorialBeat.Whole, screen.Beat, "Четвёртый бит обучения не начался.");
+            AssertBeatPlateIs(screen, GameTexts.BeatWhole, "весь уровень");
 
             yield return GameTestHarness.Until(() => screen.Runtime.Field.Thoughts.Count > 0,
                 "волны пошли после обучения");
+
+            // …and then it leaves on its own clock and the lesson is over for good.
+            yield return GameTestHarness.Until(() => screen.Beat == TutorialBeat.Done,
+                "обучение закончилось", LevelScreen.WholeBeatSeconds + 6f);
+            Assert.IsFalse(screen.View.BeatPlate.IsShown,
+                "Обучение кончилось — плашка обязана уйти с экрана.");
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -726,12 +786,16 @@ namespace Meditation.Tests
         /// arithmetic (which <c>LevelCatalogTests</c> holds separately).
         ///
         /// Two different claims, and both were needed: the arithmetic says the placement rule is sound,
-        /// this says the level actually placed the button where the rule put it. The frame the design
+        /// this says the level actually placed the hint where the rule put it. The frame the design
         /// gate judged had «КРУТИ РУЧКУ» lying across the whole shark fin and the left edge of the
         /// bucket, and every arithmetic test in the suite was green at the time.
+        ///
+        /// It used to be checked on the drawn BUTTON of each beat. The buttons are off the teaching
+        /// screens (founder, 2026-09-22) and the plate is the only thing left, so the guard moves to
+        /// the plate — which is what blocker Б1 was really about either way: «деталь видна».
         /// </summary>
         [UnityTest]
-        public IEnumerator TheTeachingButtons_CoverNoDetail_NoVessel_AndNoHudWidget()
+        public IEnumerator TheTeachingPlates_CoverNoDetail_NoVessel_AndNoHudWidget()
         {
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
@@ -741,13 +805,88 @@ namespace Meditation.Tests
             LevelDefinition level = screen.Level;
 
             Assert.AreEqual(TutorialBeat.Aim, screen.Beat);
-            AssertHintPlateIsClear(screen.View.Hint.Rect, level, "НАВОДИ");
+            AssertHintPlateIsClear(screen.View.BeatPlate.Rect, level, GameTexts.BeatAim);
 
             yield return GameTestHarness.NoticeSomething(fake, screen);
             Assert.AreEqual(TutorialBeat.Crank, screen.Beat);
-            AssertHintPlateIsClear(screen.View.Hint.Rect, level, "КРУТИ РУЧКУ");
+            AssertHintPlateIsClear(screen.View.BeatPlate.Rect, level, GameTexts.BeatCollect);
 
             LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// …and a teaching beat draws NOTHING ELSE: no caps button, no turquoise arrow, no pictogram.
+        ///
+        /// The negative half of the founder's order of 2026-09-22 — «убрать стрелки все с экранов
+        /// обучений… остальные элементы подсказок убрать» — and the half that can rot silently, because
+        /// a hint that comes back comes back as «just one arrow, to make it clearer». So the claim is
+        /// made against the SCENE and not against the classes that were deleted: every beat of the
+        /// lesson is walked, and the only thing the hint layer is allowed to have drawing components on
+        /// it is the plate with its two labels.
+        ///
+        /// The MOUNT is asserted at the same time, and asserted to be empty (<c>LevelView.BeatAnchor</c>):
+        /// it is where Катя's animations will stand, and an anchor that quietly grew an Image again
+        /// would be the button back — the same trap the title's НАЧАТЬ left behind.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheTutorial_DrawsNothingButItsPlates()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+
+            AssertOnlyThePlateDraws(screen, "бит наводки");
+
+            yield return GameTestHarness.NoticeSomething(fake, screen);
+            Assert.AreEqual(TutorialBeat.Crank, screen.Beat);
+            AssertOnlyThePlateDraws(screen, "бит сбора");
+
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            yield return GameTestHarness.Idle(fake, 4);
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat);
+            AssertOnlyThePlateDraws(screen, "бит отгона");
+
+            // …and the отгон's mount is on the sensor panel, which is the one thing this beat is about
+            // that is not on the screen at all.
+            Vector2 mount = StandTestHarness.Stage().DesignRectOf(screen.View.BeatAnchor).center;
+            Assert.Less(Vector2.Distance(mount, LevelScreen.SensorsCue), 1.5f,
+                "Якорь бита отгона уехал с панели датчиков (" + mount +
+                " против " + LevelScreen.SensorsCue + ") — анимациям Кати вставать некуда.");
+
+            yield return GameTestHarness.SwipeUntil(fake,
+                () => screen.Runtime.Field.Thoughts.Count == 0, "мысль отбита");
+            yield return GameTestHarness.Frames(3);
+            Assert.AreEqual(TutorialBeat.Whole, screen.Beat);
+            AssertOnlyThePlateDraws(screen, "финальный бит");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private static void AssertOnlyThePlateDraws(LevelScreen screen, string beat)
+        {
+            HintPlate plate = screen.View.BeatPlate;
+            Assert.IsTrue(plate.IsShown, beat + ": плашка обучения не показана.");
+
+            // The mount draws nothing at all — no Image, no Text, no Graphic of any kind.
+            foreach (UnityEngine.UI.Graphic drawn in
+                     screen.View.BeatAnchor.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+                Assert.Fail(beat + ": на якоре бита снова что-то рисуется (" + drawn.name +
+                    ", " + drawn.GetType().Name + ") — стрелки и кнопки убраны решением founder 2026-09-22.");
+
+            // …and on the hint layer itself, the only graphics are the plate's own three: the rule, the
+            // slab inside it, and the two labels.
+            var allowed = new System.Collections.Generic.HashSet<Transform> { plate.Rect };
+            foreach (Transform child in plate.Rect) allowed.Add(child);
+
+            foreach (UnityEngine.UI.Graphic drawn in
+                     screen.View.MessageLayer.GetComponentsInChildren<UnityEngine.UI.Graphic>(false))
+            {
+                if (allowed.Contains(drawn.transform)) continue;
+                Assert.Fail(beat + ": поверх обучения рисуется «" + drawn.name + "» (" +
+                    drawn.GetType().Name + ") — на экранах обучения остаются только плашки.");
+            }
         }
 
         private static void AssertHintPlateIsClear(RectTransform plateRect,
@@ -769,139 +908,23 @@ namespace Meditation.Tests
         }
 
         /// <summary>
-        /// «ТАЩИ» rides the detail it names, and never lies on the progress ring or on the thread.
+        /// The words of the отгон beat: «Это навязчивые мысли…» on a teaching plate, beside the
+        /// thought, off the art.
         ///
-        /// The gate's frame had it standing where the detail STARTED: the detail drove out from under
-        /// its own label, and the plate sat across the ring — the only thing on screen that reports what
-        /// the handle is doing. SCREENS §Обучение п.2 says «рядом с едущей деталью».
+        /// The beat had no words at all until 2026-08-08 — the drop shipped no «ТРЯСИ» — and the
+        /// founder, playing it, did not know what the arrow was asking her to do. An arrow that ends on
+        /// a piece of furniture names a PLACE; the sentence names the movement, and the movement is the
+        /// whole mechanic. On 2026-09-22 the arrow went too, and the sentence is what the beat is.
+        ///
+        /// Two tests stood beside this one and are gone with the pictures they measured: the отгон
+        /// stroke's own geometry (turquoise, clear of everything the thought paints, always landing on
+        /// the same point of the sensor panel) and «ТАЩИ» riding the travelling detail off the ring and
+        /// off the thread. What survives of both is in this file — the plate covers no art, and
+        /// <see cref="TheTutorial_DrawsNothingButItsPlates"/> holds the line that nothing else is
+        /// drawn.
         /// </summary>
         [UnityTest]
-        public IEnumerator TheDragButton_FollowsTheMovingDetail_OffTheRingAndOffTheThread()
-        {
-            TuningConfig.CollectSeconds = 10f;   // slow enough to watch it travel
-
-            yield return GameTestHarness.LoadGame();
-            FakeBackend fake = StandTestHarness.TakeOverInput();
-            yield return GameTestHarness.EnterLevel(fake, 0);
-
-            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
-            yield return GameTestHarness.NoticeSomething(fake, screen);
-            Assert.AreEqual(TutorialBeat.Crank, screen.Beat);
-
-            int index = screen.Runtime.NoticedIndex;
-            float ring = screen.View.RingRadiusOf(index);
-            DesignStage stage = StandTestHarness.Stage();
-            Vector2 startedAt = stage.DesignRectOf(screen.View.SecondHint.Rect).center;
-            int checks = 0;
-
-            foreach (float mark in new[] { 0.25f, 0.5f, 0.75f })
-            {
-                yield return GameTestHarness.CrankUntil(fake,
-                    () => screen.Runtime.DisplayProgress >= mark, "деталь прошла " + mark + " пути");
-                yield return GameTestHarness.Frames(1);
-
-                Vector2 detail = Vector2.Lerp(screen.Level.Details[index].Home, screen.Level.VesselCentre,
-                    screen.Runtime.DisplayProgress) + LevelCatalog.AnchorOffsetOf(screen.Level.Details[index]);
-                Rect plate = stage.DesignRectOf(screen.View.SecondHint.Rect);
-
-                Assert.Greater(Vector2.Distance(plate.center, detail), ring,
-                    "«ТАЩИ» залезла в кольцо прогресса на " + mark + " пути.");
-                Assert.IsFalse(
-                    HintPlacement.SegmentHits(detail, screen.Level.VesselCentre, plate),
-                    "«ТАЩИ» легла на нить на " + mark + " пути.");
-                Assert.Less(Vector2.Distance(plate.center, detail), MaxDragHintReach,
-                    "«ТАЩИ» отстала от детали на " + mark + " пути.");
-                checks++;
-            }
-
-            Assert.AreEqual(3, checks);
-            Assert.Greater(Vector2.Distance(
-                    stage.DesignRectOf(screen.View.SecondHint.Rect).center, startedAt), 60f,
-                "Плашка «ТАЩИ» осталась на месте, пока деталь ехала.");
-
-            LogAssert.NoUnexpectedReceived();
-        }
-
-        /// <summary>How far «ТАЩИ» may trail the detail it names, design px.</summary>
-        private const float MaxDragHintReach = 420f;
-
-        /// <summary>
-        /// The отгон beat's arrow: turquoise, clear of everything the thought PAINTS, running down the
-        /// frame and ending on the sensor panel — at the SAME point every time it is drawn.
-        ///
-        /// Every clause of that is a finding. The stroke was a brick-red 1047 px line from the middle of
-        /// the drawn thought, crossing the art out (gate, 2026-08-07). The 240 px stroke that replaced it
-        /// answered the crossing-out and bought two new problems (gate, 2026-08-08): it measured its
-        /// clearance off the blob's RECTANGLE while the pips hang below that rectangle, so on level 1 it
-        /// grew straight out of them with no air at all; and it took both its length and its X off the
-        /// thought, so the beat's only hint ended in empty sky at a different place every run. The tip is
-        /// now fixed on the panel the gesture names, and it is the TAIL that the thought and the swing
-        /// move.
-        /// </summary>
-        [UnityTest]
-        public IEnumerator TheSwipeArrow_ClearsTheWholeThought_AndAlwaysLandsOnTheSensorPanel()
-        {
-            yield return GameTestHarness.LoadGame();
-            FakeBackend fake = StandTestHarness.TakeOverInput();
-            yield return GameTestHarness.EnterLevel(fake, 0);
-
-            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
-            yield return GameTestHarness.NoticeSomething(fake, screen);
-            yield return GameTestHarness.CollectOneDetail(fake, screen);
-            yield return GameTestHarness.Idle(fake, 4);
-
-            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "Бит отгона не начался.");
-            Assert.AreEqual(1, screen.Runtime.Field.Thoughts.Count);
-            Thought thought = screen.Runtime.Field.Thoughts[0];
-
-            HintArrow arrow = screen.View.Hint.Arrow;
-            Assert.IsTrue(arrow.IsShown, "Стрелка отгона не нарисована.");
-            StandTestHarness.AssertVisible(arrow.FirstSegment, "Стрелка отгона");
-
-            // …the tail is clear of the DRAWING, pips and their discs included.
-            float painted = ArtThoughtView.DrawnBottomY(thought.Position, thought.Size);
-            Assert.GreaterOrEqual(arrow.From.y, painted + MinSwipeArrowClearance,
-                "Хвост стрелки прижат к нарисованному низу мысли (" + arrow.From.y.ToString("0") +
-                " против " + painted.ToString("0") + "): пипсы с подложками рисуются НИЖЕ прямоугольника.");
-
-            // …the tip is on the panel, at the bottom edge of the frame.
-            Assert.AreEqual(LevelScreen.SensorsCue.x, arrow.To.x, 0.5f,
-                "Остриё уехало с середины нижней кромки — жест перестал называть одно и то же место.");
-            Assert.GreaterOrEqual(arrow.To.y, DesignStage.DesignHeight - MaxSwipeArrowTipGap,
-                "Остриё обрывается в небе: панель с датчиками физически внизу кадра.");
-            Assert.Greater(arrow.To.y, arrow.From.y, "Стрелка идёт вверх, а пульт с датчиками снизу.");
-
-            // …and it is the same point a moment later, when the thought has drifted and the swing has
-            // moved on: a name has to be the same word twice.
-            Vector2 tip = arrow.To;
-            Vector2 tail = arrow.From;
-            fake.Next = new BackendSnapshot();
-            yield return GameTestHarness.Until(() => Vector2.Distance(tail, arrow.From) > 2f,
-                "хвост стрелки качнулся");
-
-            Assert.AreEqual(tip.x, arrow.To.x, 0.5f, "Остриё поехало за мыслью по X.");
-            Assert.AreEqual(tip.y, arrow.To.y, 0.5f, "Остриё поехало за мыслью по Y.");
-
-            Color ink = HintCard.ToneColour(HintTone.Swipe);
-            Assert.Greater(ink.b, ink.r + 0.2f, "Цвет отгона не бирюзовый — это снова кирпич грейбокса.");
-            Assert.Greater(ink.g, ink.r + 0.2f, "Цвет отгона не бирюзово-зелёный.");
-
-            LogAssert.NoUnexpectedReceived();
-        }
-
-        /// <summary>
-        /// …and the words that go with that arrow: «Маши над датчиком!» on a teaching card, beside the
-        /// thought, off the art and off its own stroke.
-        ///
-        /// The beat had no words at all until 2026-08-08 — the drop ships no «ТРЯСИ» — and the founder,
-        /// playing it, did not know what the arrow was asking her to do. An arrow that ends on a piece
-        /// of furniture names a PLACE; the sentence names the movement, and the movement is the whole
-        /// mechanic. The card is checked exactly the way the drawn buttons are (it covers no detail, no
-        /// vessel, no HUD widget), plus one thing they never had to prove: it does not lie on the stroke
-        /// it belongs to.
-        /// </summary>
-        [UnityTest]
-        public IEnumerator TheSwipeBeat_SaysWhatToDo_BesideItsOwnArrow()
+        public IEnumerator TheSwipeBeat_SaysWhatToDo_ClearOfTheArt()
         {
             yield return GameTestHarness.LoadGame();
             FakeBackend fake = StandTestHarness.TakeOverInput();
@@ -914,11 +937,13 @@ namespace Meditation.Tests
             yield return GameTestHarness.Idle(fake, 4);
             Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "Бит отгона не начался.");
 
-            HintCard card = screen.View.SwipeCard;
+            HintPlate card = screen.View.BeatPlate;
             Assert.IsTrue(card.IsShown, "На бите отгона нет подписи — игрок снова видит одну стрелку.");
             Assert.AreEqual(GameTexts.SwipeHint, card.Label.text,
                 "Подпись бита отгона пишется мимо реестра GameTexts.");
-            StandTestHarness.AssertVisible(card.Rect, "Карточка «" + GameTexts.SwipeHint + "»");
+            Assert.AreEqual(GameTexts.SwipeHintOnDesk, card.Bracket.text,
+                "ПК-скобка бита отгона пишется мимо реестра GameTexts.");
+            StandTestHarness.AssertVisible(card.Rect, "Плашка «" + GameTexts.SwipeHint + "»");
 
             Rect plate = StandTestHarness.Stage().DesignRectOf(card.Rect);
             foreach (ArtDetail detail in level.Details)
@@ -928,36 +953,119 @@ namespace Meditation.Tests
                 "Подпись отгона накрыла сосуд.");
             Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.VesselBarRectOf(level)),
                 "Подпись отгона накрыла полосу наполнения сосуда.");
+            // The dial itself went with the founder's list of 2026-09-22, but its corner of the plate
+            // stays reserved: it is the one part of each composition the art drop kept empty.
             Assert.IsFalse(StandTestHarness.Overlaps(plate, LevelCatalog.CrankRectOf(level)),
-                "Подпись отгона накрыла индикатор динамо.");
+                "Подпись отгона встала в угол, который дроп оставил пустым под индикатор.");
 
-            HintArrow arrow = screen.View.Hint.Arrow;
-            Assert.IsFalse(HintPlacement.SegmentHits(arrow.From, arrow.To, plate),
-                "Подпись отгона легла на собственную стрелку.");
+            // …and it is clear of the thought it is ABOUT — of everything the thought paints, pips
+            // and their discs included. The pips hang BELOW the blob's rectangle, and until
+            // 2026-09-22 the only thing that pushed the plate off them was the arrow corridor the
+            // plate had to dodge. The arrow is gone; the measurement is not (LevelScreen.PaintedRectOf).
+            Assert.AreEqual(1, screen.Runtime.Field.Thoughts.Count);
+            Rect painted = LevelScreen.PaintedRectOf(screen.Runtime.Field.Thoughts[0]);
+            Assert.IsFalse(StandTestHarness.Overlaps(plate, painted),
+                "Подпись отгона легла на саму мысль (плашка " + plate + ", мысль с пипсами " +
+                painted + ") — пипсы рисуются НИЖЕ её прямоугольника.");
 
-            // …and it goes away with the beat, like every other hint of the tutorial.
+            // …and the beat gives way to the fourth one, which is new on 2026-09-22: the goal, over a
+            // level that is already being played. The отгон's own sentence must be gone from it — one
+            // plate, one beat — and the new sentence up in its place.
             yield return GameTestHarness.SwipeUntil(fake,
                 () => screen.Runtime.Field.Thoughts.Count == 0, "мысль отбита");
             yield return GameTestHarness.Frames(3);
-            Assert.AreEqual(TutorialBeat.Done, screen.Beat, "Обучение не закончилось после отбитой мысли.");
-            Assert.IsFalse(card.IsShown, "Подпись отгона осталась на экране после обучения.");
+            Assert.AreEqual(TutorialBeat.Whole, screen.Beat,
+                "После отбитой мысли не начался финальный бит обучения.");
+            Assert.AreEqual(GameTexts.BeatWhole, card.Label.text,
+                "Финальный бит не сказал, ради чего всё это.");
+            Assert.IsTrue(card.IsShown, "Финальный бит обучения ничего не показывает.");
 
             LogAssert.NoUnexpectedReceived();
         }
 
-        /// <summary>Air the tail owes the thought's own drawing, design px — less is «растёт из пипсов».</summary>
-        private const float MinSwipeArrowClearance = 8f;
-
-        /// <summary>How far short of the bottom edge the tip may stop, design px.</summary>
-        private const float MaxSwipeArrowTipGap = 60f;
-
-        /// <summary>The hint has no text any more, so «which hint» is a question about WHICH PICTURE.</summary>
-        private static void AssertHintIs(LevelScreen screen, string buttonKey, string what)
+        /// <summary>
+        /// …and it is painted in the DROP's hint style, not in the greybox stand's.
+        ///
+        /// Blocker Б1 of the design gate, 2026-08-08. The lesson is four beats — НАВОДИ, КРУТИ РУЧКУ,
+        /// ТАЩИ, and this one — and three of them are the designer's PNGs: a dark slab RGB(35, 52, 65),
+        /// white caps set with tracking, a 2 px rule, square corners. The fourth was
+        /// <see cref="HintCard"/>: white paper, rounded, a 4 px coloured border, 44 pt mixed case. One
+        /// lesson cannot be written in two hands.
+        ///
+        /// What is checked here is the CONSTRUCTION (the composited pixels are
+        /// <c>GameScreenshotTests.AssertTheSwipePlateIsDark</c> on frame 05), plus the two things a
+        /// pixel measurement cannot see: that the greybox card is not on the game's screen at all any
+        /// more, and that the line still fits the plate the placement search was given.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheSwipeHint_IsTheDropsPlate_NotTheStandsWhitePaper()
         {
-            Assert.IsTrue(screen.View.Hint.IsShown, "Подсказки «" + what + "» нет на экране.");
-            StandTestHarness.AssertVisible(screen.View.Hint.Rect, "Кнопка-подсказка «" + what + "»");
-            Assert.AreEqual(ArtLibrary.Get(buttonKey), screen.View.Hint.Button.sprite,
-                "На экране не та кнопка обучения — ожидалась «" + what + "».");
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            yield return GameTestHarness.Idle(fake, 4);
+            Assert.AreEqual(TutorialBeat.Swipe, screen.Beat, "Бит отгона не начался.");
+
+            HintPlate plate = screen.View.BeatPlate;
+            Assert.IsTrue(plate.IsShown, "Подписи отгона нет на экране.");
+
+            // The slab, and the rule around it: dark fill, 2 px, the hand's own colour.
+            Assert.Less(LevelOneData.RelativeLuminance(plate.Fill.color), 0.1f,
+                "Заливка подсказки отгона светлая — это снова бумага грейбокс-стенда.");
+            Assert.AreEqual(HintCard.ToneColour(HintTone.Swipe), plate.Plate.color,
+                "Рамка подсказки потеряла цвет своей руки (бирюза отгона).");
+            Assert.AreEqual(HintPlate.BorderWidth, plate.Fill.rectTransform.offsetMin.x, 0.01f,
+                "Рамка подсказки не 2 px, как у нарисованных кнопок дропа.");
+
+            // …white ink, and the registry's own line, verbatim.
+            //
+            // Not caps and not разрядка any more, and that is the founder's change of 2026-09-22, not
+            // a regression of Б1: the beat's text went from a three-word label to a sentence, and caps
+            // with letter-spacing over a sentence shouts. Б1 was about the SLAB — its darkness, its
+            // 2 px rule, its square corners — and all three are asserted above.
+            Assert.AreEqual(Color.white, plate.Label.color, "Текст подсказки не белый.");
+            Assert.AreEqual(GameTexts.SwipeHint, plate.Label.text,
+                "На плашке не та строка реестра.");
+            Assert.AreEqual(plate.Label.text, plate.Label.text.TrimEnd(),
+                "Строка на плашке набрана с висящим пробелом.");
+            Assert.Greater(plate.Bracket.color.a, 0.3f, "ПК-скобка невидима.");
+            Assert.Less(plate.Bracket.color.a, plate.Label.color.a,
+                "ПК-скобка не приглушена — она обязана читаться как сноска.");
+            Assert.Less(plate.Bracket.fontSize, plate.Label.fontSize,
+                "ПК-скобка набрана не мельче основной строки.");
+
+            // …and the line fits the plate the placement search was handed, so the rectangle the
+            // overlap checks reason about is the rectangle on screen — in BOTH directions now that the
+            // text wraps.
+            Assert.AreEqual(HintPlate.SizeFor(GameTexts.SwipeHint, true).x, plate.Rect.sizeDelta.x, 0.5f,
+                "Плашку нарисовали не той ширины, под которую искали место.");
+            Assert.AreEqual(HintPlate.SizeFor(GameTexts.SwipeHint, true).y, plate.Rect.sizeDelta.y, 0.5f,
+                "Плашку нарисовали не той высоты, под которую искали место.");
+            Assert.LessOrEqual(plate.Label.preferredHeight, plate.Label.rectTransform.rect.height + 1f,
+                "Набранная строка не помещается по высоте — оценка числа строк разошлась с набором.");
+
+            // The greybox card is gone from the GAME. (On the stand it stays: that composition is
+            // greybox all the way down, and there the white paper is the right paper.)
+            Assert.IsNull(StandTestHarness.FindOrNull(StandTestHarness.Stage(), "HintCard"),
+                "Белая карточка грейбокс-стенда снова рисуется в игре.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// A beat's hint is one plate with one sentence on it, and the sentence comes from the registry
+        /// — so «which hint» is a question about WHICH LINE, and it is asked against
+        /// <see cref="GameTexts"/> rather than against a literal.
+        /// </summary>
+        private static void AssertBeatPlateIs(LevelScreen screen, string line, string beat)
+        {
+            Assert.IsTrue(screen.View.BeatPlate.IsShown, "Плашки бита «" + beat + "» нет на экране.");
+            StandTestHarness.AssertVisible(screen.View.BeatPlate.Rect, "Плашка бита «" + beat + "»");
+            Assert.AreEqual(line, screen.View.BeatPlate.Label.text,
+                "Подпись бита «" + beat + "» пишется мимо реестра GameTexts.");
         }
 
         /// <summary>
@@ -1043,7 +1151,7 @@ namespace Meditation.Tests
             Assert.AreEqual(TutorialBeat.Done, again.Beat, "Биты обучения обязаны быть пропущены.");
             Assert.IsTrue(again.SkipsTheIntro);
             Assert.AreEqual(LevelStage.Play, again.Stage, "Рестарт обязан начинаться СРАЗУ в игре.");
-            Assert.IsFalse(again.View.Hint.IsShown, "На рестарте подсказок быть не должно.");
+            Assert.IsFalse(again.View.BeatPlate.IsShown, "На рестарте подсказок быть не должно.");
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -1083,8 +1191,8 @@ namespace Meditation.Tests
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
             Assert.AreEqual(TutorialBeat.Done, screen.Beat, "Обучение — только на первом уровне.");
             Assert.IsFalse(screen.SkipsTheIntro, "Обзор пропускается только на рестарте первого уровня.");
-            Assert.IsFalse(screen.View.Hint.IsShown,
-                "Уровень " + (levelIndex + 1) + ": карточек обучения быть не должно.");
+            Assert.IsFalse(screen.View.BeatPlate.IsShown,
+                "Уровень " + (levelIndex + 1) + ": плашек обучения быть не должно.");
         }
 
         // ---- the office: its decoys and its foreground strip ------------------------------------------
@@ -1808,10 +1916,10 @@ namespace Meditation.Tests
                 "а не показание.");
 
             yield return GameTestHarness.CrankUntil(fake,
-                () => screen.Runtime.DisplayProgress > 0.1f, "ручка набрала заметную заливку");
+                () => screen.Runtime.DisplayProgress > 0.1f, "крутилка набрала заметную заливку");
             yield return GameTestHarness.Frames(1);
 
-            StandTestHarness.AssertVisible(ring, "кольцо прогресса под ручкой");
+            StandTestHarness.AssertVisible(ring, "кольцо прогресса под крутилкой");
 
             LogAssert.NoUnexpectedReceived();
         }

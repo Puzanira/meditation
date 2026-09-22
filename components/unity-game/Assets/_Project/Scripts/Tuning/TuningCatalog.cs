@@ -79,11 +79,11 @@ namespace Meditation.Tuning
         private static FloatParam SwipeCooldown() => FloatParam.Make("порог удара: кулдаун", 0f, 300f,
             () => TuningConfig.SwipeCooldownMs, v => TuningConfig.SwipeCooldownMs = v, "мс", "0");
 
-        private static FloatParam ThoughtGrowth() => FloatParam.Make("рост мыслей", 0f, 10f,
+        private static FloatParam ThoughtGrowth() => FloatParam.Make("рост мыслей", 0f, 25f,
             () => TuningConfig.ThoughtGrowthPercentPerSec,
             v => TuningConfig.ThoughtGrowthPercentPerSec = v, "%/с", "0.0");
 
-        private static FloatParam ThoughtGrowthCap() => FloatParam.Make("потолок роста", 1f, 3f,
+        private static FloatParam ThoughtGrowthCap() => FloatParam.Make("потолок роста", 1f, 16f,
             () => TuningConfig.ThoughtGrowthCap, v => TuningConfig.ThoughtGrowthCap = v, "×", "0.00");
 
         // --- MECHANICS §4 "состав волны: сколько и каких мыслей" -------------------------------
@@ -143,7 +143,7 @@ namespace Meditation.Tuning
                 FloatParam.Make("скорость дрейфа", 20f, 60f,
                     () => TuningConfig.DriftPxPerSec, v => TuningConfig.DriftPxPerSec = v, "px/с", "0"),
                 ThoughtsCoverVessel(),
-                FloatParam.Make("порог поражения (перекрытие)", 85f, 100f,
+                FloatParam.Make("порог поражения (перекрытие)", 50f, 100f,
                     () => TuningConfig.LossOverlapPercent, v => TuningConfig.LossOverlapPercent = v, "%", "0"),
                 FloatParam.Make("порог кручения", 10f, 1200f,
                     () => TuningConfig.CrankThresholdDegPerSec, v => TuningConfig.CrankThresholdDegPerSec = v,
@@ -182,6 +182,11 @@ namespace Meditation.Tuning
 
             return new List<TuningParam>
             {
+                // «Общий запас мыслей» (founder, 2026-09-22): the first row of every level's section,
+                // because it is the first thing about that level — how much interference it HAS.
+                FloatParam.Make(p + "запас мыслей", 0f, 60f,
+                    () => TuningConfig.ThoughtBudgetOf(i), v => TuningConfig.SetThoughtBudget(i, (int)v),
+                    "", "0", true),
                 FloatParam.Make(p + "интервал волн", 1f, 20f,
                     () => TuningConfig.WaveIntervalOf(i), v => TuningConfig.SetWaveInterval(i, v), "с", "0.0"),
                 FloatParam.Make(p + "в волне: слабых", 0f, 5f,
@@ -200,10 +205,10 @@ namespace Meditation.Tuning
                     () => TuningConfig.DriftOf(i), v => TuningConfig.SetDrift(i, v), "px/с", "0"),
                 FloatParam.Make(p + "сокращение интервала за волну", 0f, 50f,
                     () => TuningConfig.PressureRampPercentOf(i), v => TuningConfig.SetPressureRampPercent(i, v), "%", "0"),
-                FloatParam.Make(p + "рост мыслей", 0f, 10f,
+                FloatParam.Make(p + "рост мыслей", 0f, 25f,
                     () => TuningConfig.ThoughtGrowthPercentPerSecOf(i),
                     v => TuningConfig.SetThoughtGrowthPercentPerSec(i, v), "%/с", "0.0"),
-                FloatParam.Make(p + "потолок роста", 1f, 3f,
+                FloatParam.Make(p + "потолок роста", 1f, 16f,
                     () => TuningConfig.ThoughtGrowthCapOf(i),
                     v => TuningConfig.SetThoughtGrowthCap(i, v), "×", "0.00")
             };
@@ -243,7 +248,7 @@ namespace Meditation.Tuning
                     () => TuningConfig.ThoughtBacking, v => TuningConfig.ThoughtBacking = v),
                 FloatParam.Make("порог пика хаоса", 40f, 100f,
                     () => TuningConfig.PeakOverlapPercent, v => TuningConfig.PeakOverlapPercent = v, "%", "0"),
-                FloatParam.Make("порог поражения (перекрытие)", 85f, 100f,
+                FloatParam.Make("порог поражения (перекрытие)", 50f, 100f,
                     () => TuningConfig.LossOverlapPercent, v => TuningConfig.LossOverlapPercent = v, "%", "0"),
                 BoolParam.Make("передышка после детали",
                     () => TuningConfig.BreatherEnabled, v => TuningConfig.BreatherEnabled = v),
@@ -282,6 +287,40 @@ namespace Meditation.Tuning
                     v => TuningConfig.AudioThoughtsByOverlap = v),
                 BoolParam.Make("звук: тишина вне уровня",
                     () => TuningConfig.AudioSilentOffLevel, v => TuningConfig.AudioSilentOffLevel = v),
+
+                // Заказ founder 2026-09-22, п.10: смена дорожки кроссфейдом, кривая мыслей мягче.
+                FloatParam.Make("звук: кроссфейд дорожек уровня", 0f, 4f,
+                    () => TuningConfig.AudioBackgroundCrossfadeSeconds,
+                    v => TuningConfig.AudioBackgroundCrossfadeSeconds = v, "с", "0.0"),
+                FloatParam.Make("звук: кривая слоя мыслей", 1f, 4f,
+                    () => TuningConfig.AudioThoughtsCurve,
+                    v => TuningConfig.AudioThoughtsCurve = v, "×", "0.00"),
+
+                // ---- Тайминги заставок (founder 2026-09-22, п.2) -----------------------------
+                FloatParam.Make("карточка уровня: держать", 1.5f, 8f,
+                    () => TuningConfig.LevelCardSeconds,
+                    v => TuningConfig.LevelCardSeconds = v, "с", "0.0"),
+                FloatParam.Make("перебивка «Отлично!»: держать", 1f, 8f,
+                    () => TuningConfig.LevelCompleteSeconds,
+                    v => TuningConfig.LevelCompleteSeconds = v, "с", "0.0"),
+
+                // ---- Переход «круглая рябь» (founder 2026-09-22, п.8) ------------------------
+                FloatParam.Make("рябь: длительность", 0.3f, 2.5f,
+                    () => TuningConfig.RippleSeconds, v => TuningConfig.RippleSeconds = v, "с", "0.00"),
+                FloatParam.Make("рябь: ширина кольца", 0.04f, 0.4f,
+                    () => TuningConfig.RippleRingWidth, v => TuningConfig.RippleRingWidth = v, "кадра", "0.00"),
+                FloatParam.Make("рябь: амплитуда", 0f, 0.12f,
+                    () => TuningConfig.RippleAmplitude, v => TuningConfig.RippleAmplitude = v, "кадра", "0.000"),
+                FloatParam.Make("рябь: гребней", 1f, 6f,
+                    () => TuningConfig.RippleWaves, v => TuningConfig.RippleWaves = v, "", "0", true),
+
+                // ---- Мерцание деталей (founder 2026-09-22, п.7) ------------------------------
+                FloatParam.Make("мерцание: амплитуда", 0f, 0.5f,
+                    () => TuningConfig.DetailPulseAmplitude,
+                    v => TuningConfig.DetailPulseAmplitude = v, "×", "0.00"),
+                FloatParam.Make("мерцание: период", 0.4f, 3f,
+                    () => TuningConfig.DetailPulseSeconds,
+                    v => TuningConfig.DetailPulseSeconds = v, "с", "0.0"),
 
                 // ---- Луч-подсветка деталей (SCREENS «Детали в сцене») -------------------------
                 FloatParam.Make("луч: период", 4f, 20f,
@@ -333,7 +372,7 @@ namespace Meditation.Tuning
                 FloatParam.Make("скорость дрейфа", 20f, 60f,
                     () => TuningConfig.DriftPxPerSec, v => TuningConfig.DriftPxPerSec = v, "px/с", "0"),
                 ThoughtsCoverVessel(),
-                FloatParam.Make("порог поражения (перекрытие)", 85f, 100f,
+                FloatParam.Make("порог поражения (перекрытие)", 50f, 100f,
                     () => TuningConfig.LossOverlapPercent, v => TuningConfig.LossOverlapPercent = v, "%", "0"),
                 ChoiceParam.Make("выбор детали", new[] { "A: порядок", "B: взгляд", "C: авто" },
                     () => (int)TuningConfig.Notice, v => TuningConfig.Notice = (NoticeMode)v),

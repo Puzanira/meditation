@@ -33,28 +33,32 @@ namespace Meditation.Game
     /// </summary>
     public static class GameTexts
     {
-        /// <summary>
-        /// «Маши над датчиком!» — the отгон beat of the tutorial (SCREENS §Обучение п.3).
-        ///
-        /// The beat has never had words: the drop ships НАВОДИ, КРУТИ РУЧКУ and ТАЩИ, and «ТРЯСИ» —
-        /// which would have been the wrong verb anyway since the отгон moved to the height sensors —
-        /// is still with the designer. What the player got instead was an arrow to the bottom edge of
-        /// the screen, and an arrow at a piece of furniture is not an instruction (founder, 2026-08-08,
-        /// playing the build). The same sentence is already the stand's own caption for this rule
-        /// (<c>Scene2ShakeAway</c>), so this is one line in two places rather than two lines.
-        /// </summary>
-        public const string SwipeHint = "Маши над датчиком!";
+        // ---- Титул (S1) ---------------------------------------------------------------------------
 
         /// <summary>
-        /// The title's «как начать» — under the drawn НАЧАТЬ button, which is a call and not a control.
+        /// The title's «как начать» — and, since the founder's playtest of 2026-09-22, the only thing
+        /// on that screen besides the render itself.
         ///
-        /// The wording follows the CODE: the run starts on two full turns of the dynamo
-        /// (<see cref="TitleScreen.StartDegrees"/>), not on a button and not on any key. «Крути ручку,
-        /// чтобы начать» is the withdrawn line and stays withdrawn — that one belonged to the greybox
-        /// title and is baked into the render's own typography; this one names the amount, which is the
-        /// part a player standing at the cabinet cannot guess from a bar that has not started moving.
+        /// Her two orders of that day are one order: «кнопку НАЧАТЬ убрать» and «вместо неё — „Крути
+        /// ручку, чтобы начать“». A drawn button on a cabinet with nothing to press it with is an
+        /// instruction to do the wrong thing, and it was answering the question badly enough that the
+        /// line under it («Раскрути ручку — два оборота») was reading as a caption for the button
+        /// rather than as the instruction. So the button goes and the sentence takes its place.
+        ///
+        /// The wording is hers, and it is the line the greybox title carried before the drop — it went
+        /// into <see cref="Withdrawn"/> on 2026-08-07 because the render was thought to say it, and
+        /// two playtests have now established that it does not. «Раскрути ручку — два оборота» swaps
+        /// places with it: the AMOUNT is what the fill bar under the words shows, and it did not need
+        /// saying twice.
+        ///
+        /// «КРУТИЛКА», not «ручка», since later the same day — the founder's own correction while
+        /// playing. It is not a synonym swap: the cabinet's panel HAS a name for each of its controls
+        /// (<c>system/CONTROLS_BRIEF.md</c> — «колесо мыши = крутилка», Q/A = датчик, red button = в
+        /// меню), the player is standing in front of that panel, and a game that calls the крутилка a
+        /// ручка is naming a thing the room does not have. Every live line that named it was changed
+        /// at once; the old wordings are in <see cref="Withdrawn"/>.
         /// </summary>
-        public const string TitleStart = "Раскрути ручку — два оборота";
+        public const string TitleStart = "Крути крутилку, чтобы начать";
 
         /// <summary>
         /// …and the second, smaller line: the same instruction for whoever is playing at a desk.
@@ -65,6 +69,74 @@ namespace Meditation.Game
         /// its own line and not a clause of the one above.
         /// </summary>
         public const string TitleStartOnDesk = "(на компьютере — колесо мыши)";
+
+        // ---- Обучение, уровень 1 (SCREENS §Обучение) ------------------------------------------------
+        //
+        // Four sentences, dictated by the founder at the playtest of 2026-09-22. They are not captions
+        // for the drawn buttons — НАВОДИ, КРУТИ РУЧКУ and ТАЩИ name the HAND, in one word, standing
+        // next to the thing the hand acts on, and that is all a drawn button can do. What the founder
+        // could not work out from them is what the game is ASKING FOR: «наводи» on what, and why.
+        //
+        // The tone is hers too: «в тоне медитации, без клавиатурного жаргона». Nothing here names a
+        // key; the PC bracket under each line is a separate, smaller string for exactly that reason
+        // (see TitleStartOnDesk — false on the machine this ships to).
+
+        /// <summary>Бит 1, «наведение»: the gaze, and what it is for.</summary>
+        public const string BeatAim = "Наводи джойстиком на объект";
+
+        /// <summary>…its PC bracket. The joystick is the arrow keys at a desk.</summary>
+        public const string BeatAimOnDesk = "(на компьютере — стрелки)";
+
+        /// <summary>
+        /// Бит 2, «сбор» — one sentence for both hands, because the beat is both hands at once
+        /// (SCREENS §Обучение п.2 shows two buttons: КРУТИ РУЧКУ and ТАЩИ).
+        /// </summary>
+        public const string BeatCollect = "Замечай детали вокруг. Крути крутилку и тащи объект";
+
+        /// <summary>…its PC bracket.</summary>
+        public const string BeatCollectOnDesk = "(на компьютере — колесо мыши)";
+
+        /// <summary>
+        /// Бит 3, «отгон» — the beat with no drawn button at all (the drop ships no «ТРЯСИ», and it
+        /// would be the wrong verb anyway since the отгон moved to the height sensors).
+        ///
+        /// It used to be «Маши над датчиком!», which named the gesture and not the thing: the founder,
+        /// playing on 2026-09-22, said the blobs need introducing — «это навязчивые мысли» is the half
+        /// of the sentence that makes the other half worth doing. The stand's own caption for the same
+        /// rule (<c>Scene2ShakeAway</c>) keeps the short form: the scenette is a rig for the RULE and
+        /// its frame has no room for a sentence.
+        /// </summary>
+        public const string SwipeHint = "Это навязчивые мысли. Маши рукой над датчиком, чтобы отогнать их";
+
+        /// <summary>…its PC bracket — the two height sensors are two keys at a desk.</summary>
+        public const string SwipeHintOnDesk = "(на компьютере — Q и A)";
+
+        /// <summary>
+        /// Бит 4, «весь уровень» — new on 2026-09-22, and the only beat that is not about one hand.
+        ///
+        /// The lesson used to end when the first thought was beaten off, which taught three verbs and
+        /// never said what they were FOR. This is the sentence that says it, and it is up while the
+        /// level is already being played: nothing is blocked, nothing is scripted, it is the goal
+        /// written over the game the player has just been given.
+        /// </summary>
+        public const string BeatWhole =
+            "Заметь все объекты, перетащи их в ведёрко и не дай мыслям помешать тебе";
+
+        // ---- Финал (S6) ------------------------------------------------------------------------------
+
+        /// <summary>
+        /// «Подпись про выход в основное меню» (founder, 2026-09-22, п.9).
+        ///
+        /// The finale leaves on any input or after twenty seconds, and until now it said so nowhere:
+        /// the player stood in front of a panorama with no idea whether the game was over or stuck.
+        /// The wording names the BUTTON on the panel — the founder's own framing, «формулировка под
+        /// красную кнопку пульта» — rather than the action, because on the cabinet the red «в меню»
+        /// button is a thing you can see from where you stand.
+        /// </summary>
+        public const string FinaleExit = "Красная кнопка — выход в главное меню";
+
+        /// <summary>…and its PC bracket, the only place a key is named anywhere in the registry.</summary>
+        public const string FinaleExitOnDesk = "(на компьютере — Esc)";
 
         /// <summary>
         /// The lines the game itself renders, in one array — what «сначала добавляется сюда» means in
@@ -77,19 +149,27 @@ namespace Meditation.Game
         /// </summary>
         public static readonly string[] Live =
         {
-            SwipeHint,
             TitleStart,
-            TitleStartOnDesk
+            TitleStartOnDesk,
+            BeatAim,
+            BeatAimOnDesk,
+            BeatCollect,
+            BeatCollectOnDesk,
+            SwipeHint,
+            SwipeHintOnDesk,
+            BeatWhole,
+            FinaleExit,
+            FinaleExitOnDesk
         };
 
         /// <summary>
         /// «Выведено из игры» — walkthrough frame 25. Every one of these is now pixels in
-        /// <c>арт/экраны/</c> or <c>арт/кнопки/</c>, drawn by the designer.
+        /// <c>арт/экраны/</c> or <c>арт/кнопки/</c>, drawn by the designer — or, for the last two,
+        /// a line the founder replaced with a better one.
         /// </summary>
         public static readonly string[] Withdrawn =
         {
             "МЕДИТАЦИЯ В СПЕШКЕ",
-            "Крути ручку, чтобы начать",
             "Мысли захватили всё. Вдохни.",
             "Крути ручку — попробуй снова",
             "Ты заметил(а) всё. Даже в спешке.",
@@ -99,7 +179,22 @@ namespace Meditation.Game
             "КРУТИ",
             "ТРЯСИ",
             "собирай детали",
-            "отгоняй мысли"
+            "отгоняй мысли",
+
+            // Withdrawn 2026-09-22, both by the founder's own word at the playtest.
+            // «Раскрути ручку — два оборота» said the amount the fill bar already draws, and it said it
+            // as a caption under a button that has itself been removed.
+            "Раскрути ручку — два оборота",
+            // «Маши над датчиком!» named the gesture without ever naming the thing — see SwipeHint.
+            "Маши над датчиком!",
+
+            // Withdrawn 2026-09-22 (later the same day): the panel's own word for the control is
+            // «крутилка» (system/CONTROLS_BRIEF.md), and these are the wordings that called it a
+            // ручка. Both were LIVE lines until this round, so they are exactly the kind of string
+            // this list exists for — the one that comes back the next time somebody needs «a caption
+            // about the handle». See TitleStart.
+            "Крути ручку, чтобы начать",
+            "Замечай детали вокруг. Крути ручку и тащи объект"
         };
 
         /// <summary>

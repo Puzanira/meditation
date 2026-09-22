@@ -11,8 +11,7 @@ namespace Meditation.View
     /// line used to be, and the list of what the game is allowed to put on screen is this list.
     ///
     /// The renders arrived at 3840×2160 and were downscaled ×0.5 on the way into the project (SCREENS
-    /// «S1–S6»); the buttons arrived at 2–3× their game size and are drawn at
-    /// <see cref="ButtonHint.ButtonHeight"/>.
+    /// «S1–S6»).
     /// </summary>
     public static class ArtScreens
     {
@@ -30,17 +29,16 @@ namespace Meditation.View
         public const string Finale = "screens/finale";
 
         // ---- Обучение (уровень 1) ----------------------------------------------------------------
-        /// <summary>«НАВОДИ» — beat 1, the gaze.</summary>
-        public const string ButtonAim = "buttons/navodi";
-
-        /// <summary>«КРУТИ РУЧКУ» — beat 2, the dynamo.</summary>
-        public const string ButtonCrank = "buttons/kruti-ruchku";
-
-        /// <summary>«ТАЩИ» — beat 2, beside the detail on its way to the vessel.</summary>
-        public const string ButtonDrag = "buttons/tashi";
-
-        // …and there is deliberately no ButtonShake: the drop ships no «ТРЯСИ», the question is with
-        // the designer, and until it comes back that beat is an arrow with no words
-        // (ButtonHint.ShowArrowOnly).
+        //
+        // Nothing. The drop's three teaching buttons — «НАВОДИ» (buttons/navodi), «КРУТИ РУЧКУ»
+        // (buttons/kruti-ruchku) and «ТАЩИ» (buttons/tashi) — left the teaching screens on 2026-09-22
+        // by the founder's own word: «убрать стрелки все с экранов обучений, оставить только плашки с
+        // нашим текстом последним, остальные элементы подсказок убрать». The PNGs stay in Resources,
+        // because an asset that has been paid for and drawn is not deleted by a change of mind about
+        // where it stands; there is simply nothing in the game that names them any more, and this
+        // list is what the game is allowed to put on screen.
+        //
+        // (There was never a ButtonShake — the отгон beat's «ТРЯСИ» was still with the designer when
+        // the whole set was withdrawn.)
     }
 }

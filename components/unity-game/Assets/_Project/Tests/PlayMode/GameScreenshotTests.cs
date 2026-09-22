@@ -17,10 +17,12 @@ namespace Meditation.Tests
     /// <list type="bullet">
     /// <item>01 титул · 02 карточка уровня 1 · 30–32 карточки уровней 2–4 · 16 карточка уровня 5;</item>
     /// <item>03 обзор · 17 бит «НАВОДИ» · 04 бит «КРУТИ РУЧКУ» + «ТАЩИ» · 05 бит отгона ·
+    ///       40 четвёртый бит «Заметь все объекты…» поверх уже идущей игры ·
     ///       27 мысль лопается на последнем пипсе (середина разрыва) ·
     ///       29 кадр сразу после отгона (волны пошли);</item>
     /// <item>06 игра · 18 срыв детали · 07 пик хаоса (L1) · 24 пик хаоса (L3) —
-    ///       оба набраны ЖИВЫМИ волнами, не разложены сеткой;</item>
+    ///       оба набраны ЖИВЫМИ волнами, не разложены сеткой, и оба на ОТГРУЖАЕМОМ пороге пика
+    ///       (65 %, возврат дизайн-скептика 2026-09-22: раньше порог сдвигали в 32 и снимали его);</item>
     /// <item>09 · 10 (L3, виден индикатор сосуда) · 14 · 15 — уровни 2–5 в игре;
     ///       23 мысли на полосе переднего плана (L2);</item>
     /// <item>08 бит награды (L1) · 19–22 победы уровней 2–5 · 25 готовый экран победы;</item>
@@ -153,6 +155,64 @@ namespace Meditation.Tests
         private const float MinBarShare = 0.5f;
 
         /// <summary>
+        /// …and the other half of the same claim: NOTHING of the thought layer is drawn inside the
+        /// bar's rectangle (blocker Б2, design gate 2026-08-08).
+        ///
+        /// The two are not the same measurement and the first one passed while the second failed for
+        /// ten days. <see cref="AssertTheFillBarIsVisibleInThisFrame"/> asks «does the bar paint its own
+        /// rectangle», and a translucent widget does: the wash still moves every pixel it lies on. What
+        /// the gate actually caught is what the player sees THROUGH it — 23.2 % of the bar's pixels on
+        /// Game23 were the white discs under the pips, 10.4 % on Game15 — and the only way to ask that
+        /// is to switch the thoughts off and see whether anything inside the bar changes.
+        ///
+        /// SCREENS §S3, «Слой мыслей»: «HUD они не закрывают».
+        /// </summary>
+        private static void AssertNoThoughtsInsideTheFillBar(LevelScreen screen, string frameName)
+        {
+            RectInt box = StandTestHarness.PixelRectOf(StandTestHarness.Stage(),
+                screen.View.VesselFillTrack.rectTransform);
+            float share = ShareCoveredBy(screen.View.ThoughtsLayer.gameObject, box);
+
+            Assert.Less(share, MaxThoughtInkInHud,
+                frameName + ": сквозь полосу наполнения видны мысли — " +
+                (share * 100f).ToString("0.0") + " % её собственных пикселей меняются, когда слой " +
+                "мыслей выключают, при потолке " + (MaxThoughtInkInHud * 100f) +
+                " %. SCREENS §S3: «HUD они не закрывают» (блокер Б2, дизайн-гейт 2026-08-08).");
+        }
+
+        /// <summary>
+        /// …and the OTHER half of the founder's list of 2026-09-22: there is no dynamo indicator on
+        /// this frame at all.
+        ///
+        /// The assertion used to be «мысли не проступают сквозь индикатор» — the same Б2 measurement,
+        /// on the game's second HUD widget. The widget is gone («спидометр убрать из HUD игры»), so
+        /// the claim inverts: what has to be true now is that nothing draws it. Checked by NAME on the
+        /// composited stage rather than through the view's own property, because a widget can come back
+        /// from anywhere and the property is exactly the thing that would be updated with it.
+        /// </summary>
+        private static void AssertThereIsNoSpeedometer(LevelScreen screen, string frameName)
+        {
+            Assert.IsNull(screen.View.CrankDial,
+                frameName + ": индикатор динамо снова построен в игре (founder 2026-09-22: убрать).");
+
+            DesignStage stage = StandTestHarness.Stage();
+            foreach (string widget in new[] { "CrankDial", "CrankArc", "CrankNeedle", "CrankHalo" })
+                Assert.IsNull(StandTestHarness.FindOrNull(stage, widget),
+                    frameName + ": «" + widget + "» вернулся на экран игры — это спидометр, который " +
+                    "основательница попросила убрать (плейтест 2026-09-22).");
+        }
+
+        /// <summary>
+        /// How much of a HUD widget's own area the thoughts are allowed to move, 0…1.
+        ///
+        /// Not zero, and the slack is geometric rather than a tolerance for failure: the bar is drawn on
+        /// a 7 px rounded sprite, so its four corners are background inside the rectangle a test can name
+        /// — about 1.5 % of a 173×16 bar. Four per cent is above that and an order of magnitude below
+        /// the 23.2 % the gate returned.
+        /// </summary>
+        private const float MaxThoughtInkInHud = 0.04f;
+
+        /// <summary>
         /// The neon aim is IN this frame and visible against the plate underneath it.
         ///
         /// Measured the way the light sweep's frames are: the picture as shot, the picture with the aim
@@ -181,6 +241,236 @@ namespace Meditation.Tests
         /// clears everywhere and an invisible one cannot.
         /// </summary>
         private const float MinAimShare = 0.04f;
+
+        // ---- Б1 (возврат скептика 2026-09-22): a teaching plate may not bury the detail it teaches about --
+
+        /// <summary>
+        /// The detail that is TRAVELLING on this frame can still be SEEN on it — its own ink, counted
+        /// on the picture that was just written.
+        ///
+        /// Blocker Б1 of the design skeptic's return, 2026-09-22, on frame
+        /// <c>Game04_L1_tutorial_crank</c>: the sentence of the сбор beat stood at x 511…1066 ·
+        /// y 227…376 and the aeroplane drove up its thread underneath it, leaving 16 px of gap with
+        /// the nose poking out. The cause was that the beat's obstacle was a POINT — a 160×160 box at
+        /// where the detail stood when the beat opened — while the plate is placed once and never
+        /// moves (<c>LevelScreen.AddDetailTrack</c> is the fix).
+        ///
+        /// A RATIO, not an absolute share, because ink is the detail's own business: the plane paints
+        /// about a fifth of its 484×84 rectangle and the seagull most of its own. So the frame is
+        /// measured twice — as shot, and with the beat's WHOLE hint layer taken off it and nothing
+        /// else touched — and what is asserted is how much of the second survives in the first.
+        ///
+        /// The layer rather than the plate alone: the beat draws three things over this detail (the
+        /// sentence, «КРУТИ РУЧКУ» at the thread and «ТАЩИ» beside it, each with its arrow), they are
+        /// all placed by the same search against the same obstacles, and «which of the three buried
+        /// it» is not a distinction the founder makes when she cannot see the object.
+        /// </summary>
+        private static void AssertTheTravellingDetailIsVisible(LevelScreen screen, string frameName)
+        {
+            int index = screen.Runtime.NoticedIndex;
+            Assert.GreaterOrEqual(index, 0, frameName + ": на кадре бита сбора нет едущей детали.");
+            Assert.Greater(screen.Runtime.Collector.Progress01, 0f,
+                frameName + ": деталь ещё дома — на таком кадре бит сбора нечем судить.");
+
+            var image = screen.View.DetailImages[index];
+            RectInt box = StandTestHarness.PixelRectOf(StandTestHarness.Stage(), image.rectTransform);
+            Assert.Greater(box.width * box.height, 0, frameName + ": едущая деталь вне кадра.");
+
+            float shown = ShareCoveredBy(image.gameObject, box);
+
+            GameObject hints = screen.View.MessageLayer.gameObject;
+            bool was = hints.activeSelf;
+            hints.SetActive(false);
+            Canvas.ForceUpdateCanvases();
+            float bare = ShareCoveredBy(image.gameObject, box);
+            hints.SetActive(was);
+            Canvas.ForceUpdateCanvases();
+
+            Assert.Greater(bare, 0.02f,
+                frameName + ": деталь «" + screen.Level.Details[index].Name + "» не красит даже " +
+                "собственный прямоугольник без подсказок — мерить нечего.");
+
+            float visible = shown / bare;
+            TestContext.WriteLine(frameName + ": едущая деталь «" + screen.Level.Details[index].Name +
+                "» видна на " + (visible * 100f).ToString("0.0") + " % своих чернил (" +
+                (shown * 100f).ToString("0.00") + " % квадрата против " +
+                (bare * 100f).ToString("0.00") + " % без подсказок).");
+            Assert.Greater(visible, MinTravellingDetailVisible,
+                frameName + ": подсказка бита хоронит едущую деталь «" +
+                screen.Level.Details[index].Name + "» — от её чернил на кадре осталось " +
+                (visible * 100f).ToString("0.0") + " % при пороге " +
+                (MinTravellingDetailVisible * 100f).ToString("0") + " % (замерено " +
+                (shown * 100f).ToString("0.00") + " % квадрата против " +
+                (bare * 100f).ToString("0.00") + " % без подсказок). Препятствие бита — вся траектория " +
+                "детали, а не точка её старта (блокер Б1, возврат дизайн-скептика 2026-09-22).");
+        }
+
+        /// <summary>
+        /// How much of the travelling detail's ink has to survive the beat's plate, 0…1.
+        ///
+        /// 0.90 rather than 1.0 because the beat's OTHER hint is allowed to come close: «ТАЩИ» is
+        /// aimed at the detail and its arrow stops 50 px short of the ink centroid, which on a sprite
+        /// as long as the plane's is inside the rectangle. That is a few pixels of contrail, not a
+        /// buried detail.
+        ///
+        /// Measured on the shot rather than guessed: the frame as it ships now scores **98.4 %**
+        /// (20.46 % of the plane's box against 20.80 % with the hints off), and the negative control —
+        /// the old point-obstacle put back, everything else untouched — scores **47.0 %** (9.57 %
+        /// against 20.37 %). The floor sits between them with an order of magnitude of room.
+        /// </summary>
+        private const float MinTravellingDetailVisible = 0.9f;
+
+        // ---- Б1: the отгон plate is the DROP's hint, not the greybox stand's paper ----------------------
+
+        /// <summary>
+        /// The plate under «Маши над датчиком!» is dark, measured on the written frame.
+        ///
+        /// Blocker Б1 of the design gate, 2026-08-08: that one beat of the four-beat lesson was drawn
+        /// with <see cref="HintCard"/> — the greybox stand's white paper, luminance 253.6 — while the
+        /// three around it carry the drop's dark slab. Asserting the colour of the Image would be
+        /// asserting the constant back at itself; this reads the composited pixels, which is also where
+        /// the gate read the 253.6.
+        ///
+        /// The MEDIAN, because the plate is white caps on a dark slab and about a sixth of it is
+        /// lettering — a mean would be pulled up by the very text the slab exists to carry.
+        /// </summary>
+        private static void AssertTheSwipePlateIsDark(LevelScreen screen, string frameName) =>
+            AssertTheBeatPlateIsDark(screen, frameName, GameTexts.SwipeHint);
+
+        /// <summary>…the same measurement for whichever of the four beats is on this frame.</summary>
+        private static void AssertTheBeatPlateIsDark(LevelScreen screen, string frameName, string line)
+        {
+            HintPlate plate = screen.View.BeatPlate;
+            Assert.IsTrue(plate.IsShown, frameName + ": плашки бита нет на кадре.");
+
+            RectInt box = StandTestHarness.PixelRectOf(StandTestHarness.Stage(), plate.Fill.rectTransform);
+            Texture2D frame = StandTestHarness.Capture(Letterbox);
+            try
+            {
+                Color[] pixels = StandTestHarness.PixelsOf(frame, box);
+                Assert.Greater(pixels.Length, 0, frameName + ": плашка бита вне кадра.");
+
+                var sorted = new float[pixels.Length];
+                for (int i = 0; i < pixels.Length; i++) sorted[i] = Luminance(pixels[i]);
+                System.Array.Sort(sorted);
+                float median = sorted[sorted.Length / 2];
+
+                Assert.Less(median, MaxSwipePlateLuminance,
+                    frameName + ": заливка карточки «" + line + "» светимостью " +
+                    median.ToString("0.0") + "/255 при потолке " + MaxSwipePlateLuminance +
+                    " — это снова белая бумага грейбокс-стенда, а не тёмная плашка дропа " +
+                    "(блокер Б1, дизайн-гейт 2026-08-08).");
+            }
+            finally
+            {
+                Object.DestroyImmediate(frame);
+            }
+        }
+
+        /// <summary>
+        /// The ceiling, 0…255. The drop's slab RGB(35, 52, 65) composites to about 61 over the brightest
+        /// plate in the game; the white card it replaced measured 253.6. Ninety sits between them with
+        /// room for the plate to be laid on anything.
+        /// </summary>
+        private const float MaxSwipePlateLuminance = 90f;
+
+        /// <summary>
+        /// A beat's SENTENCE is on this frame and can be read off it: the right line from the registry,
+        /// on the drop's dark slab, with the lettering really painting the slab.
+        ///
+        /// The last claim is the one a layout assertion cannot make. The fourth beat («Заметь все
+        /// объекты…», founder 2026-09-22) had no frame of its own until this round — it was visible
+        /// only in the corner of <c>Game27_L1_thought_last_pip</c>, which is a frame about a bursting
+        /// thought and guards nothing about the words. A plate that is shown, sized and placed can
+        /// still carry no text at all.
+        /// </summary>
+        private static void AssertTheBeatSentenceIsReadable(LevelScreen screen, string frameName,
+            string line)
+        {
+            HintPlate plate = screen.View.BeatPlate;
+            Assert.IsTrue(plate.IsShown, frameName + ": плашки бита нет на кадре.");
+            Assert.AreEqual(line, plate.Label.text,
+                frameName + ": на плашке не та строка — тексты идут мимо реестра GameTexts.");
+            StandTestHarness.AssertVisible(plate.Rect, "Плашка бита на кадре " + frameName);
+
+            AssertTheBeatPlateIsDark(screen, frameName, line);
+
+            RectInt box = StandTestHarness.PixelRectOf(StandTestHarness.Stage(), plate.Rect);
+            float inked = ShareCoveredBy(plate.Label.gameObject, box);
+            Assert.Greater(inked, MinBeatLetteringShare,
+                frameName + ": букв на плашке нет — надпись красит " +
+                (inked * 100f).ToString("0.0") + " % её прямоугольника при пороге " +
+                (MinBeatLetteringShare * 100f) + " %. Плашка стоит пустая.");
+        }
+
+        /// <summary>
+        /// How much of the plate the lettering has to move. Three lines of 30 pt inside a 560×196 plate
+        /// with its padding work out at a few per cent of white on dark; two is under the thinnest of
+        /// the four sentences and an order of magnitude above an empty slab.
+        /// </summary>
+        private const float MinBeatLetteringShare = 0.02f;
+
+        // ---- Б2 (возврат скептика 2026-09-22): a peak frame has to be a peak on the SHIPPED threshold ----
+
+        /// <summary>
+        /// This frame really is «пик хаоса» as the game ships it — and the chaos is in the MIDDLE of
+        /// the picture, not a frame of blobs round an empty plate.
+        ///
+        /// Blocker Б2 of the skeptic's return, 2026-09-22. Frames 07 and 24 were staged by moving the
+        /// peak threshold itself down to 32 % and then waiting for it: the shipped value is 65
+        /// (<see cref="TuningConfig.Defaults.PeakOverlapPercent"/>, loss at 85), so the founder was
+        /// shown half the pressure her own number describes. The threshold is a knob and the staging
+        /// wait is allowed to use it — what is NOT allowed is measuring the picture against the moved
+        /// knob, so this measures the picture.
+        ///
+        /// Two claims, because the first one alone passed the frame she rejected. Coverage is computed
+        /// on a grid over the WHOLE frame, so blobs hugging the four edges score a coverage that a
+        /// centre-empty composition has no business scoring; the founder's word for that frame was
+        /// «рамка с пустым центром». So the second claim reads the pixels of the middle quarter of the
+        /// frame and asks what the thought layer actually paints there.
+        /// </summary>
+        private static void AssertTheFrameIsReallyAtThePeak(LevelScreen screen, string frameName)
+        {
+            // Both numbers are taken BEFORE either claim is made, so a failing frame is reported with
+            // the whole measurement rather than with the half that tripped first.
+            float overlap = screen.Runtime.Field.OverlapPercent;
+            float centre = ShareCoveredBy(screen.View.ThoughtsLayer.gameObject, PeakCentreBox);
+            TestContext.WriteLine(frameName + ": пик — перекрытие " + overlap.ToString("0.0") +
+                " %, центр кадра закрашен на " + (centre * 100f).ToString("0.0") + " %, мыслей " +
+                screen.Runtime.Field.Thoughts.Count + ".");
+
+            Assert.GreaterOrEqual(overlap, MinPeakOverlapPercent,
+                frameName + ": перекрытие на кадре " + overlap.ToString("0.0") +
+                " % при пороге кадра " + MinPeakOverlapPercent.ToString("0") +
+                " % (отгружаемый порог пика — " + TuningConfig.Defaults.PeakOverlapPercent.ToString("0") +
+                " %). Кадр пика снят на заниженном пороге (блокер Б2, возврат скептика 2026-09-22).");
+
+            Assert.Greater(centre, MinPeakCentreShare,
+                frameName + ": центр кадра пуст — мысли красят " + (centre * 100f).ToString("0.0") +
+                " % середины (640…1280 × 360…720) при пороге " + (MinPeakCentreShare * 100f) +
+                " %. Это «рамка с пустым центром», которую основательница забраковала.");
+        }
+
+        /// <summary>The middle quarter of the frame, design px — where a peak has to be happening.</summary>
+        private static readonly RectInt PeakCentreBox = new RectInt(640, 360, 640, 360);
+
+        /// <summary>
+        /// The floor for a peak frame's own coverage, per cent. Five under the shipped threshold of 65:
+        /// the frame is shot a moment after the wait returns and the thoughts drift while it is being
+        /// written, so the claim has to have the width of a few frames in it — and it is still twice
+        /// the 32 the returned frames were staged against.
+        /// </summary>
+        private const float MinPeakOverlapPercent = 60f;
+
+        /// <summary>…and how much of the middle of the picture the thought layer has to paint, 0…1.</summary>
+        /// <remarks>
+        /// Both floors are set off measurements, not off taste. On the shipped threshold the frames
+        /// come out at 65.9 % / 82.3 % of centre (07) and 65.0 % / 57.3 % (24); the negative control —
+        /// `PeakOverlapPercent = 32f` put back on frame 24, nothing else changed — comes out at
+        /// 35.9 % / 34.1 %, i.e. it fails BOTH halves, which is what a frame the founder called
+        /// «рамка с пустым центром» should do.
+        /// </remarks>
+        private const float MinPeakCentreShare = 0.4f;
 
         // ---- the defeat screen's copy has to be READABLE, not merely present -----------------------------
 
@@ -262,38 +552,8 @@ namespace Meditation.Tests
         /// Share of the frame (or of <paramref name="box"/>) whose pixels change when
         /// <paramref name="what"/> is switched off — i.e. what that object is actually painting.
         /// </summary>
-        private static float ShareCoveredBy(GameObject what, RectInt? box = null)
-        {
-            Texture2D with = StandTestHarness.Capture(Letterbox);
-            bool was = what.activeSelf;
-            what.SetActive(false);
-            Canvas.ForceUpdateCanvases();
-            Texture2D without = StandTestHarness.Capture(Letterbox);
-            what.SetActive(was);
-            Canvas.ForceUpdateCanvases();
-
-            try
-            {
-                RectInt region = box ?? new RectInt(0, 0, with.width, with.height);
-                Color[] a = StandTestHarness.PixelsOf(with, region);
-                Color[] b = StandTestHarness.PixelsOf(without, region);
-                if (a.Length == 0 || a.Length != b.Length) return 0f;
-
-                int moved = 0;
-                for (int i = 0; i < a.Length; i++)
-                    if (Mathf.Abs(Luminance(a[i]) - Luminance(b[i])) > PaintNoise ||
-                        Mathf.Abs(a[i].r - b[i].r) * 255f > PaintNoise ||
-                        Mathf.Abs(a[i].g - b[i].g) * 255f > PaintNoise ||
-                        Mathf.Abs(a[i].b - b[i].b) * 255f > PaintNoise) moved++;
-
-                return moved / (float)a.Length;
-            }
-            finally
-            {
-                Object.DestroyImmediate(with);
-                Object.DestroyImmediate(without);
-            }
-        }
+        private static float ShareCoveredBy(GameObject what, RectInt? box = null) =>
+            StandTestHarness.ShareCoveredBy(what, Letterbox, box, PaintNoise);
 
         // ---- 01 title, 02 level card -----------------------------------------------------------------
 
@@ -334,45 +594,52 @@ namespace Meditation.Tests
             Assert.AreEqual(LevelStage.Intro, screen.Stage, "Кадр обзора снят не в обзоре.");
             Shoot("Game03_L1_intro");
 
-            // 17 · обучение, бит 1: кнопка «НАВОДИ» у первой детали, круг-взгляд в кадре.
+            // 17 · обучение, бит 1: плашка «Наводи джойстиком на объект», круг-взгляд в кадре.
+            // Кнопка «НАВОДИ» со стрелкой стояла тут до 2026-09-22 (заказ founder: «убрать стрелки все
+            // с экранов обучений»), и кадр снимается ровно ради того, что осталось.
             yield return GameTestHarness.Until(() => screen.Stage == LevelStage.Play, "обзор закончился");
             yield return GameTestHarness.SettleScreen(fake);
             Assert.AreEqual(TutorialBeat.Aim, screen.Beat, "Кадр «наводи» снят не на своём бите.");
-            Assert.AreEqual(ArtLibrary.Get(ArtScreens.ButtonAim), screen.View.Hint.Button.sprite);
             StandTestHarness.AssertVisible(screen.View.Gaze.rectTransform, "Круг-взгляд");
             Shoot("Game17_L1_tutorial_aim");
+            AssertTheBeatSentenceIsReadable(screen, "Game17_L1_tutorial_aim", GameTexts.BeatAim);
 
-            // 04 · обучение, бит 2: «КРУТИ РУЧКУ» у индикатора динамо и «ТАЩИ» у едущей детали.
+            // 04 · обучение, бит 2: одна плашка на обе руки, деталь едет по нити.
             yield return GameTestHarness.NoticeSomething(fake, screen);
             yield return GameTestHarness.CrankUntil(fake,
                 () => screen.Runtime.Collector.Progress01 > 0.35f, "деталь в пути");
             fake.Next = new BackendSnapshot { CrankDeltaDegrees = GameTestHarness.CrankPerFrame };
             yield return GameTestHarness.Frames(2);
             Assert.AreEqual(TutorialBeat.Crank, screen.Beat);
-            Assert.AreEqual(ArtLibrary.Get(ArtScreens.ButtonCrank), screen.View.Hint.Button.sprite);
-            Assert.IsTrue(screen.View.SecondHint.IsShown, "На кадре нет второй кнопки «ТАЩИ».");
             Shoot("Game04_L1_tutorial_crank");
+            AssertTheBeatSentenceIsReadable(screen, "Game04_L1_tutorial_crank", GameTexts.BeatCollect);
+            AssertTheTravellingDetailIsVisible(screen, "Game04_L1_tutorial_crank");
 
-            // 05 · обучение, бит 3: мысль-кот сидит поверх следующей детали, стрелка на датчики —
-            // кнопки «ТРЯСИ» в дропе нет, и кадр должен показывать именно это.
+            // 05 · обучение, бит 3: мысль-кот сидит поверх следующей детали, плашка называет её и
+            // говорит, куда вести руку. Дуговая стрелка к датчикам с кадра убрана.
             yield return GameTestHarness.CollectOneDetail(fake, screen);
             yield return GameTestHarness.Idle(fake, 4);
             Assert.AreEqual(TutorialBeat.Swipe, screen.Beat);
             Assert.AreEqual(1, screen.Runtime.Field.Thoughts.Count, "На кадре должна быть ровно одна мысль.");
-
-            // The arrow on THIS frame, which is the one the gate reads it off: clear of everything the
-            // thought paints (pips and their discs hang below its rectangle) and landing on the sensor
-            // panel at the bottom edge instead of stopping in mid-sky (design gate, 2026-08-08).
-            Thought teaching = screen.Runtime.Field.Thoughts[0];
-            float painted = ArtThoughtView.DrawnBottomY(teaching.Position, teaching.Size);
-            Assert.Greater(screen.View.Hint.Arrow.From.y, painted,
-                "Кадр 05: стрелка растёт прямо из пипсов мысли.");
-            Assert.AreEqual(LevelScreen.SensorsCue.x, screen.View.Hint.Arrow.To.x, 0.5f,
-                "Кадр 05: остриё стрелки не в постоянной точке на нижней кромке кадра.");
-
-            Assert.IsFalse(screen.View.Hint.Button.gameObject.activeSelf,
-                "На бите отгона кнопки быть не должно — её нет в дропе.");
             Shoot("Game05_L1_tutorial_swipe");
+            AssertTheSwipePlateIsDark(screen, "Game05_L1_tutorial_swipe");
+
+            // 40 · обучение, бит 4: «Заметь все объекты, перетащи их в ведёрко и не дай мыслям
+            // помешать тебе» — заказ founder 2026-09-22, и до возврата скептика у него не было
+            // собственного кадра. Он был виден только краем на 27-м (кадре лопающейся мысли), то есть
+            // единственная подсказка игры, которая не блокирует ничего и says ЗАЧЕМ всё остальное,
+            // стояла в контракте случайно и без единого гарда на текст.
+            //
+            // Кадр снимается ПОВЕРХ уже идущей игры, потому что бит именно такой: волны пущены
+            // (TutorialAllowsSpawning пропускает их с этого бита), стрелок нет, на экране — уровень и
+            // одно предложение над ним.
+            yield return GameTestHarness.SwipeUntil(fake, () => screen.Beat == TutorialBeat.Whole,
+                "мысль отбита, пошёл четвёртый бит");
+            yield return GameTestHarness.Idle(fake, 3);
+
+            Assert.AreEqual(TutorialBeat.Whole, screen.Beat, "Кадр 40 снят не на четвёртом бите.");
+            Shoot("Game40_L1_tutorial_whole_beat");
+            AssertTheBeatSentenceIsReadable(screen, "Game40_L1_tutorial_whole_beat", GameTexts.BeatWhole);
 
             LogAssert.NoUnexpectedReceived();
         }
@@ -479,8 +746,8 @@ namespace Meditation.Tests
             yield return GameTestHarness.NoticeByLooking(fake, screen, FirstUncollected(screen));
             yield return GameTestHarness.WaitForInkOnScreen(fake, screen, StagedThoughtInk);
 
-            Assert.IsFalse(screen.View.Hint.IsShown, "После отгона подсказки на кадре быть не должно.");
-            Assert.IsFalse(screen.View.SecondHint.IsShown, "Вторая кнопка тоже обязана уйти.");
+            Assert.IsFalse(screen.View.BeatPlate.IsShown,
+                "После отгона подсказки на кадре быть не должно.");
             Assert.AreEqual(TutorialBeat.Done, screen.Beat,
                 "После отгона обучение обязано быть позади — иначе кадр не про это.");
             Assert.AreEqual(0, screen.View.Pops.Count,
@@ -602,6 +869,17 @@ namespace Meditation.Tests
             // gate has to compare.
             TuningConfig.WaveIntervalSeconds = 300f;
             screen.Runtime.Restart();
+
+            // …and this frame stages its own growth ceiling, which it did not have to before
+            // 2026-09-22. The shipped ceiling is now ×12 — «разрастаются на весь экран», the founder's
+            // own order — and a thought at ×12 is four times the frame: a picture COMPARING an old
+            // thought with a fresh one cannot be taken at a size where the old one has no edges. So
+            // the knob is wound the way the wave clock above it is wound, to the largest ceiling that
+            // still leaves both blobs whole and apart, and the rate is wound up so getting there takes
+            // seconds instead of two minutes. That the SHIPPED ceiling really covers the frame is a
+            // separate claim, and it is arithmetic — LevelCatalogTests.TheShippedGrowthCeiling_….
+            TuningConfig.ThoughtGrowthCap = 2.5f;
+            TuningConfig.ThoughtGrowthPercentPerSec = 25f;
 
             // The aim parked out of the way, on the plate above the pair — the shipped mode draws the
             // circle, and a circle sitting on one of the two thoughts would be a third thing in a frame
@@ -1109,21 +1387,29 @@ namespace Meditation.Tests
             // 07 · пик хаоса: перекрытие выше СВОЕГО порога, но игра ещё идёт — края темнеют,
             // сеттинг проступает между мыслями. Кадр набирается ЖИВЫМИ волнами: прежняя постановка
             // раскладывала мысли сеткой 5×3, а такого кадра игра не выдаёт (дизайн-гейт 2026-08-07).
-            TuningConfig.PeakOverlapPercent = 32f;
+            //
+            // И набирается он до ОТГРУЖАЕМОГО порога пика (65 %), а не до заниженного: до возврата
+            // скептика 2026-09-22 тест ставил `PeakOverlapPercent = 32f` и ждал 32 % — то есть кадр
+            // «вот что творится на пике» снимался при половине того давления, которое описывает её же
+            // число. Порог не трогаем вовсе; ждём по Defaults, потому что живое значение уровня — это
+            // и есть оно (ApplyLevel порог не переписывает).
             TuningConfig.ThoughtsCoverVessel = true;
             yield return GameTestHarness.CrowdTheScreenByPlaying(fake, screen,
-                TuningConfig.PeakOverlapPercent);
+                TuningConfig.Defaults.PeakOverlapPercent);
 
             Assert.Less(screen.Runtime.Field.OverlapPercent, TuningConfig.LossOverlapPercent,
                 "Это уже поражение, а не пик — на кадре должна быть ещё играбельная сцена.");
             Assert.AreEqual(LevelStage.Play, screen.Stage, "Пик — состояние игры, а не исхода.");
             Shoot("Game07_L1_peak");
+            AssertTheFrameIsReallyAtThePeak(screen, "Game07_L1_peak");
 
             // …and this is the frame that has to prove the fill bar survived the toggle: at the peak the
             // thought layer draws ABOVE the vessel, and until 2026-08-08 the bar drew with the vessel and
             // therefore vanished under the blobs at exactly the moment it is the only thing saying how
             // much of the level is left (design gate).
             AssertTheFillBarIsVisibleInThisFrame(screen, "Game07_L1_peak");
+            AssertNoThoughtsInsideTheFillBar(screen, "Game07_L1_peak");
+            AssertThereIsNoSpeedometer(screen, "Game07_L1_peak");
 
             // 08 · победа: мысли растворились, портфель ×2 в центре со всей добычей.
             //
@@ -1142,6 +1428,15 @@ namespace Meditation.Tests
             TuningConfig.WaveWeak = 1;
             TuningConfig.WaveMedium = 0;
             TuningConfig.WaveStrong = 0;
+
+            // …and the peak itself has to be beaten off before the level can be won, which is new with
+            // the honest threshold: 65 % of the frame with everything on it still GROWING is four
+            // fifths of the way to the loss at 85, and the five remaining details take longer to crank
+            // than the blobs take to close the rest. Beaten off with the hand over the sensor — the
+            // player's own way out of a peak — rather than by clearing the field from the test.
+            yield return GameTestHarness.SwipeUntil(fake,
+                () => screen.Runtime.Field.OverlapPercent < 25f, "пик разогнан взмахами", 90f);
+
             int needed = screen.Level.DetailCount;
             yield return GameTestHarness.PlayUntil(fake,
                 () => screen.Runtime.CollectedCount >= needed, "уровень 1 собран", 90f);
@@ -1156,7 +1451,65 @@ namespace Meditation.Tests
             yield return GameTestHarness.Frames(2);
             Shoot("Game25_L1_level_complete");
 
+            // …и наезд камеры на ведёрко (founder 2026-09-22, п.8) — первая половина нового перехода
+            // победы, которая идёт ПОВЕРХ полутора секунд бита награды. Замеряется здесь, а не на
+            // кадре 08: кадр 08 снимается через два кадра после того, как награда встала, то есть в
+            // самом начале наезда, где его ещё нет (0.2 % — что этот же тест и вернул, когда проверка
+            // стояла там). К моменту готового экрана зум прошёл целиком.
+            Assert.AreEqual(1f, screen.View.ZoomedIn, 0.02f,
+                "Наезда на ведёрко нет — сцена за бит награды так и не приблизилась.");
+            Assert.AreEqual(LevelView.VictoryZoom, screen.View.SceneLayer.localScale.x, 1e-2f,
+                "Слой сцены не отмасштабирован — «наезд на ведёрко» не нарисован.");
+            Assert.AreEqual(LevelView.VictoryZoom, screen.View.VesselLayer.localScale.x, 1e-2f,
+                "Сосуд в наезде не участвует — а наезд именно на него.");
+            Assert.AreEqual(1f, screen.View.OutcomeLayer.localScale.x, 1e-3f,
+                "Наезд утащил за собой слой готовых экранов — рендер будет обрезан.");
+            Assert.AreEqual(1f, screen.View.HudLayer.localScale.x, 1e-3f,
+                "Наезд утащил за собой HUD.");
+
+            // 39 · СЕРЕДИНА ПЕРЕХОДА «круглая рябь» — заказ founder 2026-09-22, п.8, и кадр, который
+            // она просила в контракте.
+            //
+            // Снимается на прогрессе около половины, где рябь и есть рябь: фронт вышел из ведёрка, но
+            // кадр ещё не залит. На 0 и на 1 смотреть не на что — это чистый уровень и сплошная вода.
+            GameFlow rippleFlow = GameTestHarness.Flow();
+            yield return GameTestHarness.Until(() => rippleFlow.Rippling && rippleFlow.FadeAlpha > 0.35f,
+                "рябь дошла до середины", 20f);
+            Assert.Less(rippleFlow.FadeAlpha, 0.95f, "Рябь уже закрыла кадр — снимать нечего.");
+            Shoot("Game39_ripple_mid_transition");
+            AssertTheRippleIsReallyOnTheFrame(rippleFlow, "Game39_ripple_mid_transition");
+
             LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// The ripple is PAINTING this frame, and it is painting a round front out of the vessel —
+        /// not a rectangle, and not the old fade to black.
+        ///
+        /// Three claims, because three different things could be true and still leave a frame that
+        /// looks vaguely right: the widget could be up with no shader (the flat fallback, which is the
+        /// old fade under a new name), the shader could be up and painting nothing, or it could be
+        /// painting the whole quad (a wipe with no front). So: the shader is really loaded, the quad
+        /// really moves pixels, and the share it moves is strictly between «nothing» and «everything».
+        /// </summary>
+        private static void AssertTheRippleIsReallyOnTheFrame(GameFlow flow, string frameName)
+        {
+            Assert.IsNotNull(flow.Ripple, frameName + ": перехода «рябь» нет в потоке.");
+            Assert.IsTrue(flow.Rippling, frameName + ": переход идёт не рябью, а фейдом в чёрный.");
+            Assert.IsTrue(flow.Ripple.HasShader,
+                frameName + ": шейдер ряби не загрузился — на кадре плоская заглушка, то есть " +
+                "прежний фейд под новым именем.");
+
+            // The ripple leaves the vessel of the level that has just been won.
+            Vector2 vessel = LevelCatalog.At(0).VesselCentre;
+            Assert.AreEqual(vessel.x, flow.Ripple.Centre.x, 1f, frameName + ": рябь идёт не из ведёрка.");
+            Assert.AreEqual(vessel.y, flow.Ripple.Centre.y, 1f, frameName + ": рябь идёт не из ведёрка.");
+
+            float painted = ShareCoveredBy(flow.Ripple.Image.gameObject);
+            Assert.Greater(painted, 0.05f,
+                frameName + ": рябь не красит кадр — " + (painted * 100f).ToString("0.0") + " %.");
+            Assert.Less(painted, 0.98f,
+                frameName + ": рябь залила весь кадр — фронта на кадре нет, это уже не переход.");
         }
 
         // ---- 09 level 2, 10 level 3 with its overlay, 14 level 4, 15 level 5 -----------------------------
@@ -1211,6 +1564,8 @@ namespace Meditation.Tests
             Shoot(frame);
             AssertTheThoughtsPaintThisFrame(screen, frame);
             AssertTheAimIsVisibleInThisFrame(screen, frame);
+            AssertNoThoughtsInsideTheFillBar(screen, frame);
+            AssertThereIsNoSpeedometer(screen, frame);
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -1428,6 +1783,13 @@ namespace Meditation.Tests
             Assert.IsTrue(field.IsCovered(screen.Level.VesselCentre), "Кружка на кадре не накрыта.");
             Shoot("Game23_L2_thoughts_on_strip");
 
+            // The frame the design skeptic measured Б2 on: a strong blob sits on the mug, which is this
+            // level's vessel, and the bar stands right under it. The strip may be covered; the HUD on it
+            // may not.
+            AssertTheFillBarIsVisibleInThisFrame(screen, "Game23_L2_thoughts_on_strip");
+            AssertNoThoughtsInsideTheFillBar(screen, "Game23_L2_thoughts_on_strip");
+            AssertThereIsNoSpeedometer(screen, "Game23_L2_thoughts_on_strip");
+
             LogAssert.NoUnexpectedReceived();
         }
 
@@ -1442,11 +1804,12 @@ namespace Meditation.Tests
             yield return GameTestHarness.EnterLevel(fake, 2);
 
             var screen = (LevelScreen)GameTestHarness.Flow().Screen;
-            TuningConfig.PeakOverlapPercent = 32f;
             TuningConfig.ThoughtsCoverVessel = true;
 
+            // Отгружаемый порог пика, а не заниженный — см. кадр 07 и блокер Б2 возврата скептика
+            // 2026-09-22.
             yield return GameTestHarness.CrowdTheScreenByPlaying(fake, screen,
-                TuningConfig.PeakOverlapPercent);
+                TuningConfig.Defaults.PeakOverlapPercent);
 
             Assert.Less(screen.Runtime.Field.OverlapPercent, TuningConfig.LossOverlapPercent,
                 "Это уже поражение, а не пик.");
@@ -1454,6 +1817,10 @@ namespace Meditation.Tests
             Assert.Greater(screen.View.PeakEdges.color.a, 0.3f, "Края кадра в пике не темнеют.");
 
             Shoot("Game24_L3_peak");
+            AssertTheFrameIsReallyAtThePeak(screen, "Game24_L3_peak");
+            AssertTheFillBarIsVisibleInThisFrame(screen, "Game24_L3_peak");
+            AssertNoThoughtsInsideTheFillBar(screen, "Game24_L3_peak");
+            AssertThereIsNoSpeedometer(screen, "Game24_L3_peak");
             LogAssert.NoUnexpectedReceived();
         }
 

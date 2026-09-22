@@ -21,6 +21,7 @@ namespace Meditation.Stand
         private readonly ICollectionView _view;
         private readonly List<Vector2> _homes = new List<Vector2>();
         private readonly List<Vector2> _threadOffsets = new List<Vector2>();
+        private readonly List<Rect> _hitShapes = new List<Rect>();
         private readonly List<bool> _selectable = new List<bool>();
         private readonly string[] _names;
         private readonly Vector2 _vesselCentre;
@@ -31,6 +32,10 @@ namespace Meditation.Stand
         public CollectionRuntime(ICollectionView view)
             : this(view, HomesOfLevelOne(), LevelOneData.VesselCentre, NamesOfLevelOne())
         {
+            // The greybox placeholders are squares of 50–60 px against an aim of r = 130, so this
+            // changes almost nothing on the stand — which is the point of setting it: the stand is where
+            // the rules are proved, and a rule it does not run is a rule it cannot prove.
+            SetHitShapes(ShapesOfLevelOne());
         }
 
         public CollectionRuntime(ICollectionView view, IReadOnlyList<Vector2> homes, Vector2 vesselCentre,
@@ -73,6 +78,26 @@ namespace Meditation.Stand
 
         private Vector2 OffsetOf(int index) =>
             index >= 0 && index < _threadOffsets.Count ? _threadOffsets[index] : Vector2.zero;
+
+        /// <summary>
+        /// The rectangle each detail is DRAWN in — what the aim circle has to touch to notice it
+        /// (founder, 2026-09-22: «ловился во всей площади, а не только в центре самого самолётика»).
+        ///
+        /// A composition that never measured its sprites — the greybox stand's placeholders, the rule
+        /// tests — simply does not call this, and the gaze falls back to the anchor point it used
+        /// before. Separate from the constructor's <c>homes</c> for the same reason the thread offsets
+        /// are: the loop is TOLD its composition, and a composition that knows its own sizes should not
+        /// have to be a different class from one that does not.
+        /// </summary>
+        public void SetHitShapes(IReadOnlyList<Rect> shapes)
+        {
+            _hitShapes.Clear();
+            if (shapes == null) return;
+            for (int i = 0; i < shapes.Count; i++) _hitShapes.Add(shapes[i]);
+        }
+
+        /// <summary>The drawn rectangles, or null while the composition has none.</summary>
+        private IReadOnlyList<Rect> HitShapes => _hitShapes.Count == _homes.Count ? _hitShapes : null;
 
         public ThoughtField Field { get; } = new ThoughtField();
 
@@ -220,7 +245,7 @@ namespace Meditation.Stand
                     for (int i = 0; i < _selectable.Count; i++)
                         _selectable[i] = _selectable[i] && i != NoticedIndex;
 
-                    Gaze.Tick(stick, deltaTime, _homes, _selectable);
+                    Gaze.Tick(stick, deltaTime, _homes, _selectable, HitShapes);
                     if (Gaze.NoticedThisTick) Notice(Gaze.NoticedIndex);
                     _view.SetGaze(Gaze.Position, Gaze.DwellProgress01, true);
                     break;
@@ -323,6 +348,19 @@ namespace Meditation.Stand
             var homes = new Vector2[LevelOneData.Details.Length];
             for (int i = 0; i < homes.Length; i++) homes[i] = LevelOneData.Details[i].Home;
             return homes;
+        }
+
+        private static Rect[] ShapesOfLevelOne()
+        {
+            var shapes = new Rect[LevelOneData.Details.Length];
+            for (int i = 0; i < shapes.Length; i++)
+            {
+                DetailSpec spec = LevelOneData.Details[i];
+                shapes[i] = new Rect(spec.Home.x - spec.Size * 0.5f, spec.Home.y - spec.Size * 0.5f,
+                    spec.Size, spec.Size);
+            }
+
+            return shapes;
         }
 
         private static string[] NamesOfLevelOne()

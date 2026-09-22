@@ -33,16 +33,28 @@ namespace Meditation.Game
         public const float StartDegrees = 720f;
 
         /// <summary>
-        /// Where the drawn button sits, design px — measured off <c>экраны/Title/превью.png</c>
-        /// (the render with the button) against <c>title-screen-no-button.png</c>: the difference is a
-        /// 324×93 patch centred on (962, 864). Drawn at 320 px wide with the button's own aspect.
+        /// Where the drawn НАЧАТЬ button USED to sit, design px — measured off
+        /// <c>экраны/Title/превью.png</c> (the render with the button) against
+        /// <c>title-screen-no-button.png</c>: the difference is a 324×93 patch centred on (962, 864).
+        ///
+        /// The button is gone (founder, playtest 2026-09-22: «кнопку НАЧАТЬ убрать»). A drawn button on
+        /// a cabinet that has nothing to press it with is an instruction to do the wrong thing, and it
+        /// was doing exactly that — she stood in front of this screen and looked for the mouse.
+        ///
+        /// The PLACE stays, as <see cref="StartAnchor"/>: the render was composed with a hole in it at
+        /// these coordinates, and the designer's animation of the handle (Катя, бриф 2026-09-22) is
+        /// what goes into the hole. Until it arrives the anchor is an empty RectTransform, which is
+        /// what an anchor should be.
         /// </summary>
         public static readonly Vector2 ButtonCentre = new Vector2(960f, 864f);
 
-        /// <summary>Width the button is drawn at, design px; the height follows its own proportions.</summary>
+        /// <summary>Width the anchor (and the animation that will fill it) is laid out at, design px.</summary>
         public const float ButtonWidth = 320f;
 
-        /// <summary>The fill bar under the button — its top edge, design px.</summary>
+        /// <summary>…and its height — the button's own 324×93 proportion at that width.</summary>
+        public const float ButtonHeight = 92f;
+
+        /// <summary>The fill bar under the anchor — its gap from it, design px.</summary>
         private const float ProgressGap = 18f;
 
         private const float ProgressHeight = 10f;
@@ -58,17 +70,13 @@ namespace Meditation.Game
             Ui.Place(background.rectTransform, 960f, 540f, 1920f, 1080f);
             Background = background;
 
-            StartButton = Ui.NewImage(Root, "StartButton");
-            StartButton.sprite = ArtLibrary.Get(ArtScreens.StartButton);
-            StartButton.preserveAspect = true;
-            StartButton.color = StartButton.sprite != null ? Color.white : new Color(0.56f, 0.79f, 0.79f);
+            // The hole the button left, named and laid out but drawing nothing — see ButtonCentre.
+            var anchor = new GameObject("StartAnimationAnchor", typeof(RectTransform));
+            StartAnchor = (RectTransform)anchor.transform;
+            StartAnchor.SetParent(Root, false);
+            Ui.Place(StartAnchor, ButtonCentre.x, ButtonCentre.y, ButtonWidth, ButtonHeight);
 
-            float height = StartButton.sprite != null && StartButton.sprite.rect.width > 1f
-                ? ButtonWidth * StartButton.sprite.rect.height / StartButton.sprite.rect.width
-                : 89f;
-            Ui.Place(StartButton.rectTransform, ButtonCentre.x, ButtonCentre.y, ButtonWidth, height);
-
-            float barY = ButtonCentre.y + height * 0.5f + ProgressGap;
+            float barY = ButtonCentre.y + ButtonHeight * 0.5f + ProgressGap;
             Ui.Rounded(Root, "StartProgressTrack", ButtonCentre.x, barY, ButtonWidth, ProgressHeight,
                 new Color(1f, 1f, 1f, 0.16f), Color.clear, 0f, 5);
 
@@ -90,7 +98,7 @@ namespace Meditation.Game
         /// Where the two lines stand, design px: under the fill bar, in the strip of road the render
         /// leaves empty between the bar (y ≈ 927) and the bottom edge.
         ///
-        /// Not above the button, where the render's own horizon is: the sunset there runs from cream to
+        /// Not above the anchor, where the render's own horizon is: the sunset there runs from cream to
         /// orange and there is no ink colour that reads on both halves of it. The road below is the one
         /// large dark area of the picture — and even there the type is drawn twice (see
         /// <see cref="Shadowed"/>), because the founder's apples and her mug are down there too.
@@ -128,7 +136,7 @@ namespace Meditation.Game
             return Ui.Label(Root, name, text, 960f, y, 1600f, fontSize * 1.6f, fontSize, LabelInk);
         }
 
-        /// <summary>«Раскрути ручку — два оборота» — the founder's own question, answered on screen.</summary>
+        /// <summary>«Крути ручку, чтобы начать» — the founder's own question, answered on screen.</summary>
         public Text StartLabel { get; }
 
         /// <summary>…and the PC bracket under it.</summary>
@@ -148,8 +156,12 @@ namespace Meditation.Game
         /// <summary>The finished render behind everything — the suite asserts the picture is really up.</summary>
         public Image Background { get; }
 
-        /// <summary>The drawn НАЧАТЬ button. Not clickable: on the cabinet there is nothing to click with.</summary>
-        public Image StartButton { get; }
+        /// <summary>
+        /// The place the НАЧАТЬ button occupied, empty and drawing nothing — the mount for the
+        /// designer's handle animation. The suite asserts it is EMPTY, which is the whole of «кнопку
+        /// убрать»: an anchor that quietly grew an Image again would be the button back.
+        /// </summary>
+        public RectTransform StartAnchor { get; }
 
         /// <summary>How much of the two turns is in, as a bar the player can watch.</summary>
         public Image Progress { get; }

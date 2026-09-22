@@ -106,6 +106,8 @@ namespace Meditation.Tests
         /// </summary>
         private static readonly string[] GameLevelRows =
         {
+            // «Общий запас мыслей на уровень» — founder, плейтест 2026-09-22 («волны»).
+            "запас мыслей",
             "интервал волн",
             "в волне: слабых",
             "в волне: средних",
@@ -155,6 +157,19 @@ namespace Meditation.Tests
             "звук: мысли по перекрытию, а не по числу",
             "звук: тишина вне уровня",
 
+            // Founder, плейтест 2026-09-22: п.10 (кроссфейд дорожек, кривая мыслей), п.2 (тайминги
+            // заставок), п.8 (переход «круглая рябь»), п.7 (мерцание деталей).
+            "звук: кроссфейд дорожек уровня",
+            "звук: кривая слоя мыслей",
+            "карточка уровня: держать",
+            "перебивка «Отлично!»: держать",
+            "рябь: длительность",
+            "рябь: ширина кольца",
+            "рябь: амплитуда",
+            "рябь: гребней",
+            "мерцание: амплитуда",
+            "мерцание: период",
+
             // SCREENS «Детали в сцене» — луч-подсветка, тот же заказ.
             "луч: период",
             "луч: длительность прохода",
@@ -187,6 +202,16 @@ namespace Meditation.Tests
                 { "звук: потолок слоя мыслей", (0f, 1f) },
                 { "звук: мыслей до максимума", (4f, 15f) },
                 { "звук: сглаживание громкости", (0.1f, 2f) },
+                { "звук: кроссфейд дорожек уровня", (0f, 4f) },          // founder 2026-09-22
+                { "звук: кривая слоя мыслей", (1f, 4f) },
+                { "карточка уровня: держать", (1.5f, 8f) },
+                { "перебивка «Отлично!»: держать", (1f, 8f) },
+                { "рябь: длительность", (0.3f, 2.5f) },
+                { "рябь: ширина кольца", (0.04f, 0.4f) },
+                { "рябь: амплитуда", (0f, 0.12f) },
+                { "рябь: гребней", (1f, 6f) },
+                { "мерцание: амплитуда", (0f, 0.5f) },
+                { "мерцание: период", (0.4f, 3f) },
                 { "луч: период", (4f, 20f) },                            // SCREENS «Детали в сцене»
                 { "луч: длительность прохода", (0.6f, 2.5f) },
                 { "луч: ширина полосы", (150f, 600f) },
@@ -235,12 +260,27 @@ namespace Meditation.Tests
             Assert.IsFalse(TuningConfig.AudioThoughtsByOverlap);
             Assert.IsTrue(TuningConfig.AudioSilentOffLevel);
 
-            Assert.AreEqual(8f, TuningConfig.SweepPeriodSeconds, 1e-3f);
+            // Заказ founder 2026-09-22, п.10: смена дорожки кроссфейдом, кривая мыслей мягче.
+            Assert.AreEqual(1.2f, TuningConfig.AudioBackgroundCrossfadeSeconds, 1e-3f);
+            Assert.AreEqual(2f, TuningConfig.AudioThoughtsCurve, 1e-3f,
+                "Кривая слоя мыслей приехала линейной — это та агрессивность, на которую жаловались.");
+
+            // …и п.7: «блики-пробеги по ВСЕМ объектам на ВСЕХ уровнях и с большей частотой». Three of
+            // these six changed with that one sentence, and the two toggles are the load-bearing half
+            // of it — «только по незамеченным» hides the band from the detail the player is holding,
+            // «реже на поздних» takes it away exactly where the plates are darkest.
+            Assert.AreEqual(4.5f, TuningConfig.SweepPeriodSeconds, 1e-3f);
             Assert.AreEqual(1.2f, TuningConfig.SweepDurationSeconds, 1e-3f);
             Assert.AreEqual(320f, TuningConfig.SweepWidthPx, 1e-3f);
-            Assert.AreEqual(0.45f, TuningConfig.SweepStrength, 1e-3f);
-            Assert.IsTrue(TuningConfig.SweepOnlyUnnoticed);
-            Assert.IsTrue(TuningConfig.SweepRarerOnLateLevels);
+            Assert.AreEqual(0.7f, TuningConfig.SweepStrength, 1e-3f);
+            Assert.IsFalse(TuningConfig.SweepOnlyUnnoticed,
+                "Луч снова светит только по незамеченным — founder просила по ВСЕМ объектам.");
+            Assert.IsFalse(TuningConfig.SweepRarerOnLateLevels,
+                "Луч снова реже на поздних уровнях — founder просила на ВСЕХ уровнях.");
+
+            // …и мерцание деталей, п.7: обе ручки вдвое активнее спековых.
+            Assert.AreEqual(0.24f, TuningConfig.DetailPulseAmplitude, 1e-3f);
+            Assert.AreEqual(1.2f, TuningConfig.DetailPulseSeconds, 1e-3f);
 
             // Неон-прицел и обводка. The toggle is the one that matters: the founder asked for the
             // outline precisely so she could compare it with the pulse and the sweep, and a toggle
@@ -276,8 +316,9 @@ namespace Meditation.Tests
                 { "прочность: средние", (2f, 12f) },
                 { "прочность: крепкие", (2f, 12f) },
                 { "скорость дрейфа", (20f, 60f) },          // SCREENS §Мысли
-                { "рост мыслей", (0f, 10f) },               // founder 2026-08-07
-                { "потолок роста", (1f, 3f) }
+                { "запас мыслей", (0f, 60f) },              // founder 2026-09-22
+                { "рост мыслей", (0f, 25f) },               // founder 2026-09-22 («рост увеличить»)
+                { "потолок роста", (1f, 16f) }
             };
 
             for (int level = 0; level < TuningConfig.LevelBands; level++)
@@ -461,10 +502,13 @@ namespace Meditation.Tests
             AssertRangeEverywhere("прочность: крепкие", 2f, 12f);
             AssertRangeEverywhere("пауза затухания", 400f, 1500f);
             AssertRangeEverywhere("скорость дрейфа", 20f, 60f);              // SCREENS §Мысли
-            AssertRangeEverywhere("порог поражения (перекрытие)", 85f, 100f);
+            // The floor came down to 50 with the wave budget (founder 2026-09-22): a level that sends
+            // five thoughts and stops cannot reach 92 % of the frame, so the threshold had to become
+            // a number the founder can take DOWN as well as up.
+            AssertRangeEverywhere("порог поражения (перекрытие)", 50f, 100f);
             AssertRangeEverywhere("длина передышки", 0f, 5f);
-            AssertRangeEverywhere("рост мыслей", 0f, 10f);              // founder 2026-08-07
-            AssertRangeEverywhere("потолок роста", 1f, 3f);
+            AssertRangeEverywhere("рост мыслей", 0f, 25f);              // founder 2026-09-22
+            AssertRangeEverywhere("потолок роста", 1f, 16f);
             AssertRangeEverywhere("прицел: радиус", 60f, 220f);
         }
 

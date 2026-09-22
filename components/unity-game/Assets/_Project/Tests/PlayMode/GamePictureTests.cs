@@ -634,6 +634,70 @@ namespace Meditation.Tests
             return rises.Count / (float)a.Length;
         }
 
+        // ---- Б2: «HUD они не закрывают», measured, with the negative control ---------------------------
+
+        /// <summary>
+        /// A thought put exactly ON the fill bar changes nothing inside it — and the same measurement
+        /// goes red the moment the HUD is dropped below the thought layer.
+        ///
+        /// Blocker Б2 of the design gate, 2026-08-08: SCREENS §S3 says «мысли HUD не закрывают», and
+        /// the gate's own frames measured 23.2 % (Game23) and 10.4 % (Game15) of the bar's pixels being
+        /// the white discs under the pips. The layer order was already right — the bar has been on the
+        /// HUD layer since that morning — so a Z-order assert would have been green through the whole
+        /// life of the bug. What was wrong was OPACITY: a 22 %-black track is a window.
+        ///
+        /// The negative control is the point of the test. A guard that has never been seen to fail is a
+        /// guard nobody knows the sign of, and this one is measured through two captures and a boolean:
+        /// there are several ways for it to read zero for reasons that have nothing to do with the bar
+        /// (an empty frame, a box off screen, a thought that drifted away). So the same call is made
+        /// with the HUD deliberately under the thoughts, and it has to come back well over the ceiling.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheFillBar_IsOpaqueOverTheThoughts_AndTheGuardCatchesItWhenItIsNot()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            LevelView view = screen.View;
+
+            // Staged, not hoped for: a strong blob laid on the bar's own centre through the real field.
+            Rect bar = LevelCatalog.VesselBarRectOf(screen.Level);
+            screen.Runtime.Field.SpawnAt(ThoughtStrength.Strong, screen.Level.ThoughtSprites[0],
+                bar.center);
+            yield return GameTestHarness.Idle(fake, 3);
+            Assert.GreaterOrEqual(screen.Runtime.Field.Thoughts.Count, 1, "Мысль на полосе не появилась.");
+
+            DesignStage stage = StandTestHarness.Stage();
+            RectInt box = StandTestHarness.PixelRectOf(stage, view.VesselFillTrack.rectTransform);
+            Assert.Greater(box.width * box.height, 100, "Полоса наполнения не попала в кадр.");
+
+            float through = StandTestHarness.ShareCoveredBy(view.ThoughtsLayer.gameObject, Color.black, box);
+            Assert.Less(through, MaxThoughtInkInHud,
+                "Сквозь полосу наполнения видно мысль: " + (through * 100f).ToString("0.0") +
+                " % её пикселей при потолке " + (MaxThoughtInkInHud * 100f) + " %.");
+
+            // …and the control: the same bar, the same blob, the HUD one layer lower.
+            int hud = view.HudLayer.GetSiblingIndex();
+            view.HudLayer.SetSiblingIndex(view.ThoughtsLayer.GetSiblingIndex());
+            Canvas.ForceUpdateCanvases();
+
+            float under = StandTestHarness.ShareCoveredBy(view.ThoughtsLayer.gameObject, Color.black, box);
+
+            view.HudLayer.SetSiblingIndex(hud);
+            Canvas.ForceUpdateCanvases();
+
+            Assert.Greater(under, MaxThoughtInkInHud * 2f,
+                "Гард слепой: полосу опустили ПОД слой мыслей, а замер остался " +
+                (under * 100f).ToString("0.0") + " %. Он не о том, что происходит с картинкой.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>How much of a HUD widget's own area the thought layer may move — see the guard above.</summary>
+        private const float MaxThoughtInkInHud = 0.04f;
+
         // ---- pixel arithmetic --------------------------------------------------------------------------
 
         private static float MaxChannelDistance(Color a, Color b) =>

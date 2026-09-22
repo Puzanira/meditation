@@ -70,8 +70,16 @@ namespace Meditation.Mechanics
 
         private float _meditationTail;
         private float _meditationBlend;
+        private float _trackBlend = 1f;
+        private int _outgoingLevel = NoTrack;
 
-        /// <summary>Level background, 0..1 — already scaled by the tuned ceiling.</summary>
+        /// <summary>«No second track» — the value of <see cref="OutgoingLevelIndex"/> outside a swap.</summary>
+        public const int NoTrack = -1;
+
+        /// <summary>
+        /// The background BUS, 0..1 — how loud the level's music is right now, whichever track that is.
+        /// Already scaled by the tuned ceiling and already ducked (or replaced) by «медитация».
+        /// </summary>
         public float Background { get; private set; }
 
         /// <summary>
@@ -90,7 +98,34 @@ namespace Meditation.Mechanics
         public float Thoughts { get; private set; }
 
         /// <summary>Which level's background track the mix wants loaded, 0-based.</summary>
-        public int BackgroundLevelIndex { get; private set; }
+        public int BackgroundLevelIndex { get; private set; } = NoTrack;
+
+        // ---- смена дорожки: кроссфейд (founder, плейтест 2026-09-22, п.10) ----------------------
+
+        /// <summary>
+        /// Where the swap between two levels' tracks stands: 0 = all the previous level's track,
+        /// 1 = all of this one's. Sits at 1 whenever no swap is running.
+        ///
+        /// Until this playtest a level change was <c>Stop()</c> · assign · <c>Play()</c>, i.e. a frame
+        /// of silence and then a new track at full volume, five times a run. §8 spends three [tune]
+        /// knobs on crossfading the meditation LAYER against the background inside a level and had
+        /// nothing at all to say about the one change of music the player actually hears.
+        ///
+        /// Stands still while the background bus is silent — see <see cref="TickTrackSwap"/>.
+        /// </summary>
+        public float TrackBlend => _trackBlend;
+
+        /// <summary>The level whose track is still fading out, or <see cref="NoTrack"/>.</summary>
+        public int OutgoingLevelIndex => _outgoingLevel;
+
+        /// <summary>True while two background tracks are sounding at once.</summary>
+        public bool SwappingTracks => _outgoingLevel != NoTrack;
+
+        /// <summary>Volume of the arriving track — what the bus is, times its share of the swap.</summary>
+        public float BackgroundIn => Background * _trackBlend;
+
+        /// <summary>…and of the one leaving. Zero unless <see cref="SwappingTracks"/>.</summary>
+        public float BackgroundOut => SwappingTracks ? Background * (1f - _trackBlend) : 0f;
 
         /// <summary>Everything down and the tail forgotten — «в меню» is instant silence, not a fade.</summary>
         public void SilenceNow()
@@ -100,6 +135,8 @@ namespace Meditation.Mechanics
             Thoughts = 0f;
             _meditationTail = 0f;
             _meditationBlend = 0f;
+            _trackBlend = 1f;
+            _outgoingLevel = NoTrack;
         }
 
         /// <summary>
@@ -120,7 +157,13 @@ namespace Meditation.Mechanics
 
         public void Tick(float deltaTime, in AudioScene scene)
         {
-            BackgroundLevelIndex = Mathf.Max(0, scene.LevelIndex);
+            // §8: a level always has its background; off the level the toggle decides, and the title
+            // is the exception the spec names by hand («старт — тишина, кроме титула»). Computed
+            // first because the swap of tracks needs to know whether anyone can HEAR it.
+            bool backgroundWanted = scene.OnLevel || scene.BackgroundAllowed ||
+                                    !TuningConfig.AudioSilentOffLevel;
+
+            TickTrackSwap(deltaTime, Mathf.Max(0, scene.LevelIndex), backgroundWanted);
 
             // ---- слой 2, «медитация» -------------------------------------------------------------
             if (scene.Collecting) _meditationTail = 0f;
@@ -133,10 +176,6 @@ namespace Meditation.Mechanics
                 deltaTime / (meditating ? fadeIn : fadeOut));
 
             // ---- слой 1, фон уровня --------------------------------------------------------------
-            // §8: a level always has its background; off the level the toggle decides, and the title
-            // is the exception the spec names by hand («старт — тишина, кроме титула»).
-            bool backgroundWanted = scene.OnLevel || scene.BackgroundAllowed ||
-                                    !TuningConfig.AudioSilentOffLevel;
             float ceiling = Mathf.Clamp01(TuningConfig.AudioBackgroundVolume);
             Meditation = _meditationBlend * ceiling;
 
@@ -156,11 +195,75 @@ namespace Meditation.Mechanics
                 : Mathf.Clamp01(scene.ThoughtCount / Mathf.Max(1f, TuningConfig.AudioThoughtsAtCount));
 
             float thoughtsTarget = scene.OnLevel
-                ? pressure * Mathf.Clamp01(TuningConfig.AudioThoughtsMaxVolume)
+                ? ThoughtsCurve(pressure) * Mathf.Clamp01(TuningConfig.AudioThoughtsMaxVolume)
                 : 0f;
 
             float smoothing = Mathf.Max(0.01f, TuningConfig.AudioThoughtsSmoothingSeconds);
             Thoughts = Mathf.MoveTowards(Thoughts, thoughtsTarget, deltaTime / smoothing);
+        }
+
+        /// <summary>
+        /// «Кривая слоя мыслей — менее агрессивная» (founder, 2026-09-22, п.10): the same dial, bent.
+        ///
+        /// Both ENDS are fixed by construction — silence at nothing on screen, the ceiling at a full
+        /// one — so an exponent is the whole of the change and the knob cannot turn the layer off or
+        /// make it louder than its ceiling. At the shipped 2.0 the middle of the range is a quarter of
+        /// the ceiling instead of a half, which is what the founder heard as «уже орёт, а играть ещё
+        /// нормально». At 1.0 it is exactly the straight line it used to be.
+        ///
+        /// Public because this is the whole claim of that line item, and the EditMode suite checks it
+        /// as arithmetic rather than against a speaker batch mode does not have.
+        /// </summary>
+        public static float ThoughtsCurve(float pressure01)
+        {
+            float exponent = Mathf.Clamp(TuningConfig.AudioThoughtsCurve, 1f, 8f);
+            float p = Mathf.Clamp01(pressure01);
+            return Mathf.Approximately(exponent, 1f) ? p : Mathf.Pow(p, exponent);
+        }
+
+        /// <summary>
+        /// Advance the swap between two levels' background tracks.
+        ///
+        /// The FIRST track is not a swap: at boot there is nothing to fade out of, and crossfading from
+        /// silence would open every run with a level-1 track sliding in under the title.
+        ///
+        /// …and a swap only moves while the background bus is WANTED on this screen, which is the
+        /// whole of «фоновый должен немного затухать, а новый должен нарастать» (founder, 2026-09-22).
+        /// The next level's index reaches the mix on its CARD (<c>LevelCardScreen.Audio</c>), and the
+        /// card is silence under the shipped «тишина вне уровня» [toggle] — so a blend that ran on the
+        /// card ran out in that silence, and the level opened on the new track alone, fading in from
+        /// nothing, with the old one already stopped (Codex, 2026-09-22). Frozen, the swap instead
+        /// begins on the first frame of the level, where both tracks are audible and one really does
+        /// hand over to the other. With the toggle OFF the background carries through the card, the
+        /// bus is wanted there, and the crossfade happens on the card — which is also where it is
+        /// heard. Either way the rule is the same one: the fade runs where the ear is.
+        /// </summary>
+        private void TickTrackSwap(float deltaTime, int wantedLevel, bool audible)
+        {
+            if (BackgroundLevelIndex == NoTrack)
+            {
+                BackgroundLevelIndex = wantedLevel;
+                _trackBlend = 1f;
+                _outgoingLevel = NoTrack;
+                return;
+            }
+
+            if (!audible) return;
+
+            if (wantedLevel != BackgroundLevelIndex)
+            {
+                // A swap asked for while one is still running: the track that was arriving becomes the
+                // one that is leaving, at the volume it had got to. Never a third source.
+                _outgoingLevel = BackgroundLevelIndex;
+                _trackBlend = 0f;
+                BackgroundLevelIndex = wantedLevel;
+            }
+
+            if (_outgoingLevel == NoTrack) return;
+
+            float seconds = Mathf.Max(0.01f, TuningConfig.AudioBackgroundCrossfadeSeconds);
+            _trackBlend = Mathf.MoveTowards(_trackBlend, 1f, deltaTime / seconds);
+            if (_trackBlend >= 1f) _outgoingLevel = NoTrack;
         }
     }
 }

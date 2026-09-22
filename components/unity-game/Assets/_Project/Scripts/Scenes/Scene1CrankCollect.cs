@@ -53,12 +53,16 @@ namespace Meditation.Scenes
             ShowCrankHint(LevelOneData.Details[DetailIndex].Home);
         }
 
-        /// <summary>Registry string, verbatim (walkthrough frame 25): «Крути ручку!».</summary>
+        /// <summary>
+        /// Walkthrough frame 25 wrote it «Крути ручку!» — the stand says «крутилку», because the panel
+        /// in the room does (system/CONTROLS_BRIEF.md; founder, 2026-09-22). The stand is a rig for the
+        /// RULE, but it is a rig the founder reads, and two names for one control is the bug.
+        /// </summary>
         private void ShowCrankHint(Vector2 target)
         {
             Vector2 home = LevelOneData.Details[DetailIndex].Home;
             // Стоп на подступе: деталь 50 px, стрелка не должна её накрывать (макет 4).
-            Composition.ShowHint("Крути ручку!", HintTone.Crank,
+            Composition.ShowHint("Крути крутилку!", HintTone.Crank,
                 HintCentre + (target - home) * 0.5f, target, 55f);
         }
 

@@ -81,7 +81,7 @@ namespace Meditation.Scenes
                 // Поражение по кадру 17: белая подложка под строками, цвета мыслей гаснут, HUD снят.
                 Composition.SetHudVisible(false);
                 Composition.SetDesaturated(true);
-                Composition.ShowMessage("Мысли захватили всё. Вдохни.", "Крути ручку — попробуй снова",
+                Composition.ShowMessage("Мысли захватили всё. Вдохни.", "Крути крутилку — попробуй снова",
                     true, 480f);
                 _outcomeSeconds = 0f;
                 _wipeDegrees = 0f;

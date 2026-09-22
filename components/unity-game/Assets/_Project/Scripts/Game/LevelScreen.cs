@@ -22,22 +22,36 @@ namespace Meditation.Game
     /// <summary>
     /// Scripted beats of the level-1 tutorial (SCREENS §Обучение, walkthrough Э6).
     ///
-    /// The order changed with the drop of 2026-08-07 and it changed for a reason: the drop ships three
-    /// drawn buttons — НАВОДИ, КРУТИ РУЧКУ, ТАЩИ — and they name the hands in the order the player
-    /// actually uses them. The old first beat noticed the first detail FOR the player and asked only
-    /// for the handle, so the gaze (the shipped way of choosing a detail) was taught last, after the
-    /// tutorial was over. Now it is taught first, with the button that says so.
+    /// The order changed with the drop of 2026-08-07 and it changed for a reason: it is the order the
+    /// player's hands actually come into play, and the old first beat noticed the first detail FOR the
+    /// player and asked only for the крутилка — so the gaze, the shipped way of choosing a detail, was
+    /// taught last, after the tutorial was over. Now it is taught first.
+    ///
+    /// Each beat is ONE dark plate with one sentence on it, and since 2026-09-22 that is all a beat
+    /// draws (founder: «убрать стрелки все с экранов обучений… оставить только плашки с нашим
+    /// текстом»). The drawn caps buttons that used to name the hand — НАВОДИ · КРУТИ РУЧКУ · ТАЩИ —
+    /// and every turquoise arrow went with that sentence; see <c>LevelView.BeatAnchor</c>.
     /// </summary>
     public enum TutorialBeat
     {
-        /// <summary>«НАВОДИ» — aim the gaze at a detail. Nothing else happens on screen.</summary>
+        /// <summary>«Наводи джойстиком на объект» — aim the gaze. Nothing else happens on screen.</summary>
         Aim = 0,
-        /// <summary>«КРУТИ РУЧКУ» at the dynamo, «ТАЩИ» beside the detail on its thread.</summary>
+        /// <summary>«Замечай детали вокруг. Крути крутилку и тащи объект» — one sentence, both hands.</summary>
         Crank = 1,
-        /// <summary>The first thought lands on the next detail; an arrow at the sensors, no words.</summary>
+        /// <summary>The first thought lands on the next detail; the sentence names the sensors.</summary>
         Swipe = 2,
-        /// <summary>Taught. Ordinary play, and the clock starts.</summary>
-        Done = 3
+        /// <summary>
+        /// «Заметь все объекты, перетащи их в ведёрко и не дай мыслям помешать тебе» — the goal,
+        /// written over a level that is already being played (founder, 2026-09-22).
+        ///
+        /// A beat that blocks NOTHING and scripts nothing: the three verbs have been taught, the
+        /// waves are running, and this is the sentence that says what they are for. It leaves on its
+        /// own clock (<see cref="WholeBeatSeconds"/>) rather than on an action, because there is no
+        /// one action that would mean the player has understood it.
+        /// </summary>
+        Whole = 3,
+        /// <summary>Taught. Ordinary play.</summary>
+        Done = 4
     }
 
     /// <summary>
@@ -61,8 +75,20 @@ namespace Meditation.Game
         /// </summary>
         private const float TableauSeconds = 1.5f;
 
-        /// <summary>…and then the drawn «Отлично!» screen, before the next level's card.</summary>
-        private const float CompleteScreenSeconds = 2f;
+        /// <summary>
+        /// …and then the drawn «Отлично!» screen, before the next level's card — «перебивка в конце
+        /// уровня». A [tune] since the founder's playtest of 2026-09-22 («держать дольше»), where 2 s
+        /// turned out to be less time than it takes to read what the render says.
+        /// </summary>
+        private static float CompleteScreenSeconds =>
+            Mathf.Max(0.2f, TuningConfig.LevelCompleteSeconds);
+
+        /// <summary>
+        /// How long the fourth beat's sentence stays up. Not a [tune]: it is the same «read one line»
+        /// budget as the other three beats, which have never had a clock either — they leave when the
+        /// player does the thing. This one has nothing to wait for, so it waits for a reading.
+        /// </summary>
+        public const float WholeBeatSeconds = 6f;
 
         private const float AutoRetrySeconds = 4f;  // S5 [toggle]
         private const float DegreesPerTurn = 360f;
@@ -71,40 +97,21 @@ namespace Meditation.Game
         public const float WipeSharePerTurn = 0.1f;
 
         /// <summary>
-        /// Where the arrow of the отгон beat POINTS, and it is a fixed place: the middle of the frame's
-        /// bottom edge, because that is where the panel with the two height sensors physically is
-        /// (founder, 2026-08-07: «отгоняем на датчики движения»). There is no drawn «ТРЯСИ» in the drop,
-        /// so this beat is an arrow and a stroke and nothing else.
+        /// Where the отгон beat is ABOUT: the middle of the frame's bottom edge, because that is where
+        /// the panel with the two height sensors physically is (founder, 2026-08-07: «отгоняем на
+        /// датчики движения»).
         ///
-        /// Fixed, and that is the fix of 2026-08-08. The tip used to hang off the thought — 240 px below
-        /// whatever the cat happened to be sitting on — so it ended in empty sky and its X moved with the
-        /// blob: an arrow that points at a different place every time it is drawn is not naming
-        /// anything. Now the tail moves and the tip does not, which is also what a gesture towards a
-        /// piece of furniture looks like.
+        /// It was the tip of the beat's arrow — a stroke that left the thought and landed here, swinging
+        /// up and down its own axis the way the hand is meant to. The arrow is off the teaching screens
+        /// (founder, 2026-09-22); the PLACE it named is not, because the sensors are still where the
+        /// player's hand has to go, so this is now the mount the beat's animation stands on
+        /// (<c>LevelView.BeatAnchor</c>).
+        ///
+        /// Fixed, and that has been the point since 2026-08-08: the arrow's tip used to hang 240 px
+        /// under whatever the cat happened to be sitting on, so the one hint of this beat pointed
+        /// somewhere different every run. A name has to be the same word twice.
         /// </summary>
         public static readonly Vector2 SensorsCue = new Vector2(960f, 1046f);
-
-        /// <summary>
-        /// The stroke of that arrow — the gesture, drawn. It swings ALONG its own axis, not across it:
-        /// a height sensor is answered by a hand passing up and down over it, so the stroke travels up
-        /// and down the way the hand is meant to. (Until 2026-08-07 the swing was sideways, because the
-        /// gesture then was a stick being shaken from side to side.) Since 2026-08-08 it is the TAIL
-        /// that swings, the tip staying on the panel — the same 60 px, the same beat.
-        /// </summary>
-        private const float SwipeWobblePx = 60f;
-        private const float SwipeWobbleHz = 2.5f;
-
-        /// <summary>
-        /// Air between everything the thought PAINTS and the tail of the arrow, design px.
-        ///
-        /// Measured off the whole drawing, not off the blob's rectangle: the pips hang below the blob on
-        /// their own discs, so a gap measured from the rectangle left the arrow growing straight out of
-        /// them (frame 05 at the design gate of 2026-08-08 had no gap at all).
-        /// </summary>
-        private const float SwipeArrowGap = 26f;
-
-        /// <summary>The shortest the stroke gets at the top of its swing — still an arrow, not a dash.</summary>
-        private const float SwipeArrowMinLength = 100f;
 
         private readonly LevelDefinition _level;
         private readonly int _levelIndex;
@@ -120,14 +127,12 @@ namespace Meditation.Game
         private bool _completeScreenUp;
         private Thought _tutorialThought;
         private int _swipeBeatDetail = -1;
-        private float _dragHintSide = StartingDragSide;
+        private float _wholeBeatSeconds;
 
         /// <summary>Everything a teaching plate may not cover on THIS level — the same list all beat.</summary>
         private readonly Rect[] _hintObstacles;
-        private readonly System.Collections.Generic.List<Rect> _blockedForDragHint =
-            new System.Collections.Generic.List<Rect>();
 
-        /// <summary>…and the same list for the отгон card, built once per beat.</summary>
+        /// <summary>…and the working list a beat's plate is placed against, built once per beat.</summary>
         private readonly System.Collections.Generic.List<Rect> _blockedForSwipeCard =
             new System.Collections.Generic.List<Rect>();
 
@@ -159,17 +164,24 @@ namespace Meditation.Game
             var homes = new Vector2[_level.DetailCount];
             var names = new string[_level.DetailCount];
             var threadOffsets = new Vector2[_level.DetailCount];
+            var hitShapes = new Rect[_level.DetailCount];
             for (int i = 0; i < _level.DetailCount; i++)
             {
                 homes[i] = _level.Details[i].Home;
                 names[i] = _level.Details[i].Name;
                 threadOffsets[i] = LevelCatalog.AnchorOffsetOf(_level.Details[i]);
+                hitShapes[i] = LevelCatalog.RectOf(_level.Details[i]);
             }
 
             _runtime = new CollectionRuntime(_view, homes, _level.VesselCentre, names);
 
             // The thread is tied to the ink, not to the middle of the rectangle (LevelCatalog.AnchorOf).
             _runtime.SetThreadOffsets(threadOffsets);
+
+            // …and the aim catches the detail anywhere on it, not only near that ink. The rectangle is
+            // the one LevelView draws the sprite in — `Ui.Place(image, Home, Size)` — so the area the
+            // player can hit and the area they can see are the same rectangle by construction.
+            _runtime.SetHitShapes(hitShapes);
 
             // The art drop puts real details in the foreground strip — the seashell at y 1021, the fish
             // at 991, the mouse at 1029. The gaze has to be able to go down there.
@@ -229,15 +241,13 @@ namespace Meditation.Game
             _completeScreenUp = false;
             _tutorialThought = null;
             _swipeBeatDetail = -1;
-            _dragHintSide = StartingDragSide;
+            _wholeBeatSeconds = 0f;
             Beat = _teaches ? TutorialBeat.Aim : TutorialBeat.Done;
             _sweep.Reset();
 
             EnterStage(LevelStage.Intro);
 
-            _view.HideHint();
-            _view.HideSecondHint();
-            _view.HideSwipeCard();
+            _view.HideBeatPlate();
             _view.HideOutcomeScreen();
             _view.SetHudVisible(true);
             _view.SetDesaturated(false);
@@ -336,6 +346,7 @@ namespace Meditation.Game
 
             if (_teaches)
             {
+                if (Beat == TutorialBeat.Whole) _wholeBeatSeconds += deltaTime;
                 TickTutorial();
                 AimTheHints();
             }
@@ -389,65 +400,44 @@ namespace Meditation.Game
         {
             Beat = TutorialBeat.Aim;
 
-            // «Кнопка НАВОДИ у первой детали — замечаем взглядом» (SCREENS §Обучение п.1). Nothing is
-            // noticed for the player any more: the button names the hand and the arrow names the thing.
-            ShowBeatHint(ArtScreens.ButtonAim, HintTone.Gaze, LevelCatalog.AnchorOf(_level.Details[0]));
+            // «Наводи джойстиком на объект», beside the first detail. The drawn НАВОДИ button and its
+            // arrow stood here until 2026-09-22 — see LevelView.BeatAnchor for why they went and what
+            // is left in their place.
+            Vector2 first = LevelCatalog.AnchorOf(_level.Details[0]);
+            _view.MoveBeatAnchor(first);
+            ShowBeatSentence(GameTexts.BeatAim, GameTexts.BeatAimOnDesk, HintTone.Gaze, first);
         }
 
         private void BeginCrankBeat()
         {
             Beat = TutorialBeat.Crank;
 
-            // Two buttons at once, as SCREENS п.2 asks: «КРУТИ РУЧКУ» at the hand that does it (the
-            // dynamo indicator in the HUD) and «ТАЩИ» beside the detail that is now on its thread.
-            ShowBeatHint(ArtScreens.ButtonCrank, HintTone.Crank, _level.CrankIndicatorCentre);
-
-            _dragHintSide = StartingDragSide;
+            // One sentence for both hands, standing beside the detail that is now on its thread.
+            //
+            // Two drawn buttons stood here — «КРУТИ РУЧКУ» at the midpoint of the thread and «ТАЩИ»
+            // walking along beside the travelling detail, each with its own arrow. Both are off the
+            // teaching screens (founder, 2026-09-22). The mount stays on the thread's midpoint, which
+            // is where the crank's own animation belongs: the крутилка is a thing in the room and the
+            // game cannot draw it, but it can draw the line the крутилка pulls along.
             Vector2 detail = DetailPosition(_runtime.NoticedIndex);
-            _view.ShowSecondHint(ArtScreens.ButtonDrag, HintTone.Crank, DragHintSpot(detail), detail);
+            _view.MoveBeatAnchor(ThreadMidpoint(detail));
+
+            // Placed once and never moved — so what it has to be clear of is not where the detail IS
+            // but everywhere it will BE for the length of the beat (see AddDetailTrack).
+            ShowBeatSentence(GameTexts.BeatCollect, GameTexts.BeatCollectOnDesk, HintTone.Crank, detail,
+                _runtime.NoticedIndex);
         }
 
         /// <summary>
-        /// Where «ТАЩИ» stands right now: beside the detail it names, clear of the progress ring and of
-        /// the thread (<see cref="HintPlacement.BesideTheThread"/>), and clear of the other button of
-        /// the same beat — two plates of one beat overlapping is one plate.
+        /// Halfway along the thread from the detail to the vessel, nudged towards the vessel — the
+        /// mount of the сбор beat, and what «КРУТИ РУЧКУ» pointed at while it existed.
         /// </summary>
-        private Vector2 DragHintSpot(Vector2 detail)
-        {
-            // Rebuilt in place rather than allocated: this runs every frame the detail is moving.
-            _blockedForDragHint.Clear();
-            for (int i = 0; i < _hintObstacles.Length; i++) _blockedForDragHint.Add(_hintObstacles[i]);
-            if (_view.Hint.IsShown) _blockedForDragHint.Add(_view.Hint.ButtonRect);
-
-            // The whole SPRITE of the detail it names, where that sprite is right now — not the ink
-            // around its centroid, and not the rectangle it left behind at home.
-            //
-            // «ТАЩИ» came down 1 px off the plane's contrail on frame 18 (design gate, 2026-08-07) and
-            // the trail read as though it broke against the plate. The centroid is the whole reason:
-            // the plane's ink centre is at 0.25 of its rectangle, so a plate placed at arm's length
-            // from the centroid still stands inside the 484 px box, over the 600 px of trail behind
-            // the fuselage. The trail is drawn art like any other, so it is an obstacle like any other.
-            if (_runtime.NoticedIndex >= 0 && _runtime.NoticedIndex < _level.DetailCount)
-            {
-                ArtDetail spec = _level.Details[_runtime.NoticedIndex];
-                Rect sprite = HintPlacement.Centred(detail - LevelCatalog.AnchorOffsetOf(spec), spec.Size);
-                _blockedForDragHint.Add(HintPlacement.Inflate(sprite, HintPlacement.DraggedSpriteMargin));
-            }
-
-            return HintPlacement.BesideTheThread(
-                ButtonHint.SizeOf(ArtLibrary.Get(ArtScreens.ButtonDrag)),
-                detail, _level.VesselCentre, _view.RingRadiusOf(_runtime.NoticedIndex),
-                _blockedForDragHint, ref _dragHintSide);
-        }
-
-        /// <summary>Which side of the thread «ТАЩИ» opens on before the search has an opinion.</summary>
-        private const float StartingDragSide = 90f;
-
+        private Vector2 ThreadMidpoint(Vector2 detail) =>
+            Vector2.Lerp(detail, _level.VesselCentre, 0.6f);
 
         private void BeginSwipeBeat(int justCollected)
         {
             Beat = TutorialBeat.Swipe;
-            _view.HideSecondHint();
 
             // The cat lands ON the next detail, so collection really is blocked until it is beaten off
             // (SCREENS: «сбор заблокирован её появлением поверх следующей детали»).
@@ -458,27 +448,30 @@ namespace Meditation.Game
 
             _tutorialThought = _runtime.Field.SpawnAt(ThoughtStrength.Weak, _level.ThoughtSprites[0], over);
 
-            // An arrow at the sensors — and, since 2026-08-08, the words to go with it.
-            AimTheSwipeArrow(0f);
+            // The mount goes on the sensor panel — the one thing this beat is about that is not on the
+            // screen at all (see SensorsCue). The swinging arrow that used to run down to it is gone.
+            _view.MoveBeatAnchor(SensorsCue);
             ShowSwipeCard();
         }
 
         /// <summary>
-        /// Put «Маши над датчиком!» beside the thought that has to be beaten off — once, at the start
-        /// of the beat, and not again.
+        /// Put «Это навязчивые мысли…» beside the thought that has to be beaten off — once, at the
+        /// start of the beat, and not again.
         ///
-        /// Once, and then only again if the picture moves out from under it: the stroke swings and the
-        /// thought drifts, and a plate re-placed every frame against a search that breaks ties by
-        /// nearest-clear-spot walks around the screen. So it is placed at the start of the beat and
-        /// left alone until the stroke would actually cross it (see <see cref="AimTheHints"/>).
+        /// Once, and not again: the thought drifts, and a plate re-placed every frame against a search
+        /// that breaks ties by nearest-clear-spot walks around the screen.
         ///
-        /// The stroke is handed to the search as an obstacle for the same reason the details are — the
-        /// beat is one arrow and one sentence, and a sentence lying across its own arrow is neither. As
-        /// a chain of small squares along it, not as its bounding box: the stroke runs diagonally
-        /// across most of the frame, and its box is most of the frame. On level 1 the teaching thought
-        /// can sit on the gull in the top right corner, and with the box as an obstacle there was no
-        /// clear spot anywhere — the search fell back to «on top of the target», i.e. the card landed
-        /// on the gull it was supposed to avoid.
+        /// It used to be re-placed on one condition — when the beat's own arrow swung across it. The
+        /// arrow is gone (founder, 2026-09-22), and with it the only thing that ever moved under this
+        /// plate after it was put down; the corridor of squares that kept the plate off that stroke
+        /// went with it too.
+        ///
+        /// What did NOT go with it is the measurement that corridor was built on. The thought's PIPS
+        /// hang below its rectangle on their own discs, and the first frame shot after the arrows were
+        /// removed had the plate resting on the cat's three pips — because the corridor was the only
+        /// thing that had ever pushed it clear of them. The blob's obstacle is therefore everything it
+        /// PAINTS (<see cref="ArtThoughtView.DrawnBottomY"/>), which is the same finding the arrow's
+        /// gap was made of, stated where it belongs.
         /// </summary>
         private void ShowSwipeCard()
         {
@@ -489,97 +482,120 @@ namespace Meditation.Game
             _blockedForSwipeCard.Clear();
             for (int i = 0; i < _hintObstacles.Length; i++) _blockedForSwipeCard.Add(_hintObstacles[i]);
             if (_tutorialThought != null)
-                _blockedForSwipeCard.Add(HintPlacement.Centred(thought, _tutorialThought.Size));
-            AddSwipeArrowCorridor(_blockedForSwipeCard);
+                _blockedForSwipeCard.Add(PaintedRectOf(_tutorialThought));
 
-            Vector2 size = HintCard.SizeFor(GameTexts.SwipeHint);
+            Vector2 size = HintPlate.SizeFor(GameTexts.SwipeHint, true);
             Vector2 spot = HintPlacement.Beside(size, thought, _blockedForSwipeCard);
-            _view.ShowSwipeCard(GameTexts.SwipeHint, HintTone.Swipe, spot);
+            _view.ShowBeatPlate(GameTexts.SwipeHint, HintTone.Swipe, spot, GameTexts.SwipeHintOnDesk);
         }
 
         /// <summary>
-        /// The stroke of the отгон, as squares laid along it from the panel cue up to everything the
-        /// thought paints. Sampled closer together than the squares are wide, so the chain has no gaps
-        /// for a plate to slip through.
-        ///
-        /// The swing is not added to it: the swing only ever SHORTENS the stroke (it slides the tail
-        /// down its own axis), so the stroke at rest already contains every stroke the beat draws.
+        /// Everything a thought paints, as one rectangle: its own box grown down to the bottom of the
+        /// pip discs that hang under it. Public because the suite makes the claim on this rectangle.
         /// </summary>
-        private void AddSwipeArrowCorridor(System.Collections.Generic.List<Rect> into)
+        public static Rect PaintedRectOf(Thought thought)
         {
-            Vector2 tail = SwipeArrowAnchor();
-            var square = new Vector2(SwipeCorridorWidth, SwipeCorridorWidth);
-
-            for (int i = 0; i <= SwipeCorridorSamples; i++)
-                into.Add(HintPlacement.Centred(
-                    Vector2.Lerp(tail, SensorsCue, i / (float)SwipeCorridorSamples), square));
+            Rect box = HintPlacement.Centred(thought.Position, thought.Size);
+            float painted = ArtThoughtView.DrawnBottomY(thought.Position, thought.Size);
+            return new Rect(box.xMin, box.yMin, box.width, Mathf.Max(box.height, painted - box.yMin));
         }
 
-        /// <summary>How wide the stroke's chain of squares is, design px — the arrow plus its bow.</summary>
-        private const float SwipeCorridorWidth = 90f;
-
-        /// <summary>…and how many of them, so the spacing stays under that width on a full-height stroke.</summary>
-        private const int SwipeCorridorSamples = 16;
-
         /// <summary>
-        /// The отгон beat's arrow: a stroke that leaves the thought and lands on the sensor panel at the
-        /// bottom edge of the frame, swinging along its own length — the hand passing over the sensor.
+        /// Put a beat's SENTENCE on the screen, beside the thing the beat is about and on top of
+        /// nothing — searched against the catalogue's own rectangles
+        /// (<see cref="LevelCatalog.HintObstaclesOf"/>). It is the only thing a beat draws now that the
+        /// buttons and arrows are off the teaching screens, so there is no second hint to dodge.
         ///
-        /// Two rewrites, and the second one is the point. It first ran from the MIDDLE of the thought to
-        /// (960, 1046) — 1047 px of brick-red line through the drawn art, a barrier rather than a
-        /// gesture. The answer then was to make it short: 240 px down from the blob and stop. That
-        /// bought the wrong thing — the tip now ended in empty sky and, worse, its X came off whatever
-        /// the cat was sitting on, so the one hint of this beat pointed somewhere different every run
-        /// (design gate, 2026-08-08).
-        ///
-        /// So the two ends have different jobs now. The TIP is <see cref="SensorsCue"/> and never moves:
-        /// it names a thing that exists in the room — the panel under the screen — and a name has to be
-        /// the same word twice. The TAIL starts clear of everything the thought paints (pips included)
-        /// and is what the swing moves, up and down its own axis, because a height sensor reads how high
-        /// the hand is. Length is what is left between them, and the stroke stays off the art either
-        /// way: it begins outside the drawing and travels away from it.
+        /// Searched rather than parked in a fixed band, and that is a decision with a scar behind it:
+        /// a fixed band is exactly what the row of HUD slots used to be, and the one place on the
+        /// frame that is reliably empty on all five plates does not exist — level 1's aeroplane flies
+        /// through the top of the frame at y 134, which is where a «safe» top band would have stood.
         /// </summary>
-        /// <param name="slide">
-        /// How far past the gap the tail has slid this frame, 0…<see cref="SwipeWobblePx"/>. One-sided
-        /// on purpose: the swing may shorten the stroke, never lengthen it back INTO the drawing it was
-        /// just measured clear of.
+        /// <param name="travellingDetail">
+        /// The detail that will be MOVING under this plate for the length of the beat, or −1 when the
+        /// beat is about something that stands still.
         /// </param>
-        private void AimTheSwipeArrow(float slide)
+        private void ShowBeatSentence(string line, string bracket, HintTone tone, Vector2 about,
+            int travellingDetail = -1)
         {
-            Vector2 tip = SensorsCue;
-            Vector2 anchor = SwipeArrowAnchor();
+            _blockedForSwipeCard.Clear();
+            for (int i = 0; i < _hintObstacles.Length; i++) _blockedForSwipeCard.Add(_hintObstacles[i]);
 
-            Vector2 away = tip - anchor;
-            float span = away.magnitude;
-            if (span < 1f)
+            // …and the thing the beat is ABOUT: a sentence about a detail, laid on that detail, is a
+            // sentence about nothing.
+            if (travellingDetail >= 0) AddDetailTrack(_blockedForSwipeCard, travellingDetail, about);
+            else _blockedForSwipeCard.Add(HintPlacement.Centred(about, new Vector2(160f, 160f)));
+
+            Vector2 size = HintPlate.SizeFor(line, !string.IsNullOrEmpty(bracket));
+            Vector2 spot = HintPlacement.Beside(size, about, _blockedForSwipeCard);
+            _view.ShowBeatPlate(line, tone, spot, bracket);
+        }
+
+        /// <summary>
+        /// Everything the travelling detail will be standing on between now and the end of the beat:
+        /// its whole sprite, laid along the thread from where it is to the vessel, as a chain of
+        /// rectangles.
+        ///
+        /// The obstacle of a beat is not a POINT, and that is the return of the design skeptic of
+        /// 2026-09-22 (blocker Б1, frame <c>Game04_L1_tutorial_crank</c>). The sentence of the сбор
+        /// beat was placed against a 160×160 box at the detail's position AT THE START — and the
+        /// detail then drove up its thread and straight under the plate, which is placed once and
+        /// never moves. On level 1 that buries the aeroplane: home (881, 134), vessel (549, 846), and
+        /// the plate landed at x 511…1066 · y 227…376, i.e. inside the corridor between them, with
+        /// only the nose of the plane sticking out below it.
+        ///
+        /// A chain rather than the bounding box of the run, for the same reason the отгон's stroke is
+        /// a chain (<see cref="AddSwipeArrowCorridor"/>): the box of a diagonal travel is most of the
+        /// frame, and an obstacle that leaves no clear spot anywhere makes the search fall back to
+        /// «on top of the target» — which is the very thing it is here to prevent. Sampled closer
+        /// together than the sprite is short, so the chain has no gaps for a plate to slip through.
+        ///
+        /// The whole SPRITE and not the ink zone round the centroid, exactly as
+        /// <see cref="DragHintSpot"/> takes it: the plane is drawn with 600 px of contrail behind the
+        /// fuselage, and drawn art is drawn art wherever in its rectangle it happens to be.
+        /// </summary>
+        private void AddDetailTrack(System.Collections.Generic.List<Rect> into, int index, Vector2 from)
+        {
+            if (index < 0 || index >= _level.DetailCount)
             {
-                _view.ShowArrowHint(HintTone.Swipe, tip - new Vector2(0f, SwipeArrowMinLength), tip);
+                into.Add(HintPlacement.Centred(from, new Vector2(160f, 160f)));
                 return;
             }
 
-            Vector2 axis = away / span;
+            ArtDetail spec = _level.Details[index];
+            Vector2 size = spec.Size;
 
-            // The gap is air between the DRAWING and the tail, so on a slanted stroke it takes more than
-            // its own length of travel to buy it — the floor on the divisor keeps a nearly horizontal
-            // arrow (a thought already down by the panel) from backing off half the frame for it.
-            float clearance = SwipeArrowGap / Mathf.Max(0.4f, axis.y);
-            float back = Mathf.Clamp(span - clearance - Mathf.Max(0f, slide),
-                SwipeArrowMinLength, Mathf.Max(SwipeArrowMinLength, span));
+            // `from` is where the INK is (the anchor); the sprite's own rectangle hangs off it by the
+            // same offset. The travel itself is the sprite's centre walking from there to the vessel
+            // — <see cref="DetailPosition"/> lerps the HOME and adds the offset, so the far end of the
+            // run is the vessel's centre exactly.
+            Vector2 sprite = from - LevelCatalog.AnchorOffsetOf(spec);
+            Vector2 arrives = _level.VesselCentre;
 
-            _view.ShowArrowHint(HintTone.Swipe, tip - axis * back, tip);
+            float span = Vector2.Distance(sprite, arrives);
+            float step = Mathf.Max(24f, Mathf.Min(size.x, size.y) * 0.5f);
+            int samples = Mathf.Clamp(Mathf.CeilToInt(span / step), 1, 64);
+
+            for (int i = 0; i <= samples; i++)
+                into.Add(HintPlacement.Inflate(
+                    HintPlacement.Centred(Vector2.Lerp(sprite, arrives, i / (float)samples), size),
+                    HintPlacement.DraggedSpriteMargin));
         }
 
         /// <summary>
-        /// The point on the thought the stroke has to clear: the middle of the lowest line it PAINTS.
-        /// Falls back to a plain stroke above the panel once the thought has been beaten off.
+        /// The fourth beat: the goal, over a level that is already running.
+        ///
+        /// Nothing is blocked and nothing is spawned — <see cref="TutorialAllowsSpawning"/> lets the
+        /// waves through from here — so this is ordinary play with one sentence on it. It is aimed at
+        /// the VESSEL, because that is the noun the sentence ends on and the one thing on the plate
+        /// the player has not been pointed at yet.
         /// </summary>
-        private Vector2 SwipeArrowAnchor()
+        private void BeginWholeBeat()
         {
-            if (_tutorialThought == null) return SensorsCue - new Vector2(0f, SwipeArrowMinLength * 2f);
-
-            return new Vector2(
-                _tutorialThought.Position.x,
-                ArtThoughtView.DrawnBottomY(_tutorialThought.Position, _tutorialThought.Size));
+            Beat = TutorialBeat.Whole;
+            _wholeBeatSeconds = 0f;
+            _view.MoveBeatAnchor(_level.VesselCentre);
+            ShowBeatSentence(GameTexts.BeatWhole, null, HintTone.Gaze, _level.VesselCentre);
         }
 
         /// <summary>
@@ -612,9 +628,7 @@ namespace Meditation.Game
         {
             Beat = TutorialBeat.Done;
             _tutorialThought = null;
-            _view.HideHint();
-            _view.HideSecondHint();
-            _view.HideSwipeCard();
+            _view.HideBeatPlate();
         }
 
         private void TickTutorial()
@@ -629,43 +643,34 @@ namespace Meditation.Game
 
                 case TutorialBeat.Swipe:
                     if (StillOnScreen(_tutorialThought)) return;
-                    // «Мысль отбита → таймер запускается, дальше обычный play» (SCREENS §Обучение п.4).
+                    // «Мысль отбита → дальше обычный play» (SCREENS §Обучение п.4) — and, since
+                    // 2026-09-22, one last sentence over that play.
+                    BeginWholeBeat();
+                    return;
+
+                case TutorialBeat.Whole:
+                    if (_wholeBeatSeconds < WholeBeatSeconds) return;
                     FinishTeaching();
                     return;
             }
         }
 
         /// <summary>
-        /// Keep the teaching arrows on the things they teach about — one of which MOVES: the detail on
-        /// its thread travels to the vessel as the handle turns and flies back home when it slips. The
-        /// gate's own frame once caught an arrow pointing at an empty road while the detail was
-        /// half-way to the vessel; the button is a placement, the arrow is a live aim.
+        /// Keep the beat's MOUNT on the thing the beat is about — the one subject that moves is the
+        /// detail on its thread, which travels to the vessel as the крутилка turns and flies back home
+        /// when it slips.
+        ///
+        /// Only the mount moves now. Until 2026-09-22 this drove two live aims — the отгон's swinging
+        /// stroke, and «ТАЩИ» walking along beside the travelling detail with its arrow re-pointed
+        /// every frame — and both are off the teaching screens by the founder's word. The plate itself
+        /// deliberately does NOT follow: it is placed once, clear of everywhere the detail will be
+        /// (see <see cref="AddDetailTrack"/>), because a sentence that moves while you read it is not
+        /// a sentence.
         /// </summary>
         private void AimTheHints()
         {
-            if (Beat == TutorialBeat.Swipe)
-            {
-                // The arrow swings the way the hand is meant to — the tail sliding down the stroke and
-                // back, the tip staying on the sensor panel.
-                AimTheSwipeArrow(
-                    (1f + Mathf.Sin(Age * SwipeWobbleHz * Mathf.PI * 2f)) * 0.5f * SwipeWobblePx);
-
-                // The thought DRIFTS towards the centre, and the stroke is anchored to it — so a card
-                // that was clear of the arrow when the beat opened can be crossed by it half a minute
-                // later. Re-placed only then: a plate that moves every frame is worse than one that
-                // moves twice.
-                if (_view.SwipeCard.IsShown &&
-                    HintPlacement.SegmentHits(_view.Hint.Arrow.From, _view.Hint.Arrow.To,
-                        _view.SwipeCard.CardRect))
-                    ShowSwipeCard();
-                return;
-            }
-
             if (Beat != TutorialBeat.Crank || _runtime.NoticedIndex < 0) return;
-
-            // The button FOLLOWS, it does not merely re-aim: it names the detail that is moving.
-            Vector2 detail = DetailPosition(_runtime.NoticedIndex);
-            _view.MoveSecondHint(DragHintSpot(detail), detail);
+            _view.MoveBeatAnchor(ThreadMidpoint(DetailPosition(_runtime.NoticedIndex)));
         }
 
         /// <summary>
@@ -694,33 +699,15 @@ namespace Meditation.Game
             return false;
         }
 
-        /// <summary>
-        /// Place a teaching button: beside the thing it teaches about, and on top of NOTHING.
-        ///
-        /// It used to be an offset («230 px above») clamped back into the frame, and an offset is a
-        /// guess about a picture it cannot see: on the набережная that put the 468 px «КРУТИ РУЧКУ»
-        /// plate over the whole shark fin and the left edge of the bucket. Приёмка п.3 forbids a HUD
-        /// widget covering a detail or a vessel, and the design gate extended it here — a hint that
-        /// hides the level teaches with the level switched off. So the spot is SEARCHED against the
-        /// catalogue's own rectangles (<see cref="LevelCatalog.HintObstaclesOf"/>).
-        /// </summary>
-        private void ShowBeatHint(string buttonKey, HintTone tone, Vector2 target)
-        {
-            Vector2 spot = HintPlacement.Beside(
-                ButtonHint.SizeOf(ArtLibrary.Get(buttonKey)), target,
-                _hintObstacles, LevelCatalog.ArtRectsOf(_level));
-
-            _view.ShowHint(buttonKey, tone, spot, target);
-        }
-
         // ---- victory -----------------------------------------------------------------------------
 
         private void BeginWin()
         {
             EnterStage(LevelStage.Win);
             _view.SetHudVisible(false);
-            _view.HideHint();
-            _view.HideSecondHint();
+            // The teaching plate is the only hint left, and the fourth beat can still be up when the
+            // last detail lands — it must not be standing on the reward tableau.
+            _view.HideBeatPlate();
             _view.ApplySweep(false, 0f, 0f, 0f, -1);
             _view.ApplyNeonOutline(false);
         }
@@ -741,8 +728,12 @@ namespace Meditation.Game
 
             if (_stageSeconds < DissolveSeconds + SilenceSeconds) return;   // секунда тишины
 
-            // The reward beat: the vessel in the centre with everything that was collected in it.
+            // The reward beat: the vessel in the centre with everything that was collected in it —
+            // and the camera pushing in on it as it is held (founder, 2026-09-22: «наезд на ведёрко»,
+            // the first half of the ripple transition).
             _view.StageVictory();
+            _view.SetVictoryZoom(
+                Mathf.Clamp01((_stageSeconds - DissolveSeconds - SilenceSeconds) / TableauSeconds));
 
             if (_stageSeconds < DissolveSeconds + SilenceSeconds + TableauSeconds) return;
 
@@ -763,8 +754,7 @@ namespace Meditation.Game
         {
             EnterStage(LevelStage.Lose);
             _view.SetHudVisible(false);
-            _view.HideHint();
-            _view.HideSecondHint();
+            _view.HideBeatPlate();
             _view.ApplySweep(false, 0f, 0f, 0f, -1);
             _view.ApplyNeonOutline(false);
 

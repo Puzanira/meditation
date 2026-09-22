@@ -179,12 +179,22 @@ namespace Meditation.Tests
             Run(mix, new AudioScene(true, 0, false, false, 0, 0f), settle);
             Assert.AreEqual(0f, mix.Thoughts, 1e-3f, "Ноль мыслей — ноль громкости (§8).");
 
+            // …and it grows along the CURVE, not along a straight line, since the founder's playtest
+            // of 2026-09-22 («кривая мыслей менее агрессивная»): at half the dial the layer is at the
+            // curve's own value, which at the shipped exponent of 2 is a quarter of the ceiling and
+            // not a half. The expectation is written through AudioMix.ThoughtsCurve rather than as a
+            // number, so moving the knob on the panel is a tuning decision and not a red test.
             int half = Mathf.RoundToInt(TuningConfig.AudioThoughtsAtCount * 0.5f);
             Run(mix, new AudioScene(true, 0, false, false, half, 0f), settle);
             float atHalf = mix.Thoughts;
-            Assert.That(atHalf, Is.InRange(TuningConfig.AudioThoughtsMaxVolume * 0.35f,
-                    TuningConfig.AudioThoughtsMaxVolume * 0.65f),
-                "Слой мыслей растёт не линейно с их числом.");
+            float wanted = AudioMix.ThoughtsCurve(half / TuningConfig.AudioThoughtsAtCount) *
+                           TuningConfig.AudioThoughtsMaxVolume;
+            Assert.AreEqual(wanted, atHalf, 0.02f, "Слой мыслей растёт не по своей кривой.");
+
+            Assert.Greater(atHalf, 0f, "На середине шкалы слой мыслей обязан быть слышен.");
+            Assert.Less(atHalf, TuningConfig.AudioThoughtsMaxVolume * 0.5f,
+                "Кривая слоя мыслей не смягчена — на середине шкалы она всё ещё на половине потолка " +
+                "(заказ founder 2026-09-22).");
 
             int many = Mathf.CeilToInt(TuningConfig.AudioThoughtsAtCount) + 5;
             Run(mix, new AudioScene(true, 0, false, false, many, 0f), settle);
@@ -223,6 +233,123 @@ namespace Meditation.Tests
             Run(mix, new AudioScene(true, 0, false, false, 0, TuningConfig.LossOverlapPercent), settle);
             Assert.AreEqual(TuningConfig.AudioThoughtsMaxVolume, mix.Thoughts, 1e-3f,
                 "На пороге поражения слой мыслей обязан быть на потолке.");
+        }
+
+        // ---- §8: смена дорожки уровня — кроссфейд, который СЛЫШНО --------------------------------
+
+        /// <summary>
+        /// «Фоновый должен немного затухать, а новый должен нарастать» (founder, 2026-09-22, п.10) —
+        /// and the only place that sentence can come true is a frame where BOTH tracks are audible.
+        ///
+        /// The bug Codex found: the next level's index reaches the mix on its CARD, the card is
+        /// silence under the shipped «тишина вне уровня», and the blend spent its 1.2 s there. By the
+        /// first frame of the level it was finished, the outgoing track was already released, and
+        /// what the founder heard was one track fading in from nothing — the very thing the crossfade
+        /// was ordered to replace. The PlayMode test that checks the CLIPS cannot see this: the clips
+        /// are right either way, it is the volumes over time that are wrong.
+        ///
+        /// So: level 1 · card of level 2 (silence, longer than the crossfade) · level 2.
+        /// </summary>
+        [Test]
+        public void TheTrackSwap_IsHeardOnTheLevel_NotSpentInTheSilenceOfTheCard()
+        {
+            var mix = new AudioMix();
+            var levelOne = new AudioScene(true, 0, false, false, 0, 0f);
+            AudioScene card = AudioScene.Quiet(1);          // карточка уровня 2 — уже просит трек У2
+            var levelTwo = new AudioScene(true, 1, false, false, 0, 0f);
+
+            float ceiling = TuningConfig.AudioBackgroundVolume;
+            float crossfade = TuningConfig.AudioBackgroundCrossfadeSeconds;
+            Assert.Greater(TuningConfig.LevelCardSeconds, crossfade,
+                "Карточка короче кроссфейда — тест не поймал бы «блент доехал в тишине».");
+
+            Run(mix, levelOne, 2f);
+            Assert.AreEqual(0, mix.BackgroundLevelIndex, "На уровне 1 играет не его дорожка.");
+            Assert.AreEqual(ceiling, mix.BackgroundIn, 1e-3f, "Дорожка уровня 1 не вышла на потолок.");
+
+            // The card: the whole bus goes down, and the swap must WAIT there.
+            Run(mix, card, TuningConfig.LevelCardSeconds);
+            Assert.AreEqual(0f, mix.Background, 1e-3f, "На карточке фон обязан молчать (§8).");
+            Assert.AreEqual(0, mix.BackgroundLevelIndex,
+                "Карточка увела фон на дорожку следующего уровня, пока никто не слышит.");
+            Assert.IsFalse(mix.SwappingTracks, "Смена дорожек началась и кончилась в тишине карточки.");
+
+            // Level 2: the swap starts HERE, on the first frame the ear is in the room.
+            mix.Tick(Frame, levelTwo);
+            Assert.IsTrue(mix.SwappingTracks, "На входе в уровень 2 смены дорожек не началось.");
+            Assert.AreEqual(1, mix.BackgroundLevelIndex, "Пришедшая дорожка — не уровня 2.");
+            Assert.AreEqual(0, mix.OutgoingLevelIndex, "Уходит дорожка не уровня 1.");
+            Assert.Less(mix.TrackBlend, 0.1f,
+                "Блент дорожек доехал до входа в уровень — кроссфейда никто не услышит.");
+
+            // …and now the two tracks really exchange places, frame by frame: the old one falls, the
+            // new one rises, and for most of the crossfade both are sounding.
+            float previousOut = 0f;
+            float previousIn = -1f;
+            bool busWasAtItsCeiling = false;
+            int framesBothAudible = 0;
+            int frames = Mathf.CeilToInt(crossfade / Frame);
+            for (int i = 0; i < frames; i++)
+            {
+                mix.Tick(Frame, levelTwo);
+
+                if (mix.BackgroundOut > 0.01f && mix.BackgroundIn > 0.01f) framesBothAudible++;
+
+                Assert.GreaterOrEqual(mix.BackgroundIn, previousIn - 1e-4f,
+                    "Новая дорожка не нарастает — кадр " + i + ".");
+
+                // The bus itself is still fading in over the first fraction of a second, and while it
+                // is, the outgoing track rides up with it. It is required to FALL from the frame the
+                // bus stands at its ceiling — from there on nothing but the blend moves it.
+                if (busWasAtItsCeiling)
+                    Assert.Less(mix.BackgroundOut, previousOut + 1e-4f,
+                        "Старая дорожка не затухает — кадр " + i + ".");
+
+                busWasAtItsCeiling = mix.Background >= ceiling - 1e-4f;
+                previousOut = mix.BackgroundOut;
+                previousIn = mix.BackgroundIn;
+            }
+
+            Assert.Greater(framesBothAudible, frames / 2,
+                "Две дорожки звучат вместе меньше половины кроссфейда — это не «одна затухает, " +
+                "другая нарастает», а подмена.");
+
+            // Half-way through: the old track is still a real part of the sound.
+            var half = new AudioMix();
+            Run(half, levelOne, 2f);
+            Run(half, card, TuningConfig.LevelCardSeconds);
+            Run(half, levelTwo, crossfade * 0.5f);
+            Assert.That(half.TrackBlend, Is.InRange(0.3f, 0.7f),
+                "Кроссфейд дорожек идёт не за отведённое время.");
+            Assert.Greater(half.BackgroundOut, ceiling * 0.2f,
+                "На середине кроссфейда старая дорожка уже неслышна.");
+            Assert.Greater(half.BackgroundIn, 0f, "На середине кроссфейда новой дорожки ещё нет.");
+
+            // …and it ends: one track, at the ceiling, with the second source released.
+            Run(mix, levelTwo, crossfade);
+            Assert.AreEqual(1f, mix.TrackBlend, 1e-3f, "Кроссфейд дорожек так и не закончился.");
+            Assert.IsFalse(mix.SwappingTracks, "Ушедшая дорожка осталась висеть на втором источнике.");
+            Assert.AreEqual(0f, mix.BackgroundOut, 1e-6f);
+            Assert.AreEqual(ceiling, mix.BackgroundIn, 1e-3f);
+        }
+
+        /// <summary>
+        /// The other side of the same rule: with «тишина вне уровня» OFF the background carries
+        /// through the card, so the card is where the change of music is heard — and that is where
+        /// the crossfade must run. The rule is «the fade runs where the ear is», not «only on levels».
+        /// </summary>
+        [Test]
+        public void WithTheBackgroundCarryingThroughTheCards_TheSwapHappensOnTheCard()
+        {
+            TuningConfig.AudioSilentOffLevel = false;
+
+            var mix = new AudioMix();
+            Run(mix, new AudioScene(true, 0, false, false, 0, 0f), 2f);
+
+            mix.Tick(Frame, AudioScene.Quiet(1));
+            Assert.IsTrue(mix.SwappingTracks,
+                "Фон слышен на карточке, а дорожки не начали меняться — кроссфейд ждёт впустую.");
+            Assert.Greater(mix.BackgroundOut, 0.1f, "Старая дорожка обязана быть слышна на карточке.");
         }
 
         // ---- §8: «в меню» — мгновенная тишина ----------------------------------------------------
@@ -300,18 +427,26 @@ namespace Meditation.Tests
         [Test]
         public void TheSweep_IsRarerOnLaterLevels_WhenTheToggleSaysSo()
         {
+            // The toggle SHIPS OFF since the founder's playtest of 2026-09-22 («блики по всем объектам
+            // на всех уровнях»), so the shipped state is the second half of this test and the first
+            // half has to switch it on by hand. Both halves are still worth having: the toggle is on
+            // the panel, and the founder may well want the thinning-out back once she can find the
+            // objects at all.
             var sweep = new DetailSweep { LevelIndex = 0 };
+
+            Assert.IsFalse(TuningConfig.SweepRarerOnLateLevels,
+                "Тогглер «реже на поздних уровнях» обязан приезжать ВЫКЛЮЧЕННЫМ (founder 2026-09-22).");
             float first = sweep.PeriodOfThisLevel;
-
             sweep.LevelIndex = 4;
-            float last = sweep.PeriodOfThisLevel;
-
-            Assert.AreEqual(first * Mathf.Pow(DetailSweep.LateLevelFactor, 4), last, 1e-2f,
-                "Тогглер «реже на поздних уровнях» не растягивает период по уровням.");
-
-            TuningConfig.SweepRarerOnLateLevels = false;
             Assert.AreEqual(first, sweep.PeriodOfThisLevel, 1e-3f,
                 "С выключенным тогглером период обязан быть одинаковым на всех уровнях.");
+
+            TuningConfig.SweepRarerOnLateLevels = true;
+            sweep.LevelIndex = 0;
+            first = sweep.PeriodOfThisLevel;
+            sweep.LevelIndex = 4;
+            Assert.AreEqual(first * Mathf.Pow(DetailSweep.LateLevelFactor, 4), sweep.PeriodOfThisLevel,
+                1e-2f, "Тогглер «реже на поздних уровнях» не растягивает период по уровням.");
         }
 
         // ---- plumbing ------------------------------------------------------------------------------

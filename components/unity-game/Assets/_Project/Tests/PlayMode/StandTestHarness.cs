@@ -379,6 +379,50 @@ namespace Meditation.Tests
             return frame.GetPixels(box.x, bottom, box.width, box.height);
         }
 
+        /// <summary>
+        /// Share of <paramref name="box"/> (the whole frame when it is omitted) whose pixels change
+        /// when <paramref name="what"/> is switched off — i.e. what that object is actually PAINTING on
+        /// the composited picture.
+        ///
+        /// The measurement behind every «is it really visible» / «is it really covered» claim in the
+        /// suite, and it lives here because both sides of it are asked now: the screenshot gate asks
+        /// whether a widget paints its own rectangle, and the picture tests ask whether the thought
+        /// layer paints inside somebody else's (SCREENS §S3, «HUD они не закрывают»).
+        /// </summary>
+        /// <param name="noise">How far a channel has to move, 0…255, to count as painted over.</param>
+        public static float ShareCoveredBy(GameObject what, Color letterbox, RectInt? box = null,
+            float noise = 6f)
+        {
+            Texture2D with = Capture(letterbox);
+            bool was = what.activeSelf;
+            what.SetActive(false);
+            Canvas.ForceUpdateCanvases();
+            Texture2D without = Capture(letterbox);
+            what.SetActive(was);
+            Canvas.ForceUpdateCanvases();
+
+            try
+            {
+                RectInt region = box ?? new RectInt(0, 0, with.width, with.height);
+                Color[] a = PixelsOf(with, region);
+                Color[] b = PixelsOf(without, region);
+                if (a.Length == 0 || a.Length != b.Length) return 0f;
+
+                int moved = 0;
+                for (int i = 0; i < a.Length; i++)
+                    if (Mathf.Abs(a[i].r - b[i].r) * 255f > noise ||
+                        Mathf.Abs(a[i].g - b[i].g) * 255f > noise ||
+                        Mathf.Abs(a[i].b - b[i].b) * 255f > noise) moved++;
+
+                return moved / (float)a.Length;
+            }
+            finally
+            {
+                Object.DestroyImmediate(with);
+                Object.DestroyImmediate(without);
+            }
+        }
+
         /// <summary>The part of <paramref name="rect"/> that survives clipping; width/height 0 if none.</summary>
         public static Rect ClippedBy(Rect rect, Rect clip)
         {

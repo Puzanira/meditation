@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Meditation.Game;
 using Meditation.Mechanics;
 using Meditation.Tuning;
 using Meditation.View;
@@ -424,122 +425,103 @@ namespace Meditation.Tests
         // ---- обучающие плашки: приёмка п.3 распространяется и на них ----------------------------------
 
         /// <summary>
-        /// No teaching button covers a detail, the vessel, or a HUD widget — приёмка п.3 of the drop,
-        /// extended to the tutorial's own plates by the design gate of 2026-08-07.
+        /// No teaching PLATE covers a detail, the vessel, or a HUD widget — приёмка п.3 of the drop,
+        /// extended to the tutorial's own hints by the design gate of 2026-08-07.
         ///
         /// It was broken exactly the way an offset breaks: «КРУТИ РУЧКУ» sat 230 px above the dynamo
         /// indicator, was clamped back into the frame, and the 468×88 plate landed on the whole shark
         /// fin and the left edge of the bucket. Checked here, on the catalogue, because a placement is
         /// arithmetic and this way it is decided before there is a scene to be surprised by.
         ///
-        /// Both hints of beat 2 are placed, in the order the level places them, so the second one has to
-        /// clear the first as well.
+        /// It used to place the drop's three drawn BUTTONS — НАВОДИ, КРУТИ РУЧКУ and «ТАЩИ» sampled
+        /// along the whole thread, because that one rode the travelling detail. All three left the
+        /// teaching screens on 2026-09-22 (founder: «убрать стрелки все с экранов обучений… остальные
+        /// элементы подсказок убрать»), so what is placed now is what is drawn now: one plate per beat,
+        /// sized off the registry's own sentence.
         /// </summary>
         [Test]
-        public void NoTeachingButton_CoversADetail_TheVessel_OrTheHud()
+        public void NoTeachingPlate_CoversADetail_TheVessel_OrTheHud()
         {
             foreach (LevelDefinition level in LevelCatalog.Levels)
             {
                 Rect[] obstacles = LevelCatalog.HintObstaclesOf(level);
-                Rect[] art = LevelCatalog.ArtRectsOf(level);
 
-                AssertPlateIsClear(level, ArtScreens.ButtonAim, LevelCatalog.AnchorOf(level.Details[0]),
-                    obstacles, art, "НАВОДИ");
-                Rect crank = AssertPlateIsClear(level, ArtScreens.ButtonCrank, level.CrankIndicatorCentre,
-                    obstacles, art, "КРУТИ РУЧКУ");
-
-                // «ТАЩИ» rides the detail, so it is checked along the whole thread rather than once.
-                var withCrank = new List<Rect>(obstacles) { crank };
-                Vector2 size = ButtonHint.SizeOf(ArtLibrary.Get(ArtScreens.ButtonDrag));
-                float side = 90f;
-
-                for (int step = 0; step <= 8; step++)
+                foreach (TeachingPlate beat in TeachingPlates(level))
                 {
-                    float progress = step / 8f;
-                    ArtDetail detail = level.Details[0];
-                    Vector2 travelling = Vector2.Lerp(detail.Home, level.VesselCentre, progress) +
-                                         LevelCatalog.AnchorOffsetOf(detail);
-                    float ring = View.LevelView.RingRadius(detail.Size);
-
-                    // The obstacle set the level itself builds: the travelling detail's WHOLE sprite,
-                    // where it is now. The plane is 484 px of rectangle whose ink centre sits at a
-                    // quarter of it, so a plate an arm's length from the centroid still lands on the
-                    // contrail — frame 18 shipped with 1 px between them (design gate, 2026-08-07).
-                    Rect sprite = HintPlacement.Centred(
-                        travelling - LevelCatalog.AnchorOffsetOf(detail), detail.Size);
-                    Rect keepOff = HintPlacement.Inflate(sprite, HintPlacement.DraggedSpriteMargin);
-
-                    var blocked = new List<Rect>(withCrank) { keepOff };
-
-                    Vector2 spot = HintPlacement.BesideTheThread(size, travelling, level.VesselCentre,
-                        ring, blocked, ref side);
+                    Vector2 size = HintPlate.SizeFor(beat.Line, beat.HasBracket);
+                    Vector2 spot = HintPlacement.Beside(size, beat.About, obstacles);
                     Rect plate = HintPlacement.Centred(spot, size);
 
-                    Assert.IsFalse(plate.Overlaps(keepOff),
-                        level.Title + " · «ТАЩИ» на " + (progress * 100f).ToString("0") +
-                        " % пути легла на сам спрайт детали (" + detail.Name + "): плашка " + plate +
-                        ", спрайт с полем " + keepOff + ".");
-
                     Assert.IsTrue(HintPlacement.InsideFrame(plate),
-                        level.Title + " · «ТАЩИ» на " + (progress * 100f).ToString("0") +
-                        " % пути вылезла за кадр: " + plate);
-                    Assert.IsFalse(
-                        HintPlacement.SegmentHits(travelling, level.VesselCentre, plate),
-                        level.Title + " · «ТАЩИ» на " + (progress * 100f).ToString("0") +
-                        " % пути легла на нить.");
-                    Assert.Greater(Vector2.Distance(spot, travelling), ring,
-                        level.Title + " · «ТАЩИ» на " + (progress * 100f).ToString("0") +
-                        " % пути залезла в кольцо прогресса (r=" + ring.ToString("0") + ").");
+                        level.Title + " · плашка «" + beat.Name + "» вылезла за кадр: " + plate);
+
+                    for (int i = 0; i < obstacles.Length; i++)
+                        Assert.IsFalse(plate.Overlaps(obstacles[i]),
+                            level.Title + " · плашка «" + beat.Name + "» " + plate +
+                            " накрывает " + obstacles[i] + ".");
                 }
             }
         }
 
-        private static Rect AssertPlateIsClear(LevelDefinition level, string buttonKey, Vector2 target,
-            Rect[] obstacles, Rect[] art, string what)
-        {
-            Vector2 size = ButtonHint.SizeOf(ArtLibrary.Get(buttonKey));
-            Vector2 spot = HintPlacement.Beside(size, target, obstacles, art);
-            Rect plate = HintPlacement.Centred(spot, size);
-
-            Assert.IsTrue(HintPlacement.InsideFrame(plate),
-                level.Title + " · плашка «" + what + "» вылезла за кадр: " + plate);
-
-            for (int i = 0; i < obstacles.Length; i++)
-                Assert.IsFalse(plate.Overlaps(obstacles[i]),
-                    level.Title + " · плашка «" + what + "» " + plate + " накрывает " + obstacles[i] + ".");
-
-            return plate;
-        }
-
         /// <summary>
         /// …and it still stands NEXT to what it teaches. Without this the test above is satisfied by
-        /// parking every button in the emptiest corner of the frame, which is «не перекрывает» and
+        /// parking every plate in the emptiest corner of the frame, which is «не перекрывает» and
         /// «рядом с объектом» traded against each other rather than both honoured.
         /// </summary>
         [Test]
-        public void EveryTeachingButton_StaysWithinReachOfWhatItTeaches()
+        public void EveryTeachingPlate_StaysWithinReachOfWhatItTeaches()
         {
             foreach (LevelDefinition level in LevelCatalog.Levels)
             {
                 Rect[] obstacles = LevelCatalog.HintObstaclesOf(level);
-                Rect[] art = LevelCatalog.ArtRectsOf(level);
 
-                AssertWithinReach(level, ArtScreens.ButtonAim, LevelCatalog.AnchorOf(level.Details[0]),
-                    obstacles, art, "НАВОДИ");
-                AssertWithinReach(level, ArtScreens.ButtonCrank, level.CrankIndicatorCentre,
-                    obstacles, art, "КРУТИ РУЧКУ");
+                foreach (TeachingPlate beat in TeachingPlates(level))
+                {
+                    Vector2 size = HintPlate.SizeFor(beat.Line, beat.HasBracket);
+                    Vector2 spot = HintPlacement.Beside(size, beat.About, obstacles);
+
+                    Assert.Less(Vector2.Distance(spot, beat.About), MaxHintReach,
+                        level.Title + " · плашка «" + beat.Name + "» уехала от своего объекта на " +
+                        Vector2.Distance(spot, beat.About).ToString("0") + " px — это уже не «рядом».");
+                }
             }
         }
 
-        private static void AssertWithinReach(LevelDefinition level, string buttonKey, Vector2 target,
-            Rect[] obstacles, Rect[] art, string what)
+        /// <summary>One beat's hint: the line it says and the thing it says it about.</summary>
+        private readonly struct TeachingPlate
         {
-            Vector2 size = ButtonHint.SizeOf(ArtLibrary.Get(buttonKey));
-            Vector2 spot = HintPlacement.Beside(size, target, obstacles, art);
+            public TeachingPlate(string name, string line, bool hasBracket, Vector2 about)
+            {
+                Name = name;
+                Line = line;
+                HasBracket = hasBracket;
+                About = about;
+            }
 
-            Assert.Less(Vector2.Distance(spot, target), MaxHintReach,
-                level.Title + " · плашка «" + what + "» уехала от своего объекта на " +
-                Vector2.Distance(spot, target).ToString("0") + " px — это уже не «рядом».");
+            public string Name { get; }
+            public string Line { get; }
+            public bool HasBracket { get; }
+            public Vector2 About { get; }
+        }
+
+        /// <summary>
+        /// The four beats of the lesson, as the level places them (<c>LevelScreen</c>).
+        ///
+        /// Run on EVERY level and not only on level 1, although level 1 is the only one that teaches:
+        /// the claim is about the placement RULE against a composition, and a rule that only works on
+        /// one of the five plates is a rule that happens to work. It is also the guard that catches a
+        /// level whose art leaves no clear 560 px anywhere.
+        /// </summary>
+        private static IEnumerable<TeachingPlate> TeachingPlates(LevelDefinition level)
+        {
+            yield return new TeachingPlate("наводи", GameTexts.BeatAim, true,
+                LevelCatalog.AnchorOf(level.Details[0]));
+            yield return new TeachingPlate("крути крутилку и тащи", GameTexts.BeatCollect, true,
+                LevelCatalog.AnchorOf(level.Details[0]));
+            yield return new TeachingPlate("отгон", GameTexts.SwipeHint, true,
+                LevelCatalog.AnchorOf(level.Details[level.DetailCount > 1 ? 1 : 0]));
+            yield return new TeachingPlate("весь уровень", GameTexts.BeatWhole, false,
+                level.VesselCentre);
         }
 
         /// <summary>How far a hint may stand from what it points at, design px — a third of the frame.</summary>
@@ -949,6 +931,58 @@ namespace Meditation.Tests
             }
         }
 
+        /// <summary>
+        /// The edge fade is on the moon of level 5 and on NOTHING else.
+        ///
+        /// The founder's «квадрат вокруг луны» (плейтест 2026-09-22): the moon's PNG is a disc inside a
+        /// radial glow that is still at alpha 5/255 when its canvas ends, and over a night sky that
+        /// composites — in linear space — into a hard 188×188 step. The stopgap fades that sprite's own
+        /// alpha to zero over the outermost 8 % of its UV (<see cref="ArtDetail.EdgeFadeUv"/>).
+        ///
+        /// The test is the GUARD on that stopgap, and it is the reason the fade is per detail rather
+        /// than a rule: almost every sprite in this game is trimmed to its own alpha box, so its ink
+        /// reaches the border by construction, and a fade applied to those would eat the gull's
+        /// wingtips and the office paperclip's wire. Measured, not asserted from the list: the border
+        /// alpha of every detail is read off the PNG, and a detail whose ink really does reach its edge
+        /// must not be faded.
+        /// </summary>
+        [Test]
+        public void TheEdgeFade_IsOnTheMoonAlone_AndNeverOnASpriteWhoseInkReachesItsBorder()
+        {
+            int faded = 0;
+
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            foreach (ArtDetail detail in level.Details)
+            {
+                string where = "У" + level.Number + " «" + detail.Name + "»";
+                Assert.GreaterOrEqual(detail.EdgeFadeUv, 0f, where + ": отрицательная кромка.");
+                Assert.Less(detail.EdgeFadeUv, 0.25f,
+                    where + ": кромка съедает четверть спрайта — это уже не кромка.");
+
+                if (detail.EdgeFadeUv <= 0f) continue;
+                faded++;
+
+                Assert.AreEqual("L5/objects/moon", detail.Sprite,
+                    where + ": кромку включили не луне. Она лечит ОДИН дефект одного холста " +
+                    "(обрезанное сияние луны L5), и на подрезанном по альфе спрайте она срежет " +
+                    "собственные чернила.");
+                Assert.AreEqual(LevelCatalog.MoonHaloFade, detail.EdgeFadeUv, 1e-4f);
+            }
+
+            Assert.AreEqual(1, faded, "Кромка должна стоять ровно на одной детали — на луне У5.");
+
+            // …and the sprite it is aimed at is still the one that needs it: the moon is drawn from
+            // its own square canvas, so if the art ever comes back re-exported with the glow dying
+            // inside that canvas, the size is what changes and this is the line that has to be
+            // revisited. (The border alpha itself cannot be read here — the PNG is imported
+            // non-readable, and making the whole art set readable to assert one number is a worse
+            // trade than the comment on ArtDetail.EdgeFadeUv, which records the measurement.)
+            Sprite moon = ArtLibrary.Get("L5/objects/moon");
+            Assert.IsNotNull(moon, "Спрайт луны не найден.");
+            Assert.AreEqual(moon.rect.width, moon.rect.height, 1f,
+                "Холст луны перестал быть квадратным — сияние пересобрали, проверьте кромку заново.");
+        }
+
         // ---- MECHANICS §6, the progression ---------------------------------------------------------
 
         [Test]
@@ -1001,22 +1035,125 @@ namespace Meditation.Tests
         }
 
         /// <summary>
-        /// The founder's own order of 2026-08-07, as a test rather than as a comment: level 1 sends
-        /// MORE thoughts than level 2, and level 2 sends BIGGER ones («чуть больше первого»).
+        /// The founder's wave ladder, as a test rather than as a comment — «волны», плейтест
+        /// 2026-09-22, dictated level by level.
         ///
-        /// Written as its own case because the ladder above cannot say it — the ladder only knows that
-        /// pressure climbs, and it would stay green if somebody « fixed » the dip in blob count by
-        /// making level 2 a swarm again, which is the shape the founder asked us to move away from.
+        /// **This supersedes her order of 2026-08-07** («на первом мыслей больше, на втором их МЕНЬШЕ,
+        /// но крупнее»), which this same test used to hold. That shape was about two levels differing
+        /// in TEXTURE while the tap ran forever; the new one is about a level being a finite amount of
+        /// interference — «у уровня есть общий запас мыслей: на первом 5, на втором 10, на третьем 15,
+        /// раз в 10 секунд» — and under it level 2 sends two per wave against level 1's one, which is
+        /// the exact opposite of the sentence this test was written to protect. Superseded by the
+        /// author of the thing it was protecting, so: rewritten, not deleted.
+        ///
+        /// Written as its own case because the ladder test cannot say it: that one only knows that
+        /// pressure climbs, and it would stay green on any composition that happened to climb.
         /// </summary>
         [Test]
-        public void TheFirstTwoLevels_SwapCountForSize()
+        public void TheWaveLadder_IsTheFoundersOwnNumbers()
         {
-            Assert.Greater(TuningConfig.ThoughtsPerWaveOf(0), TuningConfig.ThoughtsPerWaveOf(1),
-                "У1 обязан слать БОЛЬШЕ мыслей за волну, чем У2 (решение founder 2026-08-07).");
-            Assert.Greater(HeaviestClassOf(1), HeaviestClassOf(0),
-                "Класс размера У2 обязан быть выше, чем у У1 — «меньше, но крупнее».");
-            Assert.Greater(WavePressureOf(1), WavePressureOf(0),
-                "…и при этом давление У2 обязано остаться выше первого.");
+            int[] budgets = { 5, 10, 15, 20, 25 };
+            for (int i = 0; i < LevelCatalog.Count; i++)
+            {
+                string level = "У" + (i + 1) + ": ";
+
+                Assert.AreEqual(budgets[i], TuningConfig.ThoughtBudgetOf(i),
+                    level + "запас мыслей не тот, который продиктовала основательница 2026-09-22.");
+                Assert.AreEqual(10f, TuningConfig.WaveIntervalOf(i), 1e-3f,
+                    level + "волны приходят не раз в 10 секунд.");
+
+                // Five waves per level, on every rung — that is what makes the budgets a ladder rather
+                // than five unrelated numbers.
+                Assert.AreEqual(5, TuningConfig.WavesInBudgetOf(i),
+                    level + "запас перестал делиться на пять волн — лестница сломана.");
+                Assert.AreEqual(i + 1, TuningConfig.ThoughtsPerWaveOf(i),
+                    level + "в волне не " + (i + 1) + " мыслей.");
+
+                // …and the ramp is off, because «раз в 10 секунд» is a statement about the interval.
+                Assert.AreEqual(0f, TuningConfig.PressureRampPercentOf(i), 1e-3f,
+                    level + "интервал волн сокращается — это уже не «раз в 10 секунд».");
+            }
+
+            // The two rungs the founder spelled out by composition, not only by count.
+            Assert.AreEqual(1, TuningConfig.WaveWeakOf(0), "У1: волна — одна СЛАБАЯ мысль.");
+            Assert.AreEqual(0, TuningConfig.WaveMediumOf(0) + TuningConfig.WaveStrongOf(0),
+                "У1: «все слабые» — ничего крупнее в волне быть не должно.");
+            Assert.AreEqual(1, TuningConfig.WaveWeakOf(1), "У2: волна — пара «слабая + средняя».");
+            Assert.AreEqual(1, TuningConfig.WaveMediumOf(1), "У2: волна — пара «слабая + средняя».");
+            Assert.AreEqual(0, TuningConfig.WaveStrongOf(1), "У2: крепких в волне ещё нет.");
+
+            // …and the class ceiling still climbs, which is the half of the old order that survived.
+            Assert.Greater(HeaviestClassOf(2), HeaviestClassOf(1),
+                "У3 обязан впервые прислать крепкую мысль.");
+        }
+
+        /// <summary>
+        /// The budget is what the field actually spends: five thoughts on level 1 and then nothing,
+        /// however long the level runs.
+        ///
+        /// The other half of «волны» — the founder's own «когда запас исчерпан и всё отогнано, мысли
+        /// кончились». Without this the budget would be a number in a config that nothing reads.
+        /// </summary>
+        [Test]
+        public void ALevel_SendsItsBudgetAndThenStops()
+        {
+            for (int i = 0; i < LevelCatalog.Count; i++)
+            {
+                TuningConfig.ResetToDefaults();
+                TuningConfig.ApplyLevel(i);
+
+                var field = new ThoughtField { Labels = LevelCatalog.At(i).ThoughtSprites };
+                field.ArtFitter = ArtLibrary.FitThought;
+
+                // Ten minutes of a level nobody touches — six times the whole budget's worth of waves.
+                for (int step = 0; step < 2400; step++) field.Tick(0.25f, Vector2.zero, 0, true);
+
+                Assert.AreEqual(TuningConfig.ThoughtBudgetOf(i), field.SpentFromBudget,
+                    "У" + (i + 1) + ": уровень потратил не свой запас мыслей.");
+                Assert.AreEqual(0, field.BudgetLeft, "У" + (i + 1) + ": запас не исчерпан за 10 минут.");
+                Assert.AreEqual(TuningConfig.ThoughtBudgetOf(i), field.Thoughts.Count,
+                    "У" + (i + 1) + ": на экране не весь запас — кто-то лопнул без удара.");
+
+                // …and «мысли кончились» is only true once the screen is clear of them as well.
+                Assert.IsFalse(field.ThoughtsAreOver,
+                    "У" + (i + 1) + ": «мысли кончились» при полном экране мыслей.");
+                field.ApplyHits(400, Vector2.zero);
+                Assert.IsTrue(field.ThoughtsAreOver,
+                    "У" + (i + 1) + ": запас потрачен и экран чист, а «мысли кончились» не наступило.");
+            }
+
+            TuningConfig.ResetToDefaults();
+        }
+
+        /// <summary>
+        /// A thought that drifts never leaves the frame — the rule the budget made load-bearing.
+        ///
+        /// «Дрейф к центру» was a direction and nothing else: a blob crossed the centre and sailed out
+        /// the far side. With waves for ever that was invisible; with a budget of five it meant level 1
+        /// sat at 0 % coverage after three minutes because everything it owned had left the screen.
+        /// </summary>
+        [Test]
+        public void ADriftingThought_NeverLeavesTheFrame()
+        {
+            TuningConfig.ResetToDefaults();
+            TuningConfig.ApplyLevel(0);
+
+            var field = new ThoughtField { Labels = LevelCatalog.At(0).ThoughtSprites };
+            field.ArtFitter = ArtLibrary.FitThought;
+
+            for (int step = 0; step < 1200; step++)
+            {
+                field.Tick(0.25f, Vector2.zero, 0, true);
+                foreach (Thought t in field.Thoughts)
+                {
+                    Assert.That(t.Position.x, Is.InRange(-1f, ThoughtField.ScreenWidth + 1f),
+                        "Мысль уехала за кадр по X: " + t.Position.x.ToString("0"));
+                    Assert.That(t.Position.y, Is.InRange(-1f, ThoughtField.ScreenHeight + 1f),
+                        "Мысль уехала за кадр по Y: " + t.Position.y.ToString("0"));
+                }
+            }
+
+            TuningConfig.ResetToDefaults();
         }
 
         /// <summary>
@@ -1063,6 +1200,48 @@ namespace Meditation.Tests
             if (TuningConfig.WaveStrongOf(i) > 0) return 2;
             if (TuningConfig.WaveMediumOf(i) > 0) return 1;
             return 0;
+        }
+
+        /// <summary>
+        /// «Разрастаются на весь экран» (founder, 2026-09-22), as arithmetic: the SMALLEST class a
+        /// level sends, grown to its shipped ceiling, is bigger than the frame.
+        ///
+        /// The smallest class, because that is the hard case — a strong thought starts at 420×320 and
+        /// gets there easily, while a weak one starts at 180 wide and needs the ceiling to be worth
+        /// more than ten. And on the real silhouettes, cover-fitted, not on the class box: what the
+        /// player sees is the sprite.
+        ///
+        /// Kept here rather than on frame 34 because frame 34 cannot show it: a thought at the shipped
+        /// ceiling has no edges inside the frame, and the picture that compares an old thought with a
+        /// fresh one needs both of them whole.
+        /// </summary>
+        [Test]
+        public void TheShippedGrowthCeiling_TakesAWeakThoughtPastTheWholeFrame()
+        {
+            for (int i = 0; i < LevelCatalog.Count; i++)
+            {
+                TuningConfig.ResetToDefaults();
+                TuningConfig.ApplyLevel(i);
+
+                float cap = TuningConfig.ThoughtGrowthCapOf(i);
+                foreach (string key in LevelCatalog.At(i).ThoughtSprites)
+                {
+                    var thought = new Thought { Strength = ThoughtStrength.Weak, Label = key };
+                    ArtLibrary.FitThought(thought);
+                    Vector2 grown = thought.SpawnSize * cap;
+
+                    Assert.GreaterOrEqual(grown.x, ThoughtField.ScreenWidth,
+                        "У" + (i + 1) + " «" + key + "»: слабая мысль на потолке роста ×" +
+                        cap.ToString("0.0") + " — " + grown.x.ToString("0") +
+                        " px по ширине при кадре " + ThoughtField.ScreenWidth +
+                        ". «Разрастаются на весь экран» не выполняется (founder 2026-09-22).");
+                    Assert.GreaterOrEqual(grown.y, ThoughtField.ScreenHeight,
+                        "У" + (i + 1) + " «" + key + "»: слабая мысль на потолке роста не закрывает " +
+                        "кадр по высоте (" + grown.y.ToString("0") + " px).");
+                }
+            }
+
+            TuningConfig.ResetToDefaults();
         }
 
         /// <summary>
@@ -1178,6 +1357,95 @@ namespace Meditation.Tests
                 Assert.AreEqual(TuningConfig.DriftOf(i), TuningConfig.DriftPxPerSec, 1e-3f);
                 Assert.AreEqual(TuningConfig.ThoughtsPerWaveOf(i), TuningConfig.ThoughtsPerWave);
             }
+        }
+
+        /// <summary>
+        /// The way back OUT of a level band — the bug Codex found on 2026-09-22.
+        ///
+        /// «Уровень 5» off the stand menu copies its band onto the shared values, `ThoughtBudget`
+        /// among them; the stand menu and the scenettes used to read them as they were left. So the
+        /// founder came back from level 5 into «Отгон взмахами» — a rig whose one job is to send
+        /// blobs for as long as she watches it — and it stopped sending them after the twenty-fifth.
+        /// The budget is the value that BREAKS a rig rather than merely retunes it, because zero
+        /// means «без ограничения» and no stand slider shows it.
+        ///
+        /// Checked as the general claim, not as the one value: the stand gets back everything the
+        /// band took, and gets back what it HAD rather than the defaults (the founder's own sliders
+        /// live on those same shared values, and the panel persists them).
+        /// </summary>
+        [Test]
+        public void LeavingALevelBand_GivesTheStandBackTheValuesItWasRunningOn()
+        {
+            // The stand as the founder left it: a budget of nought (endless waves) and a couple of
+            // sliders dragged away from the shipped numbers.
+            TuningConfig.WaveIntervalSeconds = 3.5f;
+            TuningConfig.DurabilityWeak = 7;
+            Assert.AreEqual(0, TuningConfig.ThoughtBudget, "Стенд обязан стоять на безлимите.");
+            Assert.IsFalse(TuningConfig.ALevelBandIsApplied);
+
+            TuningConfig.ApplyLevel(4);
+            Assert.AreEqual(TuningConfig.ThoughtBudgetOf(4), TuningConfig.ThoughtBudget,
+                "Полоса уровня 5 не применилась — тест ни о чём.");
+            Assert.IsTrue(TuningConfig.ALevelBandIsApplied);
+
+            // …and back to the stand (its menu and every scenette call this as they boot).
+            TuningConfig.LeaveLevelBand();
+
+            Assert.AreEqual(0, TuningConfig.ThoughtBudget,
+                "Запас мыслей уровня утёк на стенд: сценка кончится после " +
+                TuningConfig.ThoughtBudgetOf(4) + "-й мысли, хотя обязана быть безлимитной.");
+            Assert.AreEqual(3.5f, TuningConfig.WaveIntervalSeconds, 1e-3f,
+                "Стенду вернули не его значение, а дефолт — настройка основательницы потеряна.");
+            Assert.AreEqual(7, TuningConfig.DurabilityWeak,
+                "Стенду вернули не его значение, а дефолт — настройка основательницы потеряна.");
+            Assert.IsFalse(TuningConfig.ALevelBandIsApplied);
+
+            // A second call has nothing to give back and must not undo anything.
+            TuningConfig.LeaveLevelBand();
+            Assert.AreEqual(3.5f, TuningConfig.WaveIntervalSeconds, 1e-3f);
+        }
+
+        /// <summary>
+        /// …and the line holds for the NEXT value someone gives a level band.
+        ///
+        /// Every shared static ApplyLevel touches must be a row of the band table, otherwise the
+        /// stand's way home has a hole in it and the hole is invisible until a scenette dies of it.
+        /// Read by reflection over the whole of <c>TuningConfig</c> rather than as a list of names:
+        /// a list of names is the very thing that falls behind.
+        /// </summary>
+        [Test]
+        public void ALevelBand_GivesBackEveryValueItTakes()
+        {
+            System.Reflection.FieldInfo[] fields = System.Linq.Enumerable.ToArray(
+                System.Linq.Enumerable.Where(
+                    typeof(TuningConfig).GetFields(
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static),
+                    f => !f.IsLiteral && !f.IsInitOnly));
+
+            var before = new Dictionary<string, object>();
+            foreach (System.Reflection.FieldInfo field in fields) before[field.Name] = field.GetValue(null);
+
+            // Level 5 is the far end of every ladder, so anything a band carries differs there.
+            TuningConfig.ApplyLevel(4);
+
+            var taken = new List<string>();
+            foreach (System.Reflection.FieldInfo field in fields)
+                if (!Equals(field.GetValue(null), before[field.Name])) taken.Add(field.Name);
+
+            Assert.IsNotEmpty(taken, "ApplyLevel не изменил ни одного значения — тест ни о чём.");
+            CollectionAssert.Contains(taken, "ThoughtBudget",
+                "Запас мыслей перестал быть частью полосы уровня — этот тест надо переписать.");
+
+            TuningConfig.LeaveLevelBand();
+
+            var kept = new List<string>();
+            foreach (System.Reflection.FieldInfo field in fields)
+                if (!Equals(field.GetValue(null), before[field.Name])) kept.Add(field.Name);
+
+            Assert.IsEmpty(kept,
+                "Полоса уровня осталась на общих значениях после выхода на стенд: " +
+                string.Join(", ", kept) + ". Новое значение полосы обязано быть строкой таблицы " +
+                "BandValues в TuningConfig — иначе оно утечёт в грейбокс-сценки.");
         }
 
         [Test]

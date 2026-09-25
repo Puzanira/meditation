@@ -45,13 +45,20 @@ namespace Meditation.View
         /// whole is a four-pixel column of aliasing. <c>Sprite.Create</c> only re-points UVs at a region
         /// of the same texture — no copy, no readable-texture flag — and <c>FullRect</c> keeps it that
         /// way (a tight mesh would want the pixels back).
+        ///
+        /// A HIDEAWAY hands over its captured picture instead of its fragment: what the player hauled
+        /// into the bucket was a shark, and the reward beat is the one place in the run where the haul
+        /// is shown at all. No hideaway has an icon crop, and the two would not want the same thing if
+        /// one ever did — a crop is a fragment chosen for a small square, and a fragment is exactly what
+        /// the capture sprite exists to stop showing.
         /// </summary>
         public static Sprite IconOf(ArtDetail detail)
         {
-            Sprite whole = Get(detail.Sprite);
+            string source = LevelCatalog.DrawnSpriteOf(detail, true);
+            Sprite whole = Get(source);
             if (whole == null || !detail.HasIconCrop) return whole;
 
-            string key = detail.Sprite + "#icon";
+            string key = source + "#icon";
             if (Alive(Cache, key, out Sprite cached)) return cached;
 
             Rect full = whole.rect;
@@ -355,9 +362,13 @@ namespace Meditation.View
             { "L1/objects/seagull-large", 11.4f },
             { "L1/objects/seashell", 51.3f },
             { "L1/objects/shark-fin", 24.8f },
+            // …and the animal the fin belongs to (hideaway, drop 2026-09-25).
+            { "L1/objects/shark-whole", 81.4f },
             { "L1/objects/ship", 35.1f },
 
-            { "L2/objects/flower", 29.9f },
+            // The office's flower is Катя's «горшок с ножками» since 2026-09-25 — a thinner drawing
+            // (legs and a stem) on a taller canvas, so the stroke fell from 29.9 to 19.9.
+            { "L2/objects/flower", 19.9f },
             { "L2/objects/mug", 125.8f },
             { "L2/objects/paperclip", 21.1f },
             { "L2/objects/slippers", 33.0f },
@@ -368,6 +379,8 @@ namespace Meditation.View
             { "L3/objects/fish", 99.1f },
             { "L3/objects/glove", 90.8f },
             { "L3/objects/goose", 125.1f },
+            // …and the rest of the bird, which is off the left edge until it is hauled in.
+            { "L3/objects/goose-whole", 112.8f },
             { "L3/objects/newspaper", 121.1f },
             { "L3/objects/sticker", 53.2f },
 
@@ -385,9 +398,15 @@ namespace Meditation.View
             { "L5/objects/bird", 31.7f },
             { "L5/objects/briefcase", 196.6f },
             { "L5/objects/cloud-middle", 23.6f },
-            { "L5/objects/curtains", 37.3f },
+            // Катя's «Window 1 Curtains Only» since 2026-09-25 — two solid panels and a rail instead of
+            // the old open pair, so the stroke went up from 37.3.
+            { "L5/objects/curtains", 54.9f },
+            // …and the woman who was behind them all along.
+            { "L5/objects/window-lady", 78.8f },
             { "L5/objects/dandelion", 17.2f },
             { "L5/objects/flowerpot", 31.5f },
+            // Unchanged by the re-export: the new canvas is 380 px round the same 220 px disc, and a
+            // stroke thickness does not care how much empty margin an export leaves round a drawing.
             { "L5/objects/moon", 123.0f },
             { "L5/objects/vine", 15.5f }
         };

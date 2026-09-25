@@ -41,6 +41,17 @@ namespace Meditation.View
         private readonly List<Image> _detailImages = new List<Image>();
         private readonly List<Image> _detailRings = new List<Image>();
         private readonly List<Image> _detailOutlines = new List<Image>();
+
+        /// <summary>
+        /// The drawing waiting UNDER a hideaway, one slot per detail and null on all the ordinary ones
+        /// (<see cref="ArtDetail.BehindSprite"/> — the city's woman in the window, and nothing else in
+        /// this drop). Built on the scene layer, so it is above the plate and under the detail that
+        /// hides it, and switched on the moment the haul starts.
+        /// </summary>
+        private readonly List<Image> _detailBehinds = new List<Image>();
+
+        /// <summary>Which details are currently drawn as their captured picture (hideaways only).</summary>
+        private readonly List<bool> _detailCaptured = new List<bool>();
         private readonly List<Image> _vesselContents = new List<Image>();
         private readonly List<Vector2> _vesselContentSizes = new List<Vector2>();
         private readonly List<Material> _sweepMaterials = new List<Material>();
@@ -248,6 +259,12 @@ namespace Meditation.View
             {
                 ArtDetail spec = _level.Details[i];
 
+                // Whatever is hiding under this one goes down FIRST and on the scene layer: above the
+                // plate, below every detail. It is decor, not a target — it has no ring, no hit shape
+                // and no place in the catalogue's counts; the only thing it does is be there once the
+                // detail on top of it has been pulled away.
+                _detailBehinds.Add(BuildBehind(spec));
+
                 Image image = Ui.NewImage(DetailsLayer, "Detail_" + spec.Name);
                 image.sprite = ArtLibrary.Get(spec.Sprite);
                 image.preserveAspect = true;
@@ -255,6 +272,7 @@ namespace Meditation.View
                 Ui.Place(image.rectTransform, spec.Home.x, spec.Home.y, spec.Size.x, spec.Size.y);
                 GiveItsOwnSweepMaterial(image, spec);
                 _detailImages.Add(image);
+                _detailCaptured.Add(false);
                 GiveItsOwnNeonOutline(image, spec);
 
                 // The ring goes round the INK, not round the rectangle: the plane is drawn with 600 px
@@ -266,6 +284,25 @@ namespace Meditation.View
                 ring.gameObject.SetActive(false);
                 _detailRings.Add(ring);
             }
+        }
+
+        /// <summary>
+        /// The drawing under a hideaway, hidden until the detail over it is hauled off — or null for
+        /// every detail that hides nothing.
+        /// </summary>
+        private Image BuildBehind(ArtDetail spec)
+        {
+            if (string.IsNullOrEmpty(spec.BehindSprite)) return null;
+
+            Image image = Ui.NewImage(SceneLayer, "Behind_" + spec.Name);
+            image.sprite = ArtLibrary.Get(spec.BehindSprite);
+            image.preserveAspect = true;
+            image.color = image.sprite != null ? Color.white : Color.magenta;
+
+            Rect box = LevelCatalog.BehindRectOf(spec);
+            Ui.Place(image.rectTransform, box.center.x, box.center.y, box.width, box.height);
+            image.gameObject.SetActive(false);
+            return image;
         }
 
         /// <summary>
@@ -685,6 +722,12 @@ namespace Meditation.View
             for (int i = 0; i < _detailImages.Count; i++)
                 if (_detailImages[i].sprite != null) _detailImages[i].color = tint;
 
+            // …and whatever a hideaway has already uncovered: it is part of the location by then, and a
+            // window that stays lit while the street goes out is the one thing the eye would find.
+            for (int i = 0; i < _detailBehinds.Count; i++)
+                if (_detailBehinds[i] != null && _detailBehinds[i].sprite != null)
+                    _detailBehinds[i].color = tint;
+
             if (_vessel != null && _vessel.sprite != null) _vessel.color = tint;
             for (int i = 0; i < _vesselContents.Count; i++)
                 if (_vesselContents[i] != null && _vesselContents[i].sprite != null)
@@ -842,11 +885,20 @@ namespace Meditation.View
 
             ArtDetail spec = _level.Details[index];
             Vector2 position = Vector2.Lerp(spec.Home, _level.VesselCentre, Mathf.Clamp01(progress01));
-            Ui.MoveTo(_detailImages[index].rectTransform, position);
+
+            bool captured = IsCaptured(progress01, active, slipped);
+            SetCaptured(index, captured);
+
+            // INVARIANT: the picture is put down and reasoned about on ONE rectangle — the drawing that
+            // is actually on the frame this instant (LevelCatalog.DrawnRectAt), fragment or whole animal.
+            // Asking «скрыта ли деталь мыслью» about the resting box of a REVEALED hideaway is the state
+            // where a blob has covered a whole shark and the ring is hidden on account of a fin.
+            Rect drawn = LevelCatalog.DrawnRectAt(spec, position, captured);
+            Ui.MoveTo(_detailImages[index].rectTransform, drawn.center);
 
             Image ring = _detailRings[index];
             ring.gameObject.SetActive(active && RingHasSomethingToShow(progress01, slipped) &&
-                                     !FullyUnderAThought(HintPlacement.Centred(position, spec.Size)));
+                                     !FullyUnderAThought(drawn));
             SetDragged(active ? index : -1);
             if (!active) return;
 
@@ -858,6 +910,66 @@ namespace Meditation.View
             ring.fillAmount = slipped ? 1f : Mathf.Clamp01(progress01);
             ring.color = spinning && !slipped ? LevelOneData.VesselStroke : LevelOneData.Alarm;
         }
+
+        /// <summary>
+        /// Is this detail «захвачена» — noticed AND really being hauled, which is when a hideaway shows
+        /// what it is (contract 2026-09-25: «покой = фрагмент, захват = полный арт, бросил — обратно»).
+        ///
+        /// Progress and not <c>spinning</c>, and that is the whole of the rule. «Реально тянется» is a
+        /// statement about the THREAD, not about the handle: the crank flag flips off on every frame the
+        /// player's hand crosses over on the dynamo, and a shark that blinks back into a fin twice a
+        /// second while it is visibly moving is a glitch, not a mechanic. Progress above zero means the
+        /// detail has left its place and is on the line; the grace window keeps it there through a stall;
+        /// and when the grace runs out the collector resets or decays the progress, the slip flag goes up
+        /// and the detail flies home — which is exactly «бросил», and it takes its body back with it.
+        ///
+        /// The floor is the ring's own (<see cref="RingMinimumFill"/>), so the picture and the only other
+        /// thing that appears at the start of a haul appear together.
+        /// </summary>
+        public static bool IsCaptured(float progress01, bool active, bool slipped) =>
+            active && !slipped && progress01 > RingMinimumFill;
+
+        /// <summary>
+        /// Swap a hideaway between its two pictures — the fragment it rests as and the whole thing it
+        /// turns out to be — and uncover whatever was waiting under it.
+        ///
+        /// Guarded by the remembered state rather than run every frame: it re-points a sprite, resizes a
+        /// rect and touches the neon rim's material, and a detail is hauled for seconds at a time.
+        /// </summary>
+        private void SetCaptured(int index, bool captured)
+        {
+            if (_detailCaptured[index] == captured) return;
+            _detailCaptured[index] = captured;
+
+            ArtDetail spec = _level.Details[index];
+
+            Image behind = _detailBehinds[index];
+            if (behind != null) behind.gameObject.SetActive(captured);
+
+            if (string.IsNullOrEmpty(spec.CaptureSprite)) return;
+
+            Image image = _detailImages[index];
+            Sprite sprite = ArtLibrary.Get(LevelCatalog.DrawnSpriteOf(spec, captured));
+            Vector2 size = LevelCatalog.DrawnSizeOf(spec, captured);
+
+            image.sprite = sprite;
+            image.color = sprite != null ? (_desaturated ? DefeatSceneTint : Color.white) : Color.magenta;
+            image.rectTransform.sizeDelta = size;
+
+            // The rim is a CHILD of the image and samples the same sprite, so it has to be re-pointed
+            // at the new one or it outlines the fin round the shark.
+            Image rim = _detailOutlines[index];
+            if (rim != null) rim.sprite = sprite;
+            Material material = _outlineMaterials[index];
+            if (material != null) material.SetVector(OutlineUvRectId, UvRectOf(sprite));
+        }
+
+        /// <summary>Is detail <paramref name="index"/> drawn as its captured picture right now?</summary>
+        public bool IsCapturedNow(int index) =>
+            index >= 0 && index < _detailCaptured.Count && _detailCaptured[index];
+
+        /// <summary>The drawing under each hideaway, in catalogue order; null where there is none.</summary>
+        public IReadOnlyList<Image> DetailBehinds => _detailBehinds;
 
         /// <summary>
         /// Fill below which the ring's arc is a hair rather than an arc — half a degree of 360.
@@ -927,6 +1039,14 @@ namespace Meditation.View
             SetDragged(-1);
             _detailImages[index].gameObject.SetActive(false);
             _detailRings[index].gameObject.SetActive(false);
+
+            // …and what was hiding under it STAYS uncovered. A curtain that has gone into the briefcase
+            // does not swing back over the window, and the collection loop never calls
+            // SetDetailProgress for a collected detail, so this is the last word on it until the level
+            // is restarted.
+            Image behind = _detailBehinds[index];
+            if (behind != null) behind.gameObject.SetActive(true);
+
             _vesselBounce = 0.3f;
 
             // The haul shows the detail by its ICON, not by its whole sprite: a cell of the haul is a
@@ -985,6 +1105,9 @@ namespace Meditation.View
 
             for (int i = 0; i < _detailImages.Count; i++)
             {
+                // A hideaway goes back to its fragment and covers what it hides again — a restart is
+                // the one thing that closes the curtain.
+                SetCaptured(i, false);
                 _detailImages[i].gameObject.SetActive(true);
                 Ui.MoveTo(_detailImages[i].rectTransform, _level.Details[i].Home);
                 _detailRings[i].gameObject.SetActive(false);
@@ -1237,11 +1360,10 @@ namespace Meditation.View
             material.SetFloat(SweepStrengthId, 0f);
             material.SetFloat(SweepSlantId, SweepSlant);
 
-            // …and the edge fade, which is not about the light band at all: one detail (the moon of
-            // level 5) is a disc inside a glow its own canvas cuts off at alpha 5/255, and over a
-            // night sky that composites into the hard box the founder reported on 2026-09-22. The
-            // material is per instance anyway, so this rides along for free — see ArtDetail.EdgeFadeUv.
-            material.SetFloat(EdgeFadeId, Mathf.Max(0f, spec.EdgeFadeUv));
+            // The edge fade (`_EdgeFadeUV`) was set here until 2026-09-25 and is not any more: the moon
+            // it existed for arrived re-exported with its glow dying inside its own canvas, so the
+            // shader's own default of 0 is the right answer for every detail. See the note in
+            // LevelCatalog where ArtDetail.EdgeFadeUv used to stand.
 
             image.material = material;
             _sweepMaterials.Add(material);
@@ -1321,8 +1443,12 @@ namespace Meditation.View
                 if (material == null) continue;
 
                 ArtDetail spec = _level.Details[i];
-                Vector2 box = spec.Size;
-                float px = RimRadiusPx(spec, Mathf.Max(0f, Tuning.TuningConfig.DetailOutlinePx));
+                // A hideaway in the middle of a haul is drawn as a different sprite in a different
+                // rectangle, and both halves of the rim's arithmetic are about the DRAWING.
+                bool captured = _detailCaptured[i];
+                Vector2 box = LevelCatalog.DrawnSizeOf(spec, captured);
+                float px = RimRadiusPx(LevelCatalog.DrawnSpriteOf(spec, captured), box,
+                    Mathf.Max(0f, Tuning.TuningConfig.DetailOutlinePx));
 
                 // The quad is grown by the radius (plus a pixel of air, so the outermost tap is not the
                 // very last row of the quad) and the shader maps the drawing back inside it.
@@ -1356,20 +1482,27 @@ namespace Meditation.View
         /// the picture allows. An unmeasured sprite keeps the panel's number, so this can only ever take
         /// the rim in, never make the slider a lie in the other direction.
         /// </summary>
-        public static float RimRadiusPx(ArtDetail spec, float wanted)
+        public static float RimRadiusPx(ArtDetail spec, float wanted) =>
+            RimRadiusPx(spec.Sprite, spec.Size, wanted);
+
+        /// <summary>
+        /// The same cap asked about a picture rather than about a catalogue entry — what a hideaway
+        /// needs while it is drawn as the animal instead of as the fragment.
+        /// </summary>
+        public static float RimRadiusPx(string spriteKey, Vector2 drawnSize, float wanted)
         {
             if (wanted <= MinRimPx) return wanted;
 
-            float canvasThickness = ArtLibrary.StrokeThicknessOf(spec.Sprite);
+            float canvasThickness = ArtLibrary.StrokeThicknessOf(spriteKey);
             if (float.IsInfinity(canvasThickness) || canvasThickness > 1e6f) return wanted;
 
-            Sprite sprite = ArtLibrary.Get(spec.Sprite);
+            Sprite sprite = ArtLibrary.Get(spriteKey);
             if (sprite == null) return wanted;
 
             Vector2 canvas = sprite.rect.size;
             if (canvas.x < 1f || canvas.y < 1f) return wanted;
 
-            float scale = Mathf.Min(spec.Size.x / canvas.x, spec.Size.y / canvas.y);
+            float scale = Mathf.Min(drawnSize.x / canvas.x, drawnSize.y / canvas.y);
             return Mathf.Clamp(canvasThickness * scale * RimShareOfStroke, MinRimPx, wanted);
         }
 
@@ -1411,7 +1544,6 @@ namespace Meditation.View
         private static readonly int SweepWidthId = Shader.PropertyToID("_SweepWidthU");
         private static readonly int SweepStrengthId = Shader.PropertyToID("_SweepStrength");
         private static readonly int SweepSlantId = Shader.PropertyToID("_SweepSlant");
-        private static readonly int EdgeFadeId = Shader.PropertyToID("_EdgeFadeUV");
 
         /// <summary>
         /// Put the light band on the details, in each one's own UV.
@@ -1433,7 +1565,11 @@ namespace Meditation.View
                     continue;
                 }
 
-                Rect box = LevelCatalog.RectOf(_level.Details[i]);
+                // The band is expressed in the sprite's own UV, so a hideaway drawn as its whole self
+                // needs the rectangle it is actually drawn in.
+                Rect box = _detailCaptured[i]
+                    ? LevelCatalog.CaptureRectOf(_level.Details[i])
+                    : LevelCatalog.RectOf(_level.Details[i]);
                 float width = Mathf.Max(1f, box.width);
                 material.SetFloat(SweepCentreId, (centreX - box.xMin) / width);
                 material.SetFloat(SweepWidthId, Mathf.Max(0.02f, widthPx * 0.5f / width));
@@ -1461,6 +1597,8 @@ namespace Meditation.View
                 if (_outlineMaterials[i] != null) Object.DestroyImmediate(_outlineMaterials[i]);
             _outlineMaterials.Clear();
             _detailOutlines.Clear();
+            _detailBehinds.Clear();
+            _detailCaptured.Clear();
 
             if (_gazeMaterial != null) Object.DestroyImmediate(_gazeMaterial);
             _gazeMaterial = null;

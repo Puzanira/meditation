@@ -8,11 +8,12 @@ using Meditation.View;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace Meditation.Tests
 {
     /// <summary>
-    /// The design gate's evidence for the game, done contract §8. The set, `Game01…Game38`:
+    /// The design gate's evidence for the game, done contract §8. The set, `Game01…Game48`:
     ///
     /// <list type="bullet">
     /// <item>01 титул · 02 карточка уровня 1 · 30–32 карточки уровней 2–4 · 16 карточка уровня 5;</item>
@@ -32,6 +33,11 @@ namespace Meditation.Tests
     ///       34 разросшиеся мысли: одна свежая, одна старая — заказ founder 2026-08-07;</item>
     /// <item>35 неон-прицел на светлой шумной плите метро · 36 прицел ПОВЕРХ детали в библиотеке ·
     ///       37 · 38 крупные планы неон-обводки на скрепке и на тапках — фикс-раунд 2026-08-08.</item>
+    /// <item>39 середина «круглой ряби» · 40 четвёртый бит · 41 добыча в ведре крупно;</item>
+    /// <item>42–47 ПРЯТКИ дропа 2026-09-25, по паре «покой → захват» на каждую: 42 · 43 акула У1,
+    ///       44 · 45 гусь У3, 46 · 47 окно со шторой У5 · 48 то же окно крупно, уже после того как
+    ///       штора уехала в дипломат. Снимаются в <c>GamePictureTests</c>, потому что каждая пара —
+    ///       это ещё и пиксельный замер с negative control, а не только картинка.</item>
     /// </list>
     ///
     /// **Кадры игры снимаются в отгружаемом режиме выбора детали** (<c>NoticeMode.GazeJoystick</c>), с
@@ -555,6 +561,88 @@ namespace Meditation.Tests
         private static float ShareCoveredBy(GameObject what, RectInt? box = null) =>
             StandTestHarness.ShareCoveredBy(what, Letterbox, box, PaintNoise);
 
+        /// <summary>
+        /// A caption the CODE writes over a finished render can be read off the render behind it.
+        ///
+        /// Two lines in the whole game are ours on somebody else's picture — «Крути крутилку, чтобы
+        /// начать» on the title and «Жми кнопку Меню для выхода в главное меню» on the finale — and both
+        /// exist because a founder stood in front of those screens and could not tell what to do
+        /// (2026-09-22). They are placed on the one dark band each render leaves free, which means their
+        /// readability is a property of THAT RENDER and is re-decided every time Катя sends a new one.
+        /// The drop of 2026-09-25 sent both.
+        ///
+        /// So the claim is measured rather than eyeballed: the caption is switched off, the same frame
+        /// is taken again, and the light pixels of the type are compared against what the picture puts
+        /// in exactly those places. A layout check («подпись на экране, текст тот») would have passed on
+        /// cream lettering laid across a sunset.
+        /// </summary>
+        private static void AssertACodeCaptionStandsOffTheRender(Text caption, string frameName)
+        {
+            Assert.IsNotNull(caption, frameName + ": подписи нет вовсе.");
+
+            DesignStage stage = StandTestHarness.Stage();
+            RectInt box = StandTestHarness.PixelRectOf(stage, caption.rectTransform);
+            Assert.Greater(box.width * box.height, 1000, frameName + ": подпись вне кадра.");
+
+            Texture2D with = StandTestHarness.Capture(Letterbox);
+            caption.gameObject.SetActive(false);
+            Canvas.ForceUpdateCanvases();
+            Texture2D without = StandTestHarness.Capture(Letterbox);
+            caption.gameObject.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+
+            try
+            {
+                Color[] lettered = StandTestHarness.PixelsOf(with, box);
+                Color[] bare = StandTestHarness.PixelsOf(without, box);
+                Assert.AreEqual(lettered.Length, bare.Length, frameName + ": кадры разной формы.");
+
+                // The ink of the type, and nothing else: the shadow under it is the other half of the
+                // device and is not what has to be bright.
+                int inked = 0;
+                float gap = 0f;
+                for (int i = 0; i < lettered.Length; i++)
+                {
+                    float lit = Luminance(lettered[i]);
+                    if (lit < CaptionInkLuminance) continue;
+                    if (Mathf.Abs(lit - Luminance(bare[i])) < 1f) continue;
+                    inked++;
+                    gap += lit - Luminance(bare[i]);
+                }
+
+                Assert.Greater(inked, MinCaptionInkPixels,
+                    frameName + ": на кадре нашлось всего " + inked +
+                    " пикселей светлых чернил подписи — она не нарисована или закрыта.");
+
+                gap /= inked;
+                Assert.Greater(gap, MinCaptionContrast,
+                    frameName + ": подпись «" + caption.text + "» не отрывается от нового рендера — " +
+                    "буквы светлее фона под ними в среднем на " + gap.ToString("0") + "/255 при пороге " +
+                    MinCaptionContrast.ToString("0") + ".");
+            }
+            finally
+            {
+                Object.DestroyImmediate(with);
+                Object.DestroyImmediate(without);
+            }
+        }
+
+        /// <summary>Above this a pixel inside the caption's box is the type itself, not its shadow.</summary>
+        private const float CaptionInkLuminance = 128f;
+
+        /// <summary>…and how many of them there have to be before the measurement means anything.</summary>
+        private const int MinCaptionInkPixels = 400;
+
+        /// <summary>
+        /// How far the type has to stand off the picture behind it, 0…255.
+        ///
+        /// 60. The captions are drawn in the drop's own off-white (242) and both bands are dark road or
+        /// dark sky, so the honest measurement is far above this; the floor is set where «cream on the
+        /// sunset» fails — which is the actual risk every time a render is redrawn, and the reason
+        /// TitleScreen puts the line on the road instead of on the horizon.
+        /// </summary>
+        private const float MinCaptionContrast = 60f;
+
         // ---- 01 title, 02 level card -----------------------------------------------------------------
 
         [UnityTest]
@@ -566,6 +654,9 @@ namespace Meditation.Tests
 
             yield return GameTestHarness.SettleScreen(fake);
             Shoot("Game01_title");
+
+            var title = (TitleScreen)flow.Screen;
+            AssertACodeCaptionStandsOffTheRender(title.StartLabel, "Game01_title");
 
             GameTestHarness.JumpTo(flow, GamePhase.LevelCard, 0);
             yield return GameTestHarness.Until(() => flow.Phase == GamePhase.LevelCard, "карточка уровня");
@@ -1973,6 +2064,10 @@ namespace Meditation.Tests
             yield return GameTestHarness.Until(() => flow.Phase == GamePhase.Finale, "финал");
             yield return GameTestHarness.SettleScreen(fake);
             Shoot("Game13_finale");
+
+            var finale = (FinaleScreen)flow.Screen;
+            AssertACodeCaptionStandsOffTheRender(finale.ExitLabel, "Game13_finale");
+
             LogAssert.NoUnexpectedReceived();
         }
     }

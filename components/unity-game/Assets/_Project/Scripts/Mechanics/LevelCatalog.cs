@@ -57,29 +57,76 @@ namespace Meditation.Mechanics
         /// </summary>
         public Vector2 AlphaCentroid;
 
+        // «EdgeFadeUv» stood here until 2026-09-25: a per-detail alpha fade over the outermost 8 % of a
+        // sprite's UV, switched on for the moon of level 5 alone. It was the stopgap for the founder's
+        // «квадрат вокруг луны» (плейтест 2026-09-22) — the old moon.png was a disc inside a radial glow
+        // still worth alpha 5/255 where its 352 px canvas ended, and five units of alpha over a night
+        // sky composites in LINEAR space into a twelve-unit step, i.e. a hard box round the moon.
+        //
+        // The comment that stood here said «the real fix is the ASSET», and the drop of 2026-09-25 is
+        // that asset: Катя's new moon is 380 px for the same 220 px disc, and its glow was down to
+        // alpha 2 at the border — the last two units were taken off on the way into Resources, so the
+        // border is a true zero and there is nothing left to fade. The guard moved with the fix:
+        // LevelCatalogTests now measures the moon PNG's own border instead of asserting that a
+        // workaround is switched on (and asserts that no detail carries a fade any more, because a
+        // fade on a sprite trimmed to its alpha box eats the gull's wingtips and the paperclip's wire).
+
+        // ---- прятки: «проявление при захвате» (контракт 2026-09-25) ---------------------------------
+        //
+        // Three details of this drop are HIDEAWAYS: at rest the player sees a fragment (a fin, a goose's
+        // head round the edge of the frame, a drawn curtain) and the whole thing only appears once the
+        // detail has been noticed AND the crank is really hauling it in. Founder's own words for the
+        // three: «видим всю акулу только, когда начинаем её перетаскивать», «тело за пределами экрана,
+        // оно появляется, только когда начинаем его перетаскивать», «когда шторки перетаскиваем, под
+        // ними окно с дамой».
+        //
+        // Two of those sentences are the same move and one is its mirror, so the data says both rather
+        // than the code saying three special cases:
+        //
+        //   * <see cref="CaptureSprite"/> — the fragment IS the whole thing, drawn small. The shark's
+        //     fin is the shark; hauling swaps the picture (and its rectangle) for the animal it belongs
+        //     to, positioned so the fragment does not jump.
+        //   * <see cref="BehindSprite"/> — the fragment HIDES something else. The curtain is a curtain
+        //     and the woman in the window is a second drawing that was always there; hauling the
+        //     curtain off uncovers her, and she stays uncovered once it is in the vessel.
+        //
+        // Everything else about a hideaway is an ordinary detail: it is noticed by its RESTING rectangle
+        // (<see cref="Home"/> + <see cref="Size"/>), its ring hangs off its resting centroid, hints
+        // avoid its resting box. Only the picture changes, and only while the thread is under tension.
+
         /// <summary>
-        /// Fade this sprite's own alpha to zero over the outermost fraction of its UV, 0 = off.
+        /// The sprite this detail is drawn as while it is being HAULED — empty on every ordinary one.
         ///
-        /// One detail needs it and it is the founder's «квадрат вокруг луны» (плейтест 2026-09-22).
-        /// Nothing draws a square: the moon's PNG is a disc inside a wide radial GLOW, and the glow is
-        /// still at alpha 5/255 when the canvas ends. Measured on `L5/objects/moon.png` (352×352): the
-        /// four corners are alpha 0, but the edge MIDPOINTS are 5, the iso-alpha contours are circular,
-        /// and at α≥1 their radius is 175 along the axes (= exactly half the width, i.e. cut by the
-        /// canvas) against 223 on the diagonals, where there is still room. A circle truncated by its
-        /// own box.
-        ///
-        /// Five units of alpha is invisible over most things and a hard step over a night sky, because
-        /// the UI composites in LINEAR space: plate sRGB 25 → linear 0.0103, the glow's cream 212 →
-        /// 0.657, blended at α = 0.0196 → 0.0255 → sRGB ≈ 44. Differencing `Game15_L5_play` against
-        /// `Game22_L5_victory` (moon already collected) returns a hard-edged 188×188 rectangle centred
-        /// exactly on (1680, 112), which is this detail's own quad at its pulse scale.
-        ///
-        /// The real fix is the ASSET — re-export with the glow dying inside its canvas, and that line
-        /// is in Катя's brief. This is the stopgap, and it is deliberately per-detail rather than a
-        /// rule: most sprites here are trimmed to their own alpha box, so their ink DOES reach the
-        /// border, and a blanket edge fade would eat the gull's wingtips and the paperclip's wire.
+        /// The resting <see cref="Sprite"/> stays the catalogue's idea of where and what the detail is;
+        /// this is the same object seen whole. Both are real files under <c>MeditationArt/</c>.
         /// </summary>
-        public float EdgeFadeUv;
+        public string CaptureSprite;
+
+        /// <summary>Its drawn size, design px — the whole animal, not the fragment's rectangle.</summary>
+        public Vector2 CaptureSize;
+
+        /// <summary>
+        /// Where the captured picture's centre sits relative to <see cref="Home"/>, design px.
+        ///
+        /// Measured, not guessed: the fragment has to stay exactly where it was drawn, or the reveal
+        /// reads as the detail teleporting. Level 1's fin tip and the waterline under it land on the
+        /// same two pixels before and after the swap; level 3's goose keeps its head on the window
+        /// frame and grows a body out past the left edge of the screen.
+        /// </summary>
+        public Vector2 CaptureOffset;
+
+        /// <summary>Decor uncovered at this detail's place once it is hauled away — «за шторкой».</summary>
+        public string BehindSprite;
+
+        /// <summary>Its drawn size, design px.</summary>
+        public Vector2 BehindSize;
+
+        /// <summary>…and its centre relative to <see cref="Home"/>.</summary>
+        public Vector2 BehindOffset;
+
+        /// <summary>True when this detail hides something — a bigger self, or a second drawing.</summary>
+        public bool IsHideaway =>
+            !string.IsNullOrEmpty(CaptureSprite) || !string.IsNullOrEmpty(BehindSprite);
 
         // «SilhouetteRadius» stood here until 2026-08-08: a per-detail dilation for the HUD slot's
         // flat-ink silhouette, needed because a square fragment of line art (the vine's leaf window)
@@ -213,7 +260,17 @@ namespace Meditation.Mechanics
                         new Rect(0f, 0f, 0.4040f, 1f), 0.2497f, 0.5103f),
                     Detail("чайка", "L1/objects/seagull-large", 1535f, 172f, 133f, 28f, 0.5002f, 0.5023f),
                     Detail("кораблик", "L1/objects/ship", 1592f, 695f, 139f, 64f, 0.4439f, 0.6381f),
-                    Detail("акулий плавник", "L1/objects/shark-fin", 169f, 725f, 196f, 63f, 0.4728f, 0.6655f),
+                    // A hideaway (see ArtDetail «прятки»). The fin is what the plate has always shown;
+                    // `shark-whole` is Катя's drawing of 2026-09-25 of the animal it belongs to, and
+                    // the two are registered on the water: the fin's own ripple sits at design y 746
+                    // (y 110 of its 130 px canvas) and the shark's waterline ellipse is centred at
+                    // y 420 of its 719 px of drawing, so at 292×180 the ellipse lands on 746.1 and the
+                    // fin's tip stays on (167, 693). Half the animal is therefore under the surface,
+                    // which is the whole joke of the fragment.
+                    Hides(
+                        Detail("акулий плавник", "L1/objects/shark-fin", 169f, 725f, 196f, 63f,
+                            0.4728f, 0.6655f),
+                        "L1/objects/shark-whole", 292f, 180f, 6f, 58f),
                     Detail("ракушка на асфальте", "L1/objects/seashell", 1285f, 1021f, 189f, 60f,
                         0.6433f, 0.6399f)
                 },
@@ -255,7 +312,19 @@ namespace Meditation.Mechanics
                     // Two more yellow sticky notes are PAINTED into this plate (the laptop upper-left
                     // and the right-hand monitor). They are decor, deliberately: the level is about
                     // looking twice. Only the one below is a detail — LevelCatalogTests counts them.
-                    Detail("цветок в окне", "L2/objects/flower", 328f, 253f, 53f, 92f, 0.5081f, 0.6160f),
+                    // Катя's «горшок с ножками для уровня с офисом» (2026-09-25) is the office's flower,
+                    // redrawn: the same wilted bloom in the same pot, now standing on two legs in a pair
+                    // of shoes. It is a REPLACEMENT and not a sixth detail — the founder named the level
+                    // and the level already has a flower in that window, and a walking pot beside a
+                    // standing one would be two of the same joke. `flower.png` therefore holds the new
+                    // drawing under the old key.
+                    //
+                    // It is taller than what it replaces (the legs) and the pane it stands in is not:
+                    // the office window's lower-left light runs y 200…301 between its mullion and its
+                    // sill, so the pot keeps its feet on the sill at y 299 and the size comes from the
+                    // pane rather than from the pot — 43×96 of the drawing's own 210×471 proportion.
+                    Detail("цветок в горшке на ножках", "L2/objects/flower", 328f, 251f, 43f, 96f,
+                        0.5012f, 0.5476f),
                     Detail("скрепка", "L2/objects/paperclip", 338f, 574f, 40f, 56f, 0.4955f, 0.4752f),
                     Detail("стикер на мониторе", "L2/objects/sticky-note", 1160f, 606f, 58f, 56f,
                         0.4617f, 0.4714f),
@@ -298,7 +367,17 @@ namespace Meditation.Mechanics
                 {
                     Detail("плакат «Пляжи Сызрани»", "L3/objects/ad-poster", 744f, 77f, 280f, 116f,
                         0.5010f, 0.4764f),
-                    Detail("гусь из-за края", "L3/objects/goose", 89f, 447f, 238f, 204f, 0.5469f, 0.5135f),
+                    // A hideaway. «Тело за пределами экрана. Оно появляется, только когда начинаем его
+                    // перетаскивать» (founder) — and it is literally off the frame: the goose's body
+                    // reaches x −125, so at rest there is nothing to draw of it and the reveal happens
+                    // as the haul carries the bird in from the left. The registration is exact rather
+                    // than eyeballed — `goose.png` in Resources IS the right-hand crop of Катя's whole
+                    // goose (matched at scale 1.00, offset (432, 318), mean |Δα| 0.015), so the head
+                    // does not move by a pixel when the picture is swapped.
+                    Hides(
+                        Detail("гусь из-за края", "L3/objects/goose", 89f, 447f, 238f, 204f,
+                            0.5469f, 0.5135f),
+                        "L3/objects/goose-whole", 334f, 266f, -47f, 30f),
                     Detail("газета в воздухе", "L3/objects/newspaper", 886f, 524f, 162f, 121f,
                         0.4988f, 0.4750f),
                     Detail("стикер на поручне", "L3/objects/sticker", 1570f, 373f, 53f, 68f,
@@ -381,10 +460,30 @@ namespace Meditation.Mechanics
                 Details = new[]
                 {
                     Detail("одуванчик", "L5/objects/dandelion", 500f, 958f, 59f, 75f, 0.4626f, 0.4258f),
-                    Detail("шторы в окне", "L5/objects/curtains", 824f, 390f, 70f, 100f, 0.5000f, 0.4476f),
+                    // A hideaway of the other kind: the curtain does not BECOME anything, it is in the
+                    // way of something. «Изначально видно окно со шторками. Когда шторки перетаскиваем,
+                    // под ними окно с дамой» (founder) — so the woman is decor that was always at this
+                    // window and is simply covered, and pulling the curtain off uncovers her for good.
+                    //
+                    // Катя drew the two as one composition on one 600 px canvas (the window's own light
+                    // is x 160…439 in both), so they are placed off ONE mapping — 0.25 of the source,
+                    // the curtain's top rail on design y 340 — and register with each other exactly as
+                    // she drew them: the woman's pelmet is the wider one and overhangs the curtain by
+                    // six pixels a side, which is what a curtain rail does.
+                    //
+                    // `curtains.png` in Resources is her new «Window 1 Curtains Only» under the old key;
+                    // the rectangle is unchanged (the plate's own window opening is 790…859 × 340…439,
+                    // and the curtain still fills it).
+                    Behind(
+                        Detail("шторы в окне", "L5/objects/curtains", 824f, 390f, 70f, 100f,
+                            0.5003f, 0.4787f),
+                        "L5/objects/window-lady", 82f, 98f, 0f, -9f),
                     Detail("воробей", "L5/objects/bird", 187f, 83f, 62f, 62f, 0.4830f, 0.4435f),
-                    EdgeFaded(Detail("луна", "L5/objects/moon", 1680f, 112f, 176f, 176f, 0.5001f, 0.5000f),
-                        MoonHaloFade),
+                    // 190 and not 176: the new moon is a 380 px canvas round the SAME 220 px disc (the
+                    // old one was 352), so the rectangle grows with the canvas and the moon in the sky
+                    // stays exactly the 110 design px it has always been. What the extra canvas buys is
+                    // room for the glow to die inside it — see the note where EdgeFadeUv used to stand.
+                    Detail("луна", "L5/objects/moon", 1680f, 112f, 190f, 190f, 0.5001f, 0.5000f),
                     Detail("облако у столба", "L5/objects/cloud-middle", 728f, 53f, 180f, 46f,
                         0.4968f, 0.5600f),
                     // The cloud «у провода» is NOT here on purpose. The drop ships it twice: once
@@ -452,7 +551,7 @@ namespace Meditation.Mechanics
         // arithmetic on the numbers above, and LevelView draws from exactly these.
 
         /// <summary>The rectangle a detail occupies, design px.</summary>
-        public static Rect RectOf(ArtDetail detail) => Centred(detail.Home, detail.Size);
+        public static Rect RectOf(ArtDetail detail) => DrawnRectAt(detail, detail.Home, false);
 
         /// <summary>
         /// Where a detail actually IS, as opposed to where its rectangle is centred: its alpha centroid
@@ -488,11 +587,72 @@ namespace Meditation.Mechanics
         /// when the icon is a crop. The haul caps every item at «не больше, чем в сцене», and for a
         /// cropped icon that ceiling belongs to the fragment: the vine's 658 px of height are the
         /// vine's, not one bend's.
+        ///
+        /// For a hideaway it is the CAPTURED size, because the haul shows what the detail turned out to
+        /// be. What went into the bucket was a shark, and a fin in the bucket would be a second riddle
+        /// at the one moment in the run where the player is shown their own answer (the reward beat).
         /// </summary>
         public static Vector2 IconSizeOf(ArtDetail detail) =>
             detail.HasIconCrop
                 ? new Vector2(detail.Size.x * detail.IconCrop.width, detail.Size.y * detail.IconCrop.height)
-                : detail.Size;
+                : DrawnSizeOf(detail, true);
+
+        /// <summary>
+        /// How big this detail is DRAWN right now: its resting rectangle, or the whole picture while it
+        /// is being hauled. One place, because the view, the icon and the tests all have to agree.
+        /// </summary>
+        public static Vector2 DrawnSizeOf(ArtDetail detail, bool captured) =>
+            captured && !string.IsNullOrEmpty(detail.CaptureSprite) ? detail.CaptureSize : detail.Size;
+
+        /// <summary>…and which file it is drawn FROM.</summary>
+        public static string DrawnSpriteOf(ArtDetail detail, bool captured) =>
+            captured && !string.IsNullOrEmpty(detail.CaptureSprite) ? detail.CaptureSprite : detail.Sprite;
+
+        /// <summary>
+        /// The rectangle this detail actually OCCUPIES on the frame right now: the picture it is drawn
+        /// from, at the place it is drawn, offset and all.
+        ///
+        /// THE one answer to «где сейчас деталь», and it is one answer because a hideaway has three
+        /// plausible ones — its catalogue rectangle, the fragment it rests as, and the animal it turns
+        /// out to be, standing half a body to the side of both. Everything that reasons about the
+        /// detail's geometry while the level is running (the ring's «скрыта мыслью», the obstacle a
+        /// teaching plate dodges, the picture's own rect) has to mean the same one, or the game gets a
+        /// state where the thought has covered a whole shark and the logic is still thinking about a fin.
+        /// </summary>
+        /// <param name="position">Where the RESTING picture's centre is — its home, or a point of its travel.</param>
+        /// <param name="captured">Is it showing what it hides (<see cref="View.LevelView.IsCaptured"/>)?</param>
+        public static Rect DrawnRectAt(ArtDetail detail, Vector2 position, bool captured)
+        {
+            bool whole = captured && !string.IsNullOrEmpty(detail.CaptureSprite);
+            return Centred(whole ? position + detail.CaptureOffset : position,
+                DrawnSizeOf(detail, captured));
+        }
+
+        /// <summary>
+        /// …and everything it CAN occupy while its resting centre is at <paramref name="position"/>:
+        /// both rectangles as one box.
+        ///
+        /// For anything that has to hold over a STRETCH of time rather than for one frame — a hideaway
+        /// that is a fragment when the question is asked and a whole animal a second later would
+        /// otherwise be answered about the fragment and drawn as the animal.
+        /// </summary>
+        public static Rect DrawnRectSpanAt(ArtDetail detail, Vector2 position)
+        {
+            Rect rest = DrawnRectAt(detail, position, false);
+            if (string.IsNullOrEmpty(detail.CaptureSprite)) return rest;
+
+            Rect whole = DrawnRectAt(detail, position, true);
+            return Rect.MinMaxRect(
+                Mathf.Min(rest.xMin, whole.xMin), Mathf.Min(rest.yMin, whole.yMin),
+                Mathf.Max(rest.xMax, whole.xMax), Mathf.Max(rest.yMax, whole.yMax));
+        }
+
+        /// <summary>Where the captured picture stands when the detail is at home, design px.</summary>
+        public static Rect CaptureRectOf(ArtDetail detail) => DrawnRectAt(detail, detail.Home, true);
+
+        /// <summary>…and where the drawing waiting under it stands.</summary>
+        public static Rect BehindRectOf(ArtDetail detail) =>
+            Centred(detail.Home + detail.BehindOffset, detail.BehindSize);
 
         /// <summary>The rectangle the vessel occupies, design px.</summary>
         public static Rect VesselRectOf(LevelDefinition level) => Centred(level.VesselCentre, level.VesselSize);
@@ -642,18 +802,29 @@ namespace Meditation.Mechanics
         }
 
         /// <summary>
-        /// How much of the moon's own UV is faded out, per side — see <see cref="ArtDetail.EdgeFadeUv"/>.
-        ///
-        /// 8 %. The disc itself ends at radius 110 of 176 (0.625 of the half-width), and the glow is
-        /// still worth removing out to the border, so the fade has to start well outside the drawing
-        /// and reach zero at the edge: 0.08 begins at 0.92 of the half-width, i.e. at radius 162 —
-        /// fifty pixels of clear glow past the disc, and nothing of the moon itself is touched.
+        /// …the same detail, turned into a hideaway that IS the thing it hides
+        /// (<see cref="ArtDetail.CaptureSprite"/>): the fin that is a shark, the head that is a goose.
         /// </summary>
-        public const float MoonHaloFade = 0.08f;
-
-        private static ArtDetail EdgeFaded(ArtDetail detail, float uv)
+        /// <param name="dx">Where the whole picture's centre goes, relative to the fragment's Home.</param>
+        private static ArtDetail Hides(ArtDetail detail, string sprite, float w, float h,
+            float dx, float dy)
         {
-            detail.EdgeFadeUv = uv;
+            detail.CaptureSprite = sprite;
+            detail.CaptureSize = new Vector2(w, h);
+            detail.CaptureOffset = new Vector2(dx, dy);
+            return detail;
+        }
+
+        /// <summary>
+        /// …and the mirror of it (<see cref="ArtDetail.BehindSprite"/>): a detail that is merely IN THE
+        /// WAY, with a second drawing waiting under it.
+        /// </summary>
+        private static ArtDetail Behind(ArtDetail detail, string sprite, float w, float h,
+            float dx, float dy)
+        {
+            detail.BehindSprite = sprite;
+            detail.BehindSize = new Vector2(w, h);
+            detail.BehindOffset = new Vector2(dx, dy);
             return detail;
         }
 

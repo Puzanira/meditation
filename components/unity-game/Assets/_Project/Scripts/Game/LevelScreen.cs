@@ -561,23 +561,42 @@ namespace Meditation.Game
                 return;
             }
 
-            ArtDetail spec = _level.Details[index];
-            Vector2 size = spec.Size;
+            AddDetailTrack(into, _level.Details[index], from, _level.VesselCentre);
+        }
 
+        /// <summary>
+        /// The same chain as arithmetic, so the suite can hold it without a scene — <c>AddDetailTrack</c>
+        /// above is this call with the level's own numbers filled in.
+        /// </summary>
+        public static void AddDetailTrack(System.Collections.Generic.List<Rect> into, ArtDetail spec,
+            Vector2 from, Vector2 vesselCentre)
+        {
             // `from` is where the INK is (the anchor); the sprite's own rectangle hangs off it by the
             // same offset. The travel itself is the sprite's centre walking from there to the vessel
             // — <see cref="DetailPosition"/> lerps the HOME and adds the offset, so the far end of the
             // run is the vessel's centre exactly.
             Vector2 sprite = from - LevelCatalog.AnchorOffsetOf(spec);
-            Vector2 arrives = _level.VesselCentre;
 
-            float span = Vector2.Distance(sprite, arrives);
-            float step = Mathf.Max(24f, Mathf.Min(size.x, size.y) * 0.5f);
-            int samples = Mathf.Clamp(Mathf.CeilToInt(span / step), 1, 64);
+            // INVARIANT: a link of this chain is the detail's WIDEST possible drawing at that point
+            // (<see cref="LevelCatalog.DrawnRectSpanAt"/>) — rest UNION capture, for the whole track.
+            // The plate is placed once and stands for the length of the beat, and a hideaway PROявится
+            // on the way: the plate would be placed clear of a 196×63 fin and end up lying on the
+            // 292×180 shark the fin turns into two frames later. Taking the union for the whole track
+            // rather than switching state mid-chain is the same decision, stated for time instead of
+            // space: the beat has no idea WHERE along the thread the reveal happens (it is the
+            // collector's progress, i.e. how hard the player cranks), so every link has to hold for
+            // both pictures. It costs the плашка some room — 292 px instead of 196 on level 1 — and
+            // that is the cheap half of the trade, because the expensive half is a sentence lying on
+            // the animal the sentence is about.
+            Rect span = LevelCatalog.DrawnRectSpanAt(spec, sprite);
+
+            float travel = Vector2.Distance(sprite, vesselCentre);
+            float step = Mathf.Max(24f, Mathf.Min(span.width, span.height) * 0.5f);
+            int samples = Mathf.Clamp(Mathf.CeilToInt(travel / step), 1, 64);
 
             for (int i = 0; i <= samples; i++)
                 into.Add(HintPlacement.Inflate(
-                    HintPlacement.Centred(Vector2.Lerp(sprite, arrives, i / (float)samples), size),
+                    LevelCatalog.DrawnRectSpanAt(spec, Vector2.Lerp(sprite, vesselCentre, i / (float)samples)),
                     HintPlacement.DraggedSpriteMargin));
         }
 

@@ -792,6 +792,473 @@ namespace Meditation.Tests
         /// <summary>How much of a HUD widget's own area the thought layer may move — see the guard above.</summary>
         private const float MaxThoughtInkInHud = 0.04f;
 
+        // ---- прятки: «проявление при захвате» (контракт 2026-09-25) ----------------------------------
+
+        /// <summary>
+        /// One hideaway, and how it is staged so the two frames differ in exactly one thing.
+        /// </summary>
+        private struct Hideaway
+        {
+            public int LevelIndex;
+            public string Sprite;
+
+            /// <summary>How far along the thread the second frame is taken.</summary>
+            public float Progress;
+
+            /// <summary>
+            /// How many times more of the frame the reveal has to paint than the fragment does.
+            ///
+            /// Per hideaway, because the two are not the same kind of reveal and one floor for both
+            /// would be the looser one. The shark is a fin that turns into an animal — composited off
+            /// the catalogue's own numbers it goes from 3 657 painted pixels to 21 952, i.e. ×6.0. The
+            /// goose's fragment is already most of a goose (head, neck and a segment of body, 17 486 px)
+            /// and what appears is the rest of it (28 582 px), so the honest ceiling there is ×1.63 and
+            /// the floor has to sit under it. Numbers measured 2026-09-25; the floors leave each about
+            /// a fifth of room.
+            /// </summary>
+            public float MinGrowth;
+
+            public string RestFrame;
+            public string HaulFrame;
+        }
+
+        /// <summary>
+        /// The three of the drop, with the progress each one's reveal frame needs.
+        ///
+        /// The numbers are not a taste: level 3's goose is off the LEFT EDGE of the frame at rest
+        /// («тело за пределами экрана», founder), so a frame taken the instant the thread goes tight
+        /// would be a frame of a goose still mostly outside the picture — it needs about a third of the
+        /// way to the bag to be wholly inside it. Level 5's curtain has to have travelled far enough to
+        /// be OFF the window it covers, or «под ними окно с дамой» is a claim about a woman nobody can
+        /// see. Level 1's shark needs nothing: it is revealed in place.
+        /// </summary>
+        private static readonly Hideaway[] Hideaways =
+        {
+            new Hideaway
+            {
+                LevelIndex = 0, Sprite = "L1/objects/shark-fin", Progress = 0.08f, MinGrowth = 3.0f,
+                RestFrame = "Game42_L1_shark_at_rest", HaulFrame = "Game43_L1_shark_hauled"
+            },
+            new Hideaway
+            {
+                LevelIndex = 2, Sprite = "L3/objects/goose", Progress = 0.32f, MinGrowth = 1.35f,
+                RestFrame = "Game44_L3_goose_at_rest", HaulFrame = "Game45_L3_goose_hauled"
+            },
+            new Hideaway
+            {
+                LevelIndex = 4, Sprite = "L5/objects/curtains", Progress = 0.30f, MinGrowth = 0f,
+                RestFrame = "Game46_L5_window_curtained", HaulFrame = "Game47_L5_window_uncovered"
+            }
+        };
+
+        /// <summary>
+        /// A hideaway shows what it hides ONLY while it is being hauled — measured on the pixel, with a
+        /// negative control, on all three of them.
+        ///
+        /// This is the gate for the mechanic the founder ordered on 2026-09-25 («видим всю акулу только,
+        /// когда начинаем её перетаскивать»), and it has to be a picture test for the same reason the
+        /// haul-inside-the-vessel gate is: the state is decidable from the objects, but «полный арт
+        /// реально виден» is a statement about how much of the frame the drawing paints, and a swap that
+        /// re-points a sprite at a rectangle the wrong size would satisfy every state check and show
+        /// nothing.
+        ///
+        /// Two claims per hideaway, and both are differences rather than levels:
+        ///
+        ///   * the detail's own image paints substantially MORE of the frame while it is hauled than at
+        ///     rest — for the kind whose fragment turns into the whole thing (шарк, гусь);
+        ///   * the drawing waiting underneath paints NOTHING at rest and most of its own rectangle once
+        ///     the thing over it has moved off — for the kind that merely covers something (шторы).
+        ///
+        /// …and the negative control is an ordinary detail of the SAME level, measured in the same two
+        /// frames: it has to paint the same amount in both. Without it a test that only ever says «the
+        /// frame changed» would pass on a frame that changed for any other reason — a wave arriving, the
+        /// pulse breathing, the light band crossing. All three are switched off here for exactly that
+        /// reason, and the control is what proves they are.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator EveryHideaway_ShowsWhatItHides_OnlyWhileItIsHauled([Values(0, 1, 2)] int which)
+        {
+            Hideaway staged = Hideaways[which];
+
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, staged.LevelIndex);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+
+            // Level 1 opens in the lesson and the lesson gates the loop, so it is played out first —
+            // the same staging the haul gate uses. Its собор beat takes the plane (fixed order, index
+            // 0); the shark is the fourth detail and is still lying in the water afterwards.
+            if (staged.LevelIndex == 0)
+            {
+                yield return GameTestHarness.CollectOneDetail(fake, screen);
+                yield return GameTestHarness.SwipeUntil(fake, () => screen.Beat == TutorialBeat.Done,
+                    "обучение пройдено");
+            }
+
+            QuietTheLevelDownForAPicture(staged.LevelIndex);
+
+            int index = IndexOfDetail(screen.Level, staged.Sprite);
+            int control = ControlDetail(screen, index);
+            ArtDetail spec = screen.Level.Details[index];
+
+            GameObject picture = screen.View.DetailImages[index].gameObject;
+            GameObject other = screen.View.DetailImages[control].gameObject;
+
+            // ---- 1. покой ---------------------------------------------------------------------------
+            yield return NoticeExactly(fake, screen, index);
+            yield return GameTestHarness.Idle(fake, 2);
+
+            Assert.AreEqual(index, screen.Runtime.NoticedIndex,
+                "Заметили не ту деталь — кадр покоя снимать не с чего.");
+            Assert.IsFalse(screen.View.IsCapturedNow(index),
+                "«" + spec.Name + "»: деталь только замечена, а прятка уже раскрыта — покоя не осталось.");
+
+            float restPicture = StandTestHarness.ShareCoveredBy(picture, Letterbox);
+            float restBehind = ShareOfWhatIsHiding(screen, index);
+            float restControl = StandTestHarness.ShareCoveredBy(other, Letterbox);
+            StandTestHarness.Shoot(staged.RestFrame, Letterbox);
+
+            // ---- 2. захват --------------------------------------------------------------------------
+            yield return GameTestHarness.CrankUntil(fake,
+                () => screen.Runtime.Collector.Progress01 >= staged.Progress,
+                "«" + spec.Name + "» вытянута на " + (staged.Progress * 100f).ToString("0") + " %");
+            yield return GameTestHarness.Frames(2);
+
+            Assert.IsTrue(screen.View.IsCapturedNow(index),
+                "«" + spec.Name + "»: нить натянута, а прятка не раскрылась.");
+
+            float haulPicture = StandTestHarness.ShareCoveredBy(picture, Letterbox);
+            float haulBehind = ShareOfWhatIsHiding(screen, index);
+            float haulControl = StandTestHarness.ShareCoveredBy(other, Letterbox);
+            StandTestHarness.Shoot(staged.HaulFrame, Letterbox);
+
+            // ---- 3. что с этого видно ---------------------------------------------------------------
+            if (!string.IsNullOrEmpty(spec.CaptureSprite))
+            {
+                Assert.Greater(haulPicture, restPicture * staged.MinGrowth,
+                    "«" + spec.Name + "»: при захвате деталь рисует " +
+                    (haulPicture * 100f).ToString("0.00") + " % кадра против " +
+                    (restPicture * 100f).ToString("0.00") + " % в покое (нужно ×" + staged.MinGrowth.ToString("0.00") + ") — полного арта на кадре нет.");
+            }
+
+            if (!string.IsNullOrEmpty(spec.BehindSprite))
+            {
+                Assert.Less(restBehind, MaxHiddenPaint,
+                    "«" + spec.Name + "»: то, что должно быть СПРЯТАНО, уже нарисовано в покое (" +
+                    (restBehind * 100f).ToString("0.0") + " % своего прямоугольника).");
+                Assert.Greater(haulBehind, MinUncoveredPaint,
+                    "«" + spec.Name + "»: штору утащили, а под ней пусто — " +
+                    (haulBehind * 100f).ToString("0.0") + " % при пороге " +
+                    (MinUncoveredPaint * 100f) + " %.");
+            }
+
+            // …and the control: an ordinary detail of the same level in the same two frames.
+            Assert.Greater(restControl, 0f, "Контрольная деталь не рисует ничего — сравнивать нечем.");
+            Assert.AreEqual(restControl, haulControl, restControl * MaxControlDrift,
+                "Гард слепой: соседняя деталь «" + screen.Level.Details[control].Name +
+                "» тоже изменилась между кадрами (" + (restControl * 100f).ToString("0.00") + " % → " +
+                (haulControl * 100f).ToString("0.00") + " %), значит замер ловит не прятку.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// «Бросил — обратно фрагмент»: the shark dives the moment the thread goes slack.
+        ///
+        /// The other half of the contract's sentence, and the half a reveal keyed to the wrong signal
+        /// gets wrong in the expensive direction — a shark left whole on the plate after the player has
+        /// stopped cranking is a detail that has visibly changed and is nevertheless back at square one.
+        /// Shot at the SHIPPED grace and stop mode (300 ms, «сброс в ноль»), because the question is
+        /// what happens in the game and not what happens under a staging knob.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AHideawayThatIsDropped_GoesBackToBeingAFragment()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            yield return GameTestHarness.SwipeUntil(fake, () => screen.Beat == TutorialBeat.Done,
+                "обучение пройдено");
+
+            TuningConfig.WaveIntervalSeconds = 300f;
+            TuningConfig.CollectSeconds = HaulSeconds;
+            TuningConfig.GraceMs = TuningConfig.Defaults.GraceMs;
+            TuningConfig.StopMode = TuningConfig.Defaults.StopMode;
+
+            int index = IndexOfDetail(screen.Level, "L1/objects/shark-fin");
+            GameObject picture = screen.View.DetailImages[index].gameObject;
+
+            yield return NoticeExactly(fake, screen, index);
+            yield return GameTestHarness.CrankUntil(fake,
+                () => screen.Runtime.Collector.Progress01 >= 0.15f, "акулу потянули");
+
+            Assert.IsTrue(screen.View.IsCapturedNow(index), "Акула не показалась целиком — нечего ронять.");
+            float whole = StandTestHarness.ShareCoveredBy(picture, Letterbox);
+
+            // Hands off the handle. The grace window forgives 300 ms, then the progress is reset and the
+            // detail flies home — and the animal goes back under the water with it.
+            fake.Next = new BackendSnapshot();
+            yield return GameTestHarness.Until(() => !screen.View.IsCapturedNow(index),
+                "акула ушла обратно под воду", 5f);
+
+            // …and all the way home, so the frame is the resting one and not a fin mid-flight.
+            yield return GameTestHarness.Until(() => !screen.Runtime.Slipping, "плавник вернулся на место",
+                5f);
+            yield return GameTestHarness.Idle(fake, 2);
+
+            float fin = StandTestHarness.ShareCoveredBy(picture, Letterbox);
+            Assert.Less(fin, whole / MinRevealGrowth,
+                "Бросили акулу, а на плите всё ещё нарисовано " + (fin * 100f).ToString("0.00") +
+                " % кадра против " + (whole * 100f).ToString("0.00") + " % под тягой.");
+
+            Assert.AreEqual(screen.Level.Details[index].Size,
+                (Vector2)screen.View.DetailImages[index].rectTransform.sizeDelta,
+                "Плавник вернулся, а прямоугольник детали остался акульим.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// The ring of a REVEALED hideaway is judged against the animal, not against the fin it used to
+        /// be (блокер 2, ревизия Codex 2026-09-25).
+        ///
+        /// «Кольцо не рисуется, пока деталь полностью закрыта мыслью» (founder, 2026-08-07) used to be
+        /// asked about <c>HintPlacement.Centred(position, spec.Size)</c> — the catalogue's 196×63 fin. A
+        /// medium blob is 280×220: it swallows the fin whole and cannot swallow the 292×180 shark, so the
+        /// state the old arithmetic produced is a shark plainly visible on the plate with the crank's only
+        /// feedback switched off «потому что деталь закрыта». Both halves are asserted here, on the live
+        /// frame: the premise is measured off the field's own thoughts, and the ring is then required to
+        /// be drawn.
+        ///
+        /// The control is the same claim in the other direction — a strong blob DOES cover the whole
+        /// animal, and then the ring has to go. Without it this test would pass on a view that had simply
+        /// stopped hiding rings at all.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheRingOfARevealedHideaway_IsJudgedAgainstTheAnimal_NotTheFragment()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 0);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            yield return GameTestHarness.CollectOneDetail(fake, screen);
+            yield return GameTestHarness.SwipeUntil(fake, () => screen.Beat == TutorialBeat.Done,
+                "обучение пройдено");
+
+            // A patient grace, so letting go of the handle to place a blob is not letting go of the shark.
+            QuietTheLevelDownForAPicture(0);
+
+            int index = IndexOfDetail(screen.Level, "L1/objects/shark-fin");
+            ArtDetail spec = screen.Level.Details[index];
+            ThoughtField field = screen.Runtime.Field;
+
+            yield return NoticeExactly(fake, screen, index);
+            yield return GameTestHarness.CrankUntil(fake,
+                () => screen.Runtime.Collector.Progress01 >= 0.1f, "акулу потянули");
+            fake.Next = new BackendSnapshot();
+            yield return GameTestHarness.Frames(2);
+
+            Assert.IsTrue(screen.View.IsCapturedNow(index), "Акула не показалась — судить не о чем.");
+
+            RectTransform ring = StandTestHarness.Find(StandTestHarness.Stage(), "Ring_" + spec.Name);
+
+            // Where the two rectangles are RIGHT NOW: the fragment's, and the animal that is drawn there.
+            // Spelled out from the catalogue's raw numbers rather than asked of
+            // <see cref="LevelCatalog.DrawnRectAt"/> — a probe that shares the seam under test would
+            // follow it back into the bug and stay green.
+            Vector2 position = Vector2.Lerp(spec.Home, screen.Level.VesselCentre,
+                screen.Runtime.DisplayProgress);
+            Rect fragment = RectAround(position, spec.Size);
+            Rect animal = RectAround(position + spec.CaptureOffset, spec.CaptureSize);
+
+            // ---- 1. мысль накрыла ФРАГМЕНТ, но не акулу — кольцо обязано остаться ---------------------
+            field.SpawnAt(ThoughtStrength.Medium, screen.Level.ThoughtSprites[0], position);
+            yield return GameTestHarness.Frames(2);
+
+            Assert.IsTrue(SomeThoughtCovers(field, fragment),
+                "Премисса потеряна: ни одна мысль не накрывает плавник целиком — блокер 2 не " +
+                "воспроизводится, мысль " + (field.Thoughts.Count > 0 ? field.Thoughts[0].Rect.ToString() : "—") +
+                " против фрагмента " + fragment + ".");
+            Assert.IsFalse(SomeThoughtCovers(field, animal),
+                "Премисса потеряна: мысль накрыла и акулу целиком — тогда кольцо гасить правильно.");
+
+            StandTestHarness.AssertVisible(ring,
+                "кольцо прогресса раскрытой акулы (мысль накрыла только плавник, блокер 2)");
+
+            // ---- 2. контроль: мысль накрыла ВСЮ акулу — кольцо обязано погаснуть ----------------------
+            field.SpawnAt(ThoughtStrength.Strong, screen.Level.ThoughtSprites[0], animal.center);
+            yield return GameTestHarness.Frames(2);
+
+            Assert.IsTrue(SomeThoughtCovers(field, animal),
+                "Контроль не поставлен: сильная мысль не накрыла акулу целиком.");
+            Assert.IsFalse(ring.gameObject.activeInHierarchy,
+                "Деталь целиком под мыслью, а кольцо всё равно нарисовано — правило founder " +
+                "«кольцо не рисуется, пока деталь полностью закрыта мыслью» перестало работать вовсе.");
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        private static Rect RectAround(Vector2 centre, Vector2 size) =>
+            new Rect(centre.x - size.x * 0.5f, centre.y - size.y * 0.5f, size.x, size.y);
+
+        /// <summary>Is any live thought covering <paramref name="what"/> whole?</summary>
+        private static bool SomeThoughtCovers(ThoughtField field, Rect what)
+        {
+            for (int i = 0; i < field.Thoughts.Count; i++)
+            {
+                Rect over = field.Thoughts[i].Rect;
+                if (over.xMin <= what.xMin && over.yMin <= what.yMin &&
+                    over.xMax >= what.xMax && over.yMax >= what.yMax) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// …and «за шторкой» stays open: the woman in the city's window is still there once the curtain
+        /// is in the briefcase.
+        ///
+        /// A curtain that has been collected does not swing back, and this is the claim that says so —
+        /// the reveal is a change to the LOCATION, not an animation that plays while a detail is in
+        /// flight. It is also the one state the collection loop never revisits (it stops calling
+        /// <c>SetDetailProgress</c> for a collected detail), so nothing else in the suite would notice
+        /// the window going dark again.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheWomanBehindTheCurtain_StaysUncoveredAfterItIsCollected()
+        {
+            yield return GameTestHarness.LoadGame();
+            FakeBackend fake = StandTestHarness.TakeOverInput();
+            yield return GameTestHarness.EnterLevel(fake, 4);
+
+            var screen = (LevelScreen)GameTestHarness.Flow().Screen;
+            TuningConfig.WaveIntervalSeconds = 300f;
+
+            int index = IndexOfDetail(screen.Level, "L5/objects/curtains");
+            Assert.Less(ShareOfWhatIsHiding(screen, index), MaxHiddenPaint,
+                "Дама видна ещё до того, как штору тронули.");
+
+            yield return NoticeExactly(fake, screen, index);
+            TuningConfig.CollectSeconds = GameTestHarness.FastCollectSeconds;
+            yield return GameTestHarness.CrankUntil(fake, () => screen.Runtime.Collected[index],
+                "штора уехала в дипломат");
+            yield return GameTestHarness.Idle(fake, 2);
+
+            Assert.IsFalse(screen.View.DetailImages[index].gameObject.activeInHierarchy,
+                "Штора собрана, а всё ещё нарисована.");
+            Assert.Greater(ShareOfWhatIsHiding(screen, index), MinUncoveredPaint,
+                "Штора в дипломате, а окно снова пустое — проявление откатилось вместе с деталью.");
+
+            StandTestHarness.ShootCloseUp("Game48_L5_window_after_the_curtain", Letterbox,
+                WithAir(LevelCatalog.BehindRectOf(screen.Level.Details[index]), 40f), 4);
+
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        /// <summary>
+        /// Stop the level from doing anything but the one thing these frames are about: no waves, no
+        /// breathing details, no band of light, and a haul slow enough to be photographed halfway.
+        ///
+        /// The patient grace is the one that needs saying out loud. The shipped window is 300 ms, and a
+        /// test that stops cranking to take a measurement loses the detail before the second capture has
+        /// been read back. It is a staging knob and nothing else — what happens when the grace DOES run
+        /// out has its own gate above, shot at the shipped numbers.
+        /// </summary>
+        private static void QuietTheLevelDownForAPicture(int levelIndex)
+        {
+            TuningConfig.SetWaveInterval(levelIndex, 300f);
+            TuningConfig.WaveIntervalSeconds = 300f;
+            TuningConfig.CollectSeconds = HaulSeconds;
+            TuningConfig.GraceMs = PatientGraceMs;
+            TuningConfig.DetailPulseAmplitude = 0f;
+            TuningConfig.SweepStrength = 0f;
+        }
+
+        /// <summary>Long enough that a few seconds of cranking is a fraction of the thread.</summary>
+        private const float HaulSeconds = 14f;
+
+        /// <summary>…and long enough that letting go to read a frame is not letting go.</summary>
+        private const float PatientGraceMs = 120000f;
+
+        /// <summary>
+        /// How far a DROPPED hideaway has to fall back — the mirror of <see cref="Hideaway.MinGrowth"/>,
+        /// used by the drop gate, which is about the shark alone.
+        /// </summary>
+        private const float MinRevealGrowth = 3.0f;
+
+        /// <summary>What a drawing that is supposed to be HIDDEN may paint of its own rectangle.</summary>
+        private const float MaxHiddenPaint = 0.02f;
+
+        /// <summary>…and what an uncovered one has to.</summary>
+        private const float MinUncoveredPaint = 0.5f;
+
+        /// <summary>How far the control detail may drift between the two frames, as a share of itself.</summary>
+        private const float MaxControlDrift = 0.15f;
+
+        /// <summary>
+        /// How much of its own rectangle the drawing under a hideaway is painting — 0 while it is
+        /// hidden, because an inactive object changes nothing when it is switched off again.
+        /// </summary>
+        private static float ShareOfWhatIsHiding(LevelScreen screen, int index)
+        {
+            Image behind = screen.View.DetailBehinds[index];
+            if (behind == null) return 0f;
+
+            RectInt box = StandTestHarness.PixelRectOf(StandTestHarness.Stage(), behind.rectTransform);
+            if (box.width < 2 || box.height < 2) return 0f;
+            return StandTestHarness.ShareCoveredBy(behind.gameObject, Letterbox, box);
+        }
+
+        /// <summary>
+        /// Park the aim on ONE named detail and wait for that one to be noticed.
+        ///
+        /// Not <c>GameTestHarness.NoticeByLooking</c>, which waits for «что-нибудь замечено» and is
+        /// therefore already satisfied on level 1: the lesson is played out in the fixed-order variant,
+        /// which leaves the next detail in the queue noticed before the aim has been pointed anywhere.
+        /// These frames are about one particular detail, so the wait has to name it.
+        /// </summary>
+        private static IEnumerator NoticeExactly(FakeBackend fake, LevelScreen screen, int index)
+        {
+            GameTestHarness.ParkTheAim(screen, LevelCatalog.AnchorOf(screen.Level.Details[index]));
+            fake.Next = new BackendSnapshot();
+            yield return GameTestHarness.Until(() => screen.Runtime.NoticedIndex == index,
+                "взгляд заметил «" + screen.Level.Details[index].Name + "»");
+        }
+
+        private static int IndexOfDetail(LevelDefinition level, string sprite)
+        {
+            for (int i = 0; i < level.DetailCount; i++)
+                if (level.Details[i].Sprite == sprite) return i;
+
+            Assert.Fail("Детали «" + sprite + "» нет на уровне «" + level.Title + "».");
+            return -1;
+        }
+
+        /// <summary>
+        /// An ordinary, uncollected, non-hideaway detail of the same level — the thing that has to look
+        /// the same in both frames.
+        /// </summary>
+        private static int ControlDetail(LevelScreen screen, int hideaway)
+        {
+            for (int i = 0; i < screen.Level.DetailCount; i++)
+            {
+                if (i == hideaway || screen.Runtime.Collected[i]) continue;
+                if (screen.Level.Details[i].IsHideaway) continue;
+                return i;
+            }
+
+            Assert.Fail("На уровне «" + screen.Level.Title + "» нет обычной детали под контроль.");
+            return -1;
+        }
+
+        private static Rect WithAir(Rect box, float air) =>
+            new Rect(box.xMin - air, box.yMin - air, box.width + 2f * air, box.height + 2f * air);
+
         // ---- pixel arithmetic --------------------------------------------------------------------------
 
         private static float MaxChannelDistance(Color a, Color b) =>

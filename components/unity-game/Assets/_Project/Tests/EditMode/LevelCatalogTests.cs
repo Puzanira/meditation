@@ -37,7 +37,14 @@ namespace Meditation.Tests
                 Check(level.BackgroundSprite, missing);
                 if (!level.VesselIsBaked) Check(level.VesselSprite, missing);
 
-                foreach (ArtDetail detail in level.Details) Check(detail.Sprite, missing);
+                foreach (ArtDetail detail in level.Details)
+                {
+                    Check(detail.Sprite, missing);
+                    // …and both pictures a hideaway keeps behind the first one.
+                    if (!string.IsNullOrEmpty(detail.CaptureSprite)) Check(detail.CaptureSprite, missing);
+                    if (!string.IsNullOrEmpty(detail.BehindSprite)) Check(detail.BehindSprite, missing);
+                }
+
                 foreach (string thought in level.ThoughtSprites) Check(thought, missing);
             }
 
@@ -963,22 +970,34 @@ namespace Meditation.Tests
             foreach (LevelDefinition level in LevelCatalog.Levels)
             foreach (ArtDetail detail in level.Details)
             {
-                float rim = LevelView.RimRadiusPx(detail, TuningConfig.Defaults.DetailOutlinePx);
-                Assert.LessOrEqual(rim, TuningConfig.Defaults.DetailOutlinePx,
-                    detail.Name + ": обводка шире, чем ручка на панели.");
+                // Both skins of a hideaway: the rim is re-pointed at the captured drawing while the
+                // detail is hauled (LevelView.ApplyNeonOutline), and «too wide for its own stroke» is a
+                // question about whichever picture is on the frame.
+                for (int skin = 0; skin < 2; skin++)
+                {
+                    bool captured = skin == 1;
+                    if (captured && string.IsNullOrEmpty(detail.CaptureSprite)) continue;
 
-                Sprite sprite = ArtLibrary.Get(detail.Sprite);
-                Assert.IsNotNull(sprite, detail.Name + ": спрайт не найден.");
+                    string key = LevelCatalog.DrawnSpriteOf(detail, captured);
+                    Vector2 drawn = LevelCatalog.DrawnSizeOf(detail, captured);
+                    string skinned = detail.Name + (captured ? " (в захвате)" : string.Empty);
 
-                float scale = Mathf.Min(detail.Size.x / sprite.rect.width,
-                    detail.Size.y / sprite.rect.height);
-                float stroke = ArtLibrary.StrokeThicknessOf(detail.Sprite) * scale;
+                    float rim = LevelView.RimRadiusPx(key, drawn, TuningConfig.Defaults.DetailOutlinePx);
+                    Assert.LessOrEqual(rim, TuningConfig.Defaults.DetailOutlinePx,
+                        skinned + ": обводка шире, чем ручка на панели.");
 
-                Assert.LessOrEqual(rim, Mathf.Max(LevelView.MinRimPx,
-                        stroke * LevelView.RimShareOfStroke) + 0.01f,
-                    "Уровень " + level.Number + ", «" + detail.Name + "»: обводка " +
-                    rim.ToString("0.0") + " px на штрихе шириной " + stroke.ToString("0.0") +
-                    " px — ободок смыкается в заливку.");
+                    Sprite sprite = ArtLibrary.Get(key);
+                    Assert.IsNotNull(sprite, skinned + ": спрайт не найден.");
+
+                    float scale = Mathf.Min(drawn.x / sprite.rect.width, drawn.y / sprite.rect.height);
+                    float stroke = ArtLibrary.StrokeThicknessOf(key) * scale;
+
+                    Assert.LessOrEqual(rim, Mathf.Max(LevelView.MinRimPx,
+                            stroke * LevelView.RimShareOfStroke) + 0.01f,
+                        "Уровень " + level.Number + ", «" + skinned + "»: обводка " +
+                        rim.ToString("0.0") + " px на штрихе шириной " + stroke.ToString("0.0") +
+                        " px — ободок смыкается в заливку.");
+                }
             }
         }
 
@@ -1040,55 +1059,457 @@ namespace Meditation.Tests
         }
 
         /// <summary>
-        /// The edge fade is on the moon of level 5 and on NOTHING else.
+        /// There is no square around the moon — measured on the ASSET, which is where the fix now is.
         ///
-        /// The founder's «квадрат вокруг луны» (плейтест 2026-09-22): the moon's PNG is a disc inside a
-        /// radial glow that is still at alpha 5/255 when its canvas ends, and over a night sky that
-        /// composites — in linear space — into a hard 188×188 step. The stopgap fades that sprite's own
-        /// alpha to zero over the outermost 8 % of its UV (<see cref="ArtDetail.EdgeFadeUv"/>).
+        /// The founder's «квадрат вокруг луны» (плейтест 2026-09-22). Nothing ever drew a square: the
+        /// moon's PNG is a disc inside a wide radial glow, and the old 352 px canvas cut that glow off
+        /// while it was still worth alpha 5/255. Five units of alpha is invisible over most things and a
+        /// hard step over a night sky, because the UI composites in LINEAR space — the plate under the
+        /// moon is sRGB (25, 25, 49) and the glow's cream at α = 5/255 lifts it by twelve units, with a
+        /// straight edge exactly on this detail's own quad.
         ///
-        /// The test is the GUARD on that stopgap, and it is the reason the fade is per detail rather
-        /// than a rule: almost every sprite in this game is trimmed to its own alpha box, so its ink
-        /// reaches the border by construction, and a fade applied to those would eat the gull's
-        /// wingtips and the office paperclip's wire. Measured, not asserted from the list: the border
-        /// alpha of every detail is read off the PNG, and a detail whose ink really does reach its edge
-        /// must not be faded.
+        /// It was patched in the shader until 2026-09-25 (a per-detail UV fade, <c>EdgeFadeUv</c>) and is
+        /// patched in the art since: Катя's re-export is the same 220 px disc on a 380 px canvas, and the
+        /// last two units of glow left at the border were taken off on the way into Resources.
+        ///
+        /// So the guard changed with the fix, and it is the stronger one — it reads the PNG and does the
+        /// compositing arithmetic instead of asserting that a workaround is switched on. Two claims:
+        ///
+        ///   1. the moon's own border cannot lift the darkest plate pixel under it by a visible amount;
+        ///   2. NO detail carries an edge fade any more — the field is gone, so this is the assertion
+        ///      that the stopgap cannot creep back as a copy of itself on a sprite that is trimmed to
+        ///      its own alpha box (where it would eat the gull's wingtips and the paperclip's wire).
         /// </summary>
         [Test]
-        public void TheEdgeFade_IsOnTheMoonAlone_AndNeverOnASpriteWhoseInkReachesItsBorder()
+        public void NoSquareAroundTheMoon_AndNoSpriteNeedsAnEdgeFadeAnyMore()
         {
-            int faded = 0;
-
-            foreach (LevelDefinition level in LevelCatalog.Levels)
-            foreach (ArtDetail detail in level.Details)
-            {
-                string where = "У" + level.Number + " «" + detail.Name + "»";
-                Assert.GreaterOrEqual(detail.EdgeFadeUv, 0f, where + ": отрицательная кромка.");
-                Assert.Less(detail.EdgeFadeUv, 0.25f,
-                    where + ": кромка съедает четверть спрайта — это уже не кромка.");
-
-                if (detail.EdgeFadeUv <= 0f) continue;
-                faded++;
-
-                Assert.AreEqual("L5/objects/moon", detail.Sprite,
-                    where + ": кромку включили не луне. Она лечит ОДИН дефект одного холста " +
-                    "(обрезанное сияние луны L5), и на подрезанном по альфе спрайте она срежет " +
-                    "собственные чернила.");
-                Assert.AreEqual(LevelCatalog.MoonHaloFade, detail.EdgeFadeUv, 1e-4f);
-            }
-
-            Assert.AreEqual(1, faded, "Кромка должна стоять ровно на одной детали — на луне У5.");
-
-            // …and the sprite it is aimed at is still the one that needs it: the moon is drawn from
-            // its own square canvas, so if the art ever comes back re-exported with the glow dying
-            // inside that canvas, the size is what changes and this is the line that has to be
-            // revisited. (The border alpha itself cannot be read here — the PNG is imported
-            // non-readable, and making the whole art set readable to assert one number is a worse
-            // trade than the comment on ArtDetail.EdgeFadeUv, which records the measurement.)
             Sprite moon = ArtLibrary.Get("L5/objects/moon");
             Assert.IsNotNull(moon, "Спрайт луны не найден.");
             Assert.AreEqual(moon.rect.width, moon.rect.height, 1f,
                 "Холст луны перестал быть квадратным — сияние пересобрали, проверьте кромку заново.");
+
+            string path = UnityEditor.AssetDatabase.GetAssetPath(moon);
+            Assert.IsNotEmpty(path, "У луны нет файла — нечего мерить.");
+
+            var decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                Assert.IsTrue(decoded.LoadImage(System.IO.File.ReadAllBytes(path)),
+                    "PNG луны не читается — " + path);
+
+                Color32[] pixels = decoded.GetPixels32();
+                int w = decoded.width;
+                int h = decoded.height;
+
+                // The worst pixel of the border, and the colour it would be composited with.
+                Color32 worst = new Color32(0, 0, 0, 0);
+                for (int x = 0; x < w; x++)
+                {
+                    worst = Louder(worst, pixels[x]);
+                    worst = Louder(worst, pixels[(h - 1) * w + x]);
+                }
+
+                for (int y = 0; y < h; y++)
+                {
+                    worst = Louder(worst, pixels[y * w]);
+                    worst = Louder(worst, pixels[y * w + w - 1]);
+                }
+
+                float step = SrgbStepOver(NightSkyUnderTheMoon, worst);
+                Assert.LessOrEqual(step, MaxInvisibleStep,
+                    "Кромка холста луны поднимает ночное небо на " + step.ToString("0.0") +
+                    " из 255 при пороге " + MaxInvisibleStep + " (альфа на границе " + worst.a +
+                    "/255) — это и есть «квадрат вокруг луны»: сияние снова обрезано холстом.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(decoded);
+            }
+
+            // …and the workaround has not grown back. The field is gone from ArtDetail, and this is the
+            // line that says so out loud rather than letting a re-added `EdgeFadeUv` quietly compile:
+            // a fade on the other thirty-one details would eat their own ink, because they are trimmed
+            // to their alpha boxes and their drawings DO reach the border.
+            Assert.IsNull(typeof(ArtDetail).GetField("EdgeFadeUv"),
+                "Поле EdgeFadeUv вернулось в ArtDetail. Костыль снят 2026-09-25 вместе с ассетом, " +
+                "который его требовал; чинить кромку надо в PNG, а не в шейдере.");
+        }
+
+        /// <summary>The louder of two border pixels — the one that would show most over a dark plate.</summary>
+        private static Color32 Louder(Color32 a, Color32 b) => b.a > a.a ? b : a;
+
+        /// <summary>
+        /// The darkest place on level 5's plate under the moon's rectangle, sRGB — measured off
+        /// `L5/background.png` (the sky there runs (17, 20, 43)…(34, 32, 57)).
+        /// </summary>
+        private static readonly Color32 NightSkyUnderTheMoon = new Color32(17, 20, 43, 255);
+
+        /// <summary>
+        /// How far a straight edge may move an sRGB channel before a person finds it, 0…255.
+        ///
+        /// One level. The step the founder reported measured twelve; the number here is «no step»
+        /// rather than «a smaller step», because the whole point of fixing the asset instead of fading
+        /// it in the shader was to stop arguing about how faint a hard edge has to be.
+        /// </summary>
+        private const float MaxInvisibleStep = 1f;
+
+        /// <summary>
+        /// How much one sRGB channel moves when <paramref name="over"/> is composited on
+        /// <paramref name="under"/> — in LINEAR space, the way this project renders
+        /// (<c>m_ActiveColorSpace: 1</c>). The whole defect was that a step invisible in gamma is not.
+        /// </summary>
+        private static float SrgbStepOver(Color32 under, Color32 over)
+        {
+            float alpha = over.a / 255f;
+            float worst = 0f;
+            for (int channel = 0; channel < 3; channel++)
+            {
+                float plate = channel == 0 ? under.r : channel == 1 ? under.g : under.b;
+                float ink = channel == 0 ? over.r : channel == 1 ? over.g : over.b;
+                float mixed = Mathf.LinearToGammaSpace(
+                    Mathf.GammaToLinearSpace(plate / 255f) * (1f - alpha) +
+                    Mathf.GammaToLinearSpace(ink / 255f) * alpha) * 255f;
+                worst = Mathf.Max(worst, Mathf.Abs(mixed - plate));
+            }
+
+            return worst;
+        }
+
+        // ---- прятки: «проявление при захвате» (контракт 2026-09-25) ----------------------------------
+
+        /// <summary>
+        /// The three hideaways of this drop, and nothing else pretending to be one.
+        ///
+        /// A hideaway is a detail with a second picture — the shark behind its fin, the goose behind its
+        /// head, the woman behind the city's curtain (<see cref="ArtDetail.IsHideaway"/>). The registry
+        /// is named here rather than counted, for the same reason the icon crops are: it is three
+        /// decisions the founder made about three drawings, and a fourth appearing silently would be a
+        /// mechanic nobody asked for.
+        ///
+        /// What is checked beyond the list is the arithmetic that keeps the reveal from being a jump:
+        /// the captured picture has to be BIGGER than the fragment (otherwise there is nothing to
+        /// reveal) and it has to contain the fragment's own rectangle (otherwise the fin moves out from
+        /// under the player's aim at the moment they start pulling).
+        /// </summary>
+        [Test]
+        public void TheHideaways_AreTheThreeTheDropNames_AndTheirRevealDoesNotJump()
+        {
+            var found = new List<string>();
+
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            foreach (ArtDetail detail in level.Details)
+            {
+                if (!detail.IsHideaway) continue;
+                found.Add(detail.Sprite);
+
+                string what = "У" + level.Number + " «" + detail.Name + "»: ";
+
+                if (!string.IsNullOrEmpty(detail.CaptureSprite))
+                {
+                    Assert.IsNotNull(Resources.Load<Sprite>(LevelCatalog.ArtRoot + detail.CaptureSprite),
+                        what + "нет спрайта захвата «" + detail.CaptureSprite + "».");
+
+                    Rect capture = LevelCatalog.CaptureRectOf(detail);
+                    Rect rest = LevelCatalog.RectOf(detail);
+
+                    Assert.Greater(capture.width * capture.height, rest.width * rest.height,
+                        what + "полный арт не больше фрагмента — проявлять нечего.");
+                    Assert.IsTrue(capture.Contains(new Vector2(rest.xMin, rest.yMin)) &&
+                                  capture.Contains(new Vector2(rest.xMax, rest.yMax)),
+                        what + "прямоугольник захвата " + capture + " не накрывает покой " + rest +
+                        " — при захвате фрагмент прыгнет из-под прицела.");
+
+                    // A captured picture may hang off an edge (the goose's body does, deliberately —
+                    // «тело за пределами экрана»), but it may not be somewhere else entirely.
+                    Assert.IsTrue(capture.Overlaps(new Rect(0f, 0f, DesignStage.DesignWidth,
+                            DesignStage.DesignHeight)),
+                        what + "полный арт целиком за кадром.");
+                }
+
+                if (string.IsNullOrEmpty(detail.BehindSprite)) continue;
+
+                Assert.IsNotNull(Resources.Load<Sprite>(LevelCatalog.ArtRoot + detail.BehindSprite),
+                    what + "нет спрайта под деталью «" + detail.BehindSprite + "».");
+
+                Rect behind = LevelCatalog.BehindRectOf(detail);
+                Assert.Greater(behind.width, 20f, what + "то, что под деталью, уже 20 px.");
+                Assert.Greater(behind.height, 20f, what + "то, что под деталью, ниже 20 px.");
+                Assert.IsTrue(behind.Overlaps(LevelCatalog.RectOf(detail)),
+                    what + "то, что «под шторкой», лежит не под ней: " + behind + " против " +
+                    LevelCatalog.RectOf(detail) + ".");
+            }
+
+            CollectionAssert.AreEquivalent(
+                new[] { "L1/objects/shark-fin", "L3/objects/goose", "L5/objects/curtains" }, found,
+                "Прятки — решение по каждой детали отдельно (founder, 2026-09-25); список изменился молча.");
+        }
+
+        /// <summary>
+        /// A hideaway's HAUL shows what it turned out to be, and its resting geometry is untouched.
+        ///
+        /// Both halves are easy to lose. The icon is the reward beat's only subject, and a fin arriving
+        /// in the bucket after the player has just watched a shark go in is the riddle asked twice. The
+        /// resting geometry is what the aim, the ring, the thread and the teaching plates all read, and
+        /// «the detail got bigger» must not quietly mean «the detail is now 292 px wide for everything
+        /// that measures it».
+        /// </summary>
+        [Test]
+        public void AHideawaysIcon_IsTheWholeThing_AndItsRestingRectangleIsNot()
+        {
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            foreach (ArtDetail detail in level.Details)
+            {
+                string what = "У" + level.Number + " «" + detail.Name + "»: ";
+
+                if (string.IsNullOrEmpty(detail.CaptureSprite))
+                {
+                    // The two ribbons are the exception the icon crop exists for and have their own
+                    // test; everything else is its own sprite, whole.
+                    if (!detail.HasIconCrop)
+                        Assert.AreSame(ArtLibrary.Get(detail.Sprite), ArtLibrary.IconOf(detail),
+                            what + "иконка обычной детали — не её собственный спрайт.");
+                    continue;
+                }
+
+                Assert.IsFalse(detail.HasIconCrop,
+                    what + "у прятки есть и кроп иконки, и полный арт — это два разных ответа на " +
+                    "один вопрос «что кладём в сосуд».");
+
+                Assert.AreSame(ArtLibrary.Get(detail.CaptureSprite), ArtLibrary.IconOf(detail),
+                    what + "в сосуд кладётся фрагмент, а игрок только что втащил туда целое.");
+                Assert.AreEqual(detail.CaptureSize, LevelCatalog.IconSizeOf(detail),
+                    what + "потолок ячейки добычи снят с фрагмента, а не с того, что в неё легло.");
+
+                // …and the catalogue's own numbers are still the fragment's.
+                Assert.AreEqual(detail.Size, LevelCatalog.DrawnSizeOf(detail, false),
+                    what + "покой перестал быть покоем.");
+                Assert.AreEqual(detail.Sprite, LevelCatalog.DrawnSpriteOf(detail, false),
+                    what + "в покое рисуется не фрагмент.");
+            }
+        }
+
+        /// <summary>
+        /// «Захват» is progress on the thread, not the crank flag — and a slip takes it back.
+        ///
+        /// The rule the contract states is «замечена и реально тянется… обратно — если бросили», and the
+        /// tempting reading of «тянется» is <c>CrankCollector.IsSpinning</c>. It is the wrong one: that
+        /// flag drops on every frame the player's hand crosses over on the dynamo, so a shark keyed to
+        /// it flickers back into a fin twice a second while it is visibly travelling. This holds the
+        /// reading that shipped (<see cref="LevelView.IsCaptured"/>), which is the same sentence read as
+        /// a statement about the thread.
+        /// </summary>
+        [Test]
+        public void TheCapture_FollowsTheThread_NotTheHandle()
+        {
+            Assert.IsFalse(LevelView.IsCaptured(0f, true, false),
+                "Деталь замечена, но не сдвинулась — это ещё покой.");
+            Assert.IsFalse(LevelView.IsCaptured(0.5f, false, false),
+                "Деталь не замечена — показывать нечего.");
+            Assert.IsTrue(LevelView.IsCaptured(0.02f, true, false),
+                "Нить натянута, а прятка не раскрылась.");
+            Assert.IsTrue(LevelView.IsCaptured(0.99f, true, false),
+                "У самого сосуда прятка обязана быть раскрытой.");
+            Assert.IsFalse(LevelView.IsCaptured(0.6f, true, true),
+                "Бросили — прятка обязана закрыться, даже пока летит домой.");
+        }
+
+        /// <summary>
+        /// «Где сейчас деталь» has ONE answer, and it is the drawing that is on the frame
+        /// (<see cref="LevelCatalog.DrawnRectAt"/>).
+        ///
+        /// A hideaway has three plausible rectangles — the catalogue's, the fragment's, and the animal's,
+        /// which stands half a body to the side of both — and every consumer that picks a different one
+        /// produces the same class of bug: the game draws a shark and the logic reasons about a fin. Two
+        /// consumers were caught doing exactly that on 2026-09-25 (the beat's obstacle track and the
+        /// ring's «скрыта мыслью»), so the seam is held here rather than at each of them.
+        /// </summary>
+        [Test]
+        public void TheDrawnRectangle_IsTheFragmentAtRest_AndTheWholeAnimalWithItsOffsetInTheHaul()
+        {
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            foreach (ArtDetail detail in level.Details)
+            {
+                string what = "У" + level.Number + " «" + detail.Name + "»: ";
+
+                Rect rest = LevelCatalog.DrawnRectAt(detail, detail.Home, false);
+                AssertSameRect(LevelCatalog.RectOf(detail), rest,
+                    what + "покой перестал быть прямоугольником каталога.");
+
+                Rect hauled = LevelCatalog.DrawnRectAt(detail, detail.Home, true);
+                Rect span = LevelCatalog.DrawnRectSpanAt(detail, detail.Home);
+
+                if (string.IsNullOrEmpty(detail.CaptureSprite))
+                {
+                    // Обычная деталь — без изменений: у неё один рисунок, и захват его не меняет.
+                    AssertSameRect(rest, hauled, what + "у обычной детали появился второй габарит.");
+                    AssertSameRect(rest, span, what + "у обычной детали разъехались покой и охват.");
+                    continue;
+                }
+
+                AssertSameRect(LevelCatalog.CaptureRectOf(detail), hauled,
+                    what + "в захвате рисуется не полный арт со своим офсетом.");
+                Assert.AreEqual(detail.CaptureSize.x, hauled.width, 0.001f,
+                    what + "ширина в захвате — не CaptureSize.");
+                Assert.AreEqual(detail.CaptureSize.y, hauled.height, 0.001f,
+                    what + "высота в захвате — не CaptureSize.");
+                Assert.AreEqual(detail.Home + detail.CaptureOffset, hauled.center,
+                    what + "полный арт встал не по CaptureOffset.");
+
+                Assert.IsTrue(span.xMin <= rest.xMin + 0.001f && span.yMin <= rest.yMin + 0.001f &&
+                              span.xMax >= rest.xMax - 0.001f && span.yMax >= rest.yMax - 0.001f,
+                    what + "охват " + span + " не накрывает покой " + rest + ".");
+                Assert.IsTrue(span.xMin <= hauled.xMin + 0.001f && span.yMin <= hauled.yMin + 0.001f &&
+                              span.xMax >= hauled.xMax - 0.001f && span.yMax >= hauled.yMax - 0.001f,
+                    what + "охват " + span + " не накрывает захват " + hauled + ".");
+
+                // …и то же самое в пути: прямоугольник едет вместе с деталью, офсет не «прилипает» к дому.
+                Vector2 midway = Vector2.Lerp(detail.Home, level.VesselCentre, 0.37f);
+                Rect moved = LevelCatalog.DrawnRectAt(detail, midway, true);
+                Assert.AreEqual(midway - detail.Home, moved.center - hauled.center,
+                    what + "полный арт не поехал вместе с деталью.");
+
+                // Это и есть блокер 2 в чистой арифметике: мысль, накрывшая фрагмент целиком, не
+                // накрывает то, чем деталь оказалась — то есть два прямоугольника дают РАЗНЫЙ ответ на
+                // вопрос «деталь скрыта мыслью?», и спрашивать его про покой раскрытой прятки нельзя.
+                Rect blob = HintPlacement.Centred(detail.Home, Thought.SizeOf(ThoughtStrength.Medium));
+                Assert.IsTrue(Covers(blob, rest),
+                    what + "средняя мысль не накрывает фрагмент — премисса блокера 2 не воспроизводится.");
+                Assert.IsFalse(Covers(blob, hauled),
+                    what + "средняя мысль накрыла и полный арт — блокер 2 нечем показать.");
+            }
+        }
+
+        /// <summary>Does <paramref name="over"/> cover <paramref name="what"/> whole?</summary>
+        private static bool Covers(Rect over, Rect what) =>
+            over.xMin <= what.xMin && over.yMin <= what.yMin &&
+            over.xMax >= what.xMax && over.yMax >= what.yMax;
+
+        private static void AssertSameRect(Rect expected, Rect actual, string message)
+        {
+            Assert.AreEqual(expected.xMin, actual.xMin, 0.001f, message + " (x)");
+            Assert.AreEqual(expected.yMin, actual.yMin, 0.001f, message + " (y)");
+            Assert.AreEqual(expected.width, actual.width, 0.001f, message + " (ширина)");
+            Assert.AreEqual(expected.height, actual.height, 0.001f, message + " (высота)");
+        }
+
+        /// <summary>
+        /// The сбор beat's obstacle is everything the travelling detail will be — including the body a
+        /// hideaway grows on the way (блокер 1, ревизия Codex 2026-09-25).
+        ///
+        /// <c>LevelScreen.AddDetailTrack</c> laid its chain out for <c>spec.Size</c>, i.e. for the 196×63
+        /// fin, and the plate was placed clear of THAT. Two frames into the haul the fin is a 292×180
+        /// shark standing 58 px lower, and the plate — placed once for the length of the beat and never
+        /// moved — has no idea. The chain is now the union of both drawings
+        /// (<see cref="LevelCatalog.DrawnRectSpanAt"/>).
+        ///
+        /// Held on the CHAIN and not only on where the plate ended up, because «где оказалась плашка» is
+        /// a fact about today's five compositions: on level 1 the сбор sentence happens to land far
+        /// enough from the water that the old arithmetic got away with it, and a guard that only watches
+        /// the outcome would have stayed green through the whole bug and gone red the first time somebody
+        /// moved the bucket. What is wrong is the obstacle, so the obstacle is what is measured — and the
+        /// placement claim is kept underneath it as the end-to-end half.
+        /// </summary>
+        [Test]
+        public void TheSborBeatsObstacle_IsTheWholeAnimal_NotTheFragmentItRestsAs()
+        {
+            var track = new List<Rect>();
+            var blocked = new List<Rect>();
+
+            foreach (LevelDefinition level in LevelCatalog.Levels)
+            {
+                Rect[] standing = LevelCatalog.HintObstaclesOf(level);
+
+                for (int i = 0; i < level.DetailCount; i++)
+                {
+                    ArtDetail spec = level.Details[i];
+                    Vector2 about = LevelCatalog.AnchorOf(spec);
+                    string what = level.Title + " · «" + spec.Name + "»: ";
+
+                    track.Clear();
+                    LevelScreen.AddDetailTrack(track, spec, about, level.VesselCentre);
+                    Assert.Greater(track.Count, 1, what + "цепочка препятствия пуста.");
+
+                    // 1. Every link is big enough for the drawing the detail can be showing under it.
+                    Rect widest = ByHand(spec, Vector2.zero, true);
+                    Rect resting = ByHand(spec, Vector2.zero, false);
+                    float wide = Mathf.Max(widest.width, resting.width);
+                    float tall = Mathf.Max(widest.height, resting.height);
+
+                    for (int k = 0; k < track.Count; k++)
+                    {
+                        Assert.GreaterOrEqual(track[k].width, wide,
+                            what + "звено цепочки " + track[k] + " уже, чем деталь бывает (" +
+                            wide.ToString("0") + " px) — плашку поставят рядом с фрагментом, а ляжет " +
+                            "она на то, чем деталь окажется (блокер 1).");
+                        Assert.GreaterOrEqual(track[k].height, tall,
+                            what + "звено цепочки " + track[k] + " ниже, чем деталь бывает (" +
+                            tall.ToString("0") + " px) — блокер 1.");
+                    }
+
+                    // 2. …and the two ends of the run are covered by the links that stand there: the
+                    // detail at home and the detail arriving at the vessel, in BOTH of its skins.
+                    AssertLinkCovers(track[0], spec, spec.Home, what + "в начале пути ");
+                    AssertLinkCovers(track[track.Count - 1], spec, level.VesselCentre,
+                        what + "у самого сосуда ");
+
+                    // 3. The end-to-end half: the plate the beat actually places touches neither picture
+                    // at any point of the travel.
+                    blocked.Clear();
+                    blocked.AddRange(standing);
+                    blocked.AddRange(track);
+
+                    Vector2 size = HintPlate.SizeFor(GameTexts.BeatCollect);
+                    Rect plate = HintPlacement.Centred(
+                        HintPlacement.Beside(size, about, blocked), size);
+
+                    Assert.IsTrue(HintPlacement.InsideFrame(plate),
+                        what + "плашка сбора вылезла за кадр: " + plate);
+
+                    for (int s = 0; s <= TrackProbes; s++)
+                    {
+                        float share = s / (float)TrackProbes;
+                        Vector2 at = Vector2.Lerp(spec.Home, level.VesselCentre, share);
+
+                        Assert.IsFalse(plate.Overlaps(ByHand(spec, at, false)),
+                            what + "плашка сбора " + plate + " легла на деталь в покое " +
+                            ByHand(spec, at, false) + " на доле пути " + share.ToString("0.00") + ".");
+
+                        Assert.IsFalse(plate.Overlaps(ByHand(spec, at, true)),
+                            what + "плашка сбора " + plate + " легла на проявившуюся деталь " +
+                            ByHand(spec, at, true) + " на доле пути " + share.ToString("0.00") +
+                            " (блокер 1, ревизия Codex 2026-09-25).");
+                    }
+                }
+            }
+        }
+
+        /// <summary>One link of the chain has to cover both skins of the detail standing at that point.</summary>
+        private static void AssertLinkCovers(Rect link, ArtDetail spec, Vector2 at, string what)
+        {
+            Assert.IsTrue(Covers(link, ByHand(spec, at, false)),
+                what + "звено " + link + " не накрывает деталь в покое " + ByHand(spec, at, false) + ".");
+            Assert.IsTrue(Covers(link, ByHand(spec, at, true)),
+                what + "звено " + link + " не накрывает проявившуюся деталь " + ByHand(spec, at, true) +
+                " (блокер 1, ревизия Codex 2026-09-25).");
+        }
+
+        /// <summary>How finely the travel is re-walked when the placed plate is checked against it.</summary>
+        private const int TrackProbes = 96;
+
+        /// <summary>
+        /// The detail's rectangle spelled out from the catalogue's raw numbers, on purpose.
+        ///
+        /// The guard above must not be able to agree with the bug: if it asked
+        /// <see cref="LevelCatalog.DrawnRectAt"/> what the detail's rectangle is, then a seam reverted to
+        /// <c>spec.Size</c> would move the obstacle and the probe together and the test would stay green
+        /// on a plate lying across a shark. So the probe re-states the arithmetic instead of calling it.
+        /// </summary>
+        private static Rect ByHand(ArtDetail spec, Vector2 at, bool captured)
+        {
+            bool whole = captured && !string.IsNullOrEmpty(spec.CaptureSprite);
+            Vector2 centre = whole ? at + spec.CaptureOffset : at;
+            Vector2 size = whole ? spec.CaptureSize : spec.Size;
+            return new Rect(centre.x - size.x * 0.5f, centre.y - size.y * 0.5f, size.x, size.y);
         }
 
         // ---- MECHANICS §6, the progression ---------------------------------------------------------

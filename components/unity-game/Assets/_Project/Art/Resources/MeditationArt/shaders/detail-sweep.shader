@@ -23,7 +23,6 @@ Shader "Meditation/DetailSweep"
         _SweepWidthU ("Sweep width (UV)", Float) = 0.5
         _SweepStrength ("Sweep strength", Range(0,1)) = 0
         _SweepSlant ("Sweep slant (UV)", Float) = 0.25
-        _EdgeFadeUV ("Edge fade (UV, 0 = off)", Float) = 0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -100,7 +99,6 @@ Shader "Meditation/DetailSweep"
             float _SweepWidthU;
             float _SweepStrength;
             float _SweepSlant;
-            float _EdgeFadeUV;
 
             v2f vert(appdata_t v)
             {
@@ -143,22 +141,17 @@ Shader "Meditation/DetailSweep"
                 // asks for «маска по их альфе» — one mask, not two.
                 color.rgb += _SweepStrength * band;
 
-                // …and the one thing this shader does that has nothing to do with the light band: fade
-                // the sprite's own alpha to zero over the outermost _EdgeFadeUV of its UV, on the
-                // details that ask for it (ArtDetail.EdgeFadeUv — exactly one, the moon of level 5).
+                // An `_EdgeFadeUV` block stood here until 2026-09-25 and did the one thing in this
+                // shader that had nothing to do with the light band: it faded a sprite's own alpha to
+                // zero over the outermost fraction of its UV, for the moon of level 5 and nothing else.
+                // The moon's old PNG was a disc inside a radial glow still worth alpha 5/255 where its
+                // canvas ended, and over a night sky that composited — in LINEAR space — into the hard
+                // box the founder called «квадрат вокруг луны» (плейтест 2026-09-22).
                 //
-                // Its PNG is a disc inside a radial glow that is still at alpha 5/255 when the canvas
-                // ends, and five units of alpha over a night sky composites in LINEAR space to a
-                // fifteen-unit step — a hard 188×188 box around the moon, which is what the founder
-                // saw and called «квадрат вокруг луны». The asset is the real fix (Катя's brief);
-                // this removes the step meanwhile. Per detail and never a rule: most sprites here are
-                // trimmed to their own alpha box, so their ink reaches the border by construction.
-                if (_EdgeFadeUV > 0.0001)
-                {
-                    float2 toEdge = min(IN.texcoord, 1.0 - IN.texcoord);
-                    float near = min(toEdge.x, toEdge.y);
-                    color.a *= smoothstep(0.0, _EdgeFadeUV, near);
-                }
+                // Катя's re-export of 2026-09-25 is the fix the comment here promised: the same disc on
+                // a wider canvas, with the glow reaching the border at alpha 2, and the last two units
+                // taken off on the way into Resources. The border is a true zero, so there is nothing
+                // to fade and no sprite in the game asks for this any more.
 
                 #ifdef UNITY_UI_CLIP_RECT
                 color.a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect);
